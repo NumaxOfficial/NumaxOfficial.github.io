@@ -5,99 +5,152 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Numax — Master Profile</title>
 <style>
-  :root { --bg:#0f1216; --card:#181d24; --line:#2a323d; --fg:#e7ecf2; --mut:#93a1b3; --acc:#4c9ffe; --warn:#e0b341; --bad:#e06a5a; --good:#57c97d; }
-  * { box-sizing: border-box; }
-  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
-  .wrap { max-width:860px; margin:0 auto; padding:24px 18px 80px; }
-  h1 { font-size:20px; margin:0 0 4px; }
-  .sub { color:var(--mut); margin:0 0 24px; font-size:13px; }
-  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
-  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:0 0 12px; }
-  label { display:block; font-size:13px; color:var(--mut); margin:8px 0 4px; }
-  input, select { width:100%; background:#0f141a; border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:9px 10px; font:inherit; }
-  .row { display:flex; gap:10px; flex-wrap:wrap; }
-  .row > * { flex:1; min-width:140px; }
-  button { background:var(--acc); color:#04121f; border:0; border-radius:8px; padding:10px 14px; font:inherit; font-weight:600; cursor:pointer; }
-  button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); font-weight:500; }
-  button:disabled { opacity:.45; cursor:not-allowed; }
-  .acct, .target { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
-  .acct:first-child, .target:first-child { border-top:0; }
-  .pill { font-size:11px; color:var(--mut); border:1px solid var(--line); border-radius:999px; padding:1px 8px; }
-  .cats { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; }
-  .cat { display:flex; align-items:center; gap:8px; }
-  .cat select { width:auto; padding:4px 8px; font-size:12px; }
-  .status { font-size:13px; margin-top:8px; min-height:18px; }
-  .status.err { color:var(--bad); } .status.ok { color:var(--good); }
-  .report { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-top:10px; }
-  .report h3 { margin:0 0 6px; font-size:14px; }
-  .chg { font-size:13px; margin:2px 0; }
-  .chg .add { color:var(--good); } .chg .rem { color:var(--bad); } .chg .kep { color:var(--mut); } .chg .upd { color:var(--acc); }
-  .warnbox { border:1px solid var(--warn); background:rgba(224,179,65,.08); border-radius:8px; padding:10px 12px; margin-top:12px; font-size:13px; }
-  .muted { color:var(--mut); font-size:12px; }
-  code { background:#0f141a; padding:1px 5px; border-radius:4px; font-size:12px; }
-  details summary { cursor:pointer; color:var(--mut); font-size:12px; }
+  :root{
+    --bg:#0a0c10; --bg2:#0e1117; --card:#12161d; --card2:#161b23; --line:#222933;
+    --fg:#e9eef5; --mut:#8996a8; --dim:#5f6b7a;
+    --acc:#4c8dff; --acc-ink:#04101f; --good:#43c977; --bad:#ef6a58; --warn:#e6b24a;
+    --rad:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:radial-gradient(1100px 500px at 50% -8%, #131a26 0%, var(--bg) 60%) no-repeat, var(--bg);
+    color:var(--fg); font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:820px;margin:0 auto;padding:28px 18px 96px}
+
+  .brand{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .logo{font-weight:800;letter-spacing:.04em;font-size:20px}
+  .logo .tri{color:var(--acc)}
+  .tag{font-size:13px;color:var(--mut);margin:0 0 26px}
+  h1{font-size:22px;font-weight:700;margin:0}
+
+  section{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);
+    border-radius:var(--rad);padding:18px 20px;margin-bottom:16px;box-shadow:0 1px 0 rgba(255,255,255,.02) inset}
+  .sec-h{display:flex;align-items:center;gap:10px;margin:0 0 14px}
+  .sec-h h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--mut);margin:0;font-weight:700}
+  .sec-h .tick{width:6px;height:14px;border-radius:2px;background:var(--acc);opacity:.9}
+  .sec-h .spacer{flex:1}
+  .count-pill{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:2px 9px}
+
+  label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+  input,select{width:100%;background:var(--bg2);border:1px solid var(--line);color:var(--fg);
+    border-radius:9px;padding:10px 11px;font:inherit;outline:none;transition:border-color .12s,box-shadow .12s}
+  input:focus,select:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(76,141,255,.18)}
+  input::placeholder{color:var(--dim)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .row>*{flex:1;min-width:150px}
+  button{background:var(--acc);color:var(--acc-ink);border:0;border-radius:9px;padding:11px 16px;
+    font:inherit;font-weight:650;cursor:pointer;transition:filter .12s,opacity .12s}
+  button:hover{filter:brightness(1.06)}
+  button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line);font-weight:550}
+  button.ghost:hover{border-color:var(--acc);color:#fff}
+  button:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  button.sm{padding:7px 11px;font-size:13px}
+
+  .acct{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
+  .acct:first-child{border-top:0}
+  .acct .em{flex:1;font-weight:550}
+  .idpill{font-size:11px;color:var(--dim);font-family:ui-monospace,Menlo,monospace}
+  .status{font-size:13px;margin-top:10px;min-height:18px;color:var(--mut)}
+  .status.err{color:var(--bad)} .status.ok{color:var(--good)}
+  details.adv{margin-top:12px} details.adv summary{cursor:pointer;color:var(--mut);font-size:12px}
+
+  .contents{margin-top:14px;display:grid;gap:8px}
+  .cbox{border:1px solid var(--line);border-radius:11px;background:var(--bg2);overflow:hidden}
+  .cbox>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:10px 13px;font-size:13px;font-weight:600}
+  .cbox>summary::-webkit-details-marker{display:none}
+  .cbox>summary .chev{color:var(--dim);transition:transform .15s}
+  .cbox[open]>summary .chev{transform:rotate(90deg)}
+  .cbox .chip{margin-left:auto;font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+  .items{padding:4px 13px 12px;display:flex;flex-direction:column;gap:5px}
+  .item{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg);min-width:0}
+  .item .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .sub{color:var(--dim);font-size:11px;font-family:ui-monospace,Menlo,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:auto;max-width:45%}
+  .item .dot{width:6px;height:6px;border-radius:50%;background:var(--good);flex:0 0 auto}
+  .item .dot.off{background:var(--dim)}
+  .empty{color:var(--dim);font-size:12px;padding:2px 0}
+  .held{color:var(--warn);font-size:12px;padding:2px 13px 10px}
+
+  .ctl{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--line)}
+  .ctl:first-of-type{border-top:0}
+  .ctl input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;accent-color:var(--acc)}
+  .ctl .nm{font-weight:600}
+  .ctl .chip{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+  .ctl .sp{flex:1}
+  .ctl select{width:auto;padding:6px 9px;font-size:13px}
+  .hint{color:var(--mut);font-size:12px;margin-top:12px}
+  .opt{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13px;color:var(--fg)}
+  .opt input{width:17px;height:17px;accent-color:var(--acc)}
+
+  .tgroup .ghead{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 2px}
+  .target{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+  .target input{width:17px;height:17px;accent-color:var(--acc)}
+  .target .nm{flex:1;font-weight:550}
+  .target .chip{font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+
+  .report{border:1px solid var(--line);border-radius:11px;padding:13px 15px;margin-top:11px;background:var(--bg2)}
+  .report h3{margin:0 0 7px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .report h3 .nochg{font-size:11px;color:var(--dim);font-weight:500}
+  .chg{font-size:13px;margin:3px 0}
+  .chg .add{color:var(--good)} .chg .rem{color:var(--bad)} .chg .upd{color:var(--acc)} .chg .kep{color:var(--mut)}
+  .warnbox{border:1px solid var(--warn);background:rgba(230,178,74,.08);border-radius:10px;padding:11px 13px;margin-top:14px;font-size:13px}
+  .actions{display:flex;gap:12px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Numax — Master Profile</h1>
-  <p class="sub">On-device. Your logins never leave this browser. Nothing is written until you Preview, then Apply.</p>
+  <div class="brand"><span class="logo">NUM<span class="tri">&#9656;</span>X</span><span style="color:var(--dim)">&middot;</span><h1>Master Profile</h1></div>
+  <p class="tag">On-device. Your logins never leave this browser. Nothing is written until you Preview, then Apply.</p>
 
   <section>
-    <h2>Linked accounts</h2>
-    <div id="accounts"><p class="muted">No accounts linked yet.</p></div>
-    <div class="row" style="margin-top:12px">
+    <div class="sec-h"><span class="tick"></span><h2>Linked accounts</h2><span class="spacer"></span><span class="count-pill" id="acct-count">0</span></div>
+    <div id="accounts"><p class="empty">No accounts linked yet.</p></div>
+    <div class="row" style="margin-top:14px">
       <input id="link-email" type="email" placeholder="Nuvio email" autocomplete="off" />
       <input id="link-password" type="password" placeholder="Password" autocomplete="off" />
-    </div>
-    <div class="row" style="margin-top:8px">
-      <button id="btn-link">Link account</button>
+      <button id="btn-link" style="flex:0 0 auto">Link account</button>
     </div>
     <div id="link-status" class="status"></div>
-    <details style="margin-top:8px">
+    <details class="adv">
       <summary>Advanced: link by pasting a session token instead</summary>
-      <label for="paste-json">Paste the JSON from <code>localStorage["nuvio.supabase.session"]</code></label>
-      <input id="paste-json" type="text" placeholder='{"access_token":"...","refresh_token":"...","expires_at":...}' />
-      <div class="row" style="margin-top:8px"><button id="btn-link-paste" class="ghost">Link from token</button></div>
+      <label for="paste-json" style="margin-top:8px">Paste the JSON from <code>localStorage["nuvio.supabase.session"]</code></label>
+      <div class="row"><input id="paste-json" type="text" placeholder='{"access_token":"...","refresh_token":"..."}' />
+        <button id="btn-link-paste" class="ghost sm" style="flex:0 0 auto">Link</button></div>
     </details>
   </section>
 
   <section>
-    <h2>Master profile</h2>
+    <div class="sec-h"><span class="tick"></span><h2>Master profile</h2></div>
     <div class="row">
       <div><label for="master-account">Account</label><select id="master-account"></select></div>
       <div><label for="master-profile">Profile</label><select id="master-profile"></select></div>
     </div>
+    <div class="contents" id="master-contents"></div>
   </section>
 
   <section>
-    <h2>What the master controls</h2>
-    <div class="cats">
-      <div class="cat"><input type="checkbox" id="cat-addons" checked /><label for="cat-addons" style="margin:0">Addons</label>
-        <select id="mode-addons"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-      <div class="cat"><input type="checkbox" id="cat-plugins" checked /><label for="cat-plugins" style="margin:0">Plugins</label>
-        <select id="mode-plugins"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-      <div class="cat"><input type="checkbox" id="cat-collections" /><label for="cat-collections" style="margin:0">Collections</label>
-        <select id="mode-collections"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-      <div class="cat"><input type="checkbox" id="cat-settings" checked /><label for="cat-settings" style="margin:0">Settings</label></div>
-    </div>
-    <label style="margin-top:12px"><input type="checkbox" id="settings-personal" /> Also copy personal prefs (audio/subtitle languages)</label>
-    <p class="muted"><b>merge</b> adds/updates, never deletes. <b>mirror</b> makes the target match the master exactly (removals shown before apply). Secrets and account logins are never copied.</p>
+    <div class="sec-h"><span class="tick"></span><h2>What the master controls</h2></div>
+    <div class="ctl"><input type="checkbox" id="cat-addons" checked /><span class="nm">Addons</span><span class="chip" id="cnt-addons">&mdash;</span><span class="sp"></span><select id="mode-addons"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+    <div class="ctl"><input type="checkbox" id="cat-plugins" checked /><span class="nm">Plugins</span><span class="chip" id="cnt-plugins">&mdash;</span><span class="sp"></span><select id="mode-plugins"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+    <div class="ctl"><input type="checkbox" id="cat-collections" /><span class="nm">Collections</span><span class="chip" id="cnt-collections">&mdash;</span><span class="sp"></span><select id="mode-collections"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+    <div class="ctl"><input type="checkbox" id="cat-settings" checked /><span class="nm">Settings</span><span class="chip" id="cnt-settings">&mdash;</span><span class="sp"></span></div>
+    <label class="opt"><input type="checkbox" id="settings-personal" /> Also copy personal prefs (audio / subtitle languages)</label>
+    <p class="hint"><b style="color:var(--fg)">merge</b> adds &amp; updates, never deletes. <b style="color:var(--fg)">mirror</b> makes the target match the master exactly (removals are shown before apply). Secrets and account logins are never copied.</p>
   </section>
 
   <section>
-    <h2>Apply to these profiles</h2>
-    <div id="targets"><p class="muted">Link an account and pick a master first.</p></div>
+    <div class="sec-h"><span class="tick"></span><h2>Apply to these profiles</h2></div>
+    <div id="targets"><p class="empty">Link an account and pick a master first.</p></div>
   </section>
 
   <section>
-    <div class="row">
+    <div class="actions">
       <button id="btn-preview">Preview (no changes)</button>
       <button id="btn-apply" class="ghost" disabled>Apply</button>
     </div>
     <div id="global-status" class="status"></div>
     <div id="confirm-wrap" class="warnbox" style="display:none">
-      <label style="margin:0"><input type="checkbox" id="confirm-removals" /> I understand items will be <b>removed</b> from the profiles above (mirror mode).</label>
+      <label class="opt" style="margin:0"><input type="checkbox" id="confirm-removals" /> I understand items will be <b>removed</b> from the profiles above (mirror mode).</label>
     </div>
     <div id="results"></div>
   </section>
