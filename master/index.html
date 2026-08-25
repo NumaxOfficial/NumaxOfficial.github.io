@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Numax — Master Profile</title>
+<style>
+  :root { --bg:#0f1216; --card:#181d24; --line:#2a323d; --fg:#e7ecf2; --mut:#93a1b3; --acc:#4c9ffe; --warn:#e0b341; --bad:#e06a5a; --good:#57c97d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 18px 80px; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 24px; font-size:13px; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px 18px; margin-bottom:16px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); margin:0 0 12px; }
+  label { display:block; font-size:13px; color:var(--mut); margin:8px 0 4px; }
+  input, select { width:100%; background:#0f141a; border:1px solid var(--line); color:var(--fg); border-radius:8px; padding:9px 10px; font:inherit; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:140px; }
+  button { background:var(--acc); color:#04121f; border:0; border-radius:8px; padding:10px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); font-weight:500; }
+  button:disabled { opacity:.45; cursor:not-allowed; }
+  .acct, .target { display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line); }
+  .acct:first-child, .target:first-child { border-top:0; }
+  .pill { font-size:11px; color:var(--mut); border:1px solid var(--line); border-radius:999px; padding:1px 8px; }
+  .cats { display:grid; grid-template-columns:1fr 1fr; gap:10px 18px; }
+  .cat { display:flex; align-items:center; gap:8px; }
+  .cat select { width:auto; padding:4px 8px; font-size:12px; }
+  .status { font-size:13px; margin-top:8px; min-height:18px; }
+  .status.err { color:var(--bad); } .status.ok { color:var(--good); }
+  .report { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-top:10px; }
+  .report h3 { margin:0 0 6px; font-size:14px; }
+  .chg { font-size:13px; margin:2px 0; }
+  .chg .add { color:var(--good); } .chg .rem { color:var(--bad); } .chg .kep { color:var(--mut); } .chg .upd { color:var(--acc); }
+  .warnbox { border:1px solid var(--warn); background:rgba(224,179,65,.08); border-radius:8px; padding:10px 12px; margin-top:12px; font-size:13px; }
+  .muted { color:var(--mut); font-size:12px; }
+  code { background:#0f141a; padding:1px 5px; border-radius:4px; font-size:12px; }
+  details summary { cursor:pointer; color:var(--mut); font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Numax — Master Profile</h1>
+  <p class="sub">On-device. Your logins never leave this browser. Nothing is written until you Preview, then Apply.</p>
+
+  <section>
+    <h2>Linked accounts</h2>
+    <div id="accounts"><p class="muted">No accounts linked yet.</p></div>
+    <div class="row" style="margin-top:12px">
+      <input id="link-email" type="email" placeholder="Nuvio email" autocomplete="off" />
+      <input id="link-password" type="password" placeholder="Password" autocomplete="off" />
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btn-link">Link account</button>
+    </div>
+    <div id="link-status" class="status"></div>
+    <details style="margin-top:8px">
+      <summary>Advanced: link by pasting a session token instead</summary>
+      <label for="paste-json">Paste the JSON from <code>localStorage["nuvio.supabase.session"]</code></label>
+      <input id="paste-json" type="text" placeholder='{"access_token":"...","refresh_token":"...","expires_at":...}' />
+      <div class="row" style="margin-top:8px"><button id="btn-link-paste" class="ghost">Link from token</button></div>
+    </details>
+  </section>
+
+  <section>
+    <h2>Master profile</h2>
+    <div class="row">
+      <div><label for="master-account">Account</label><select id="master-account"></select></div>
+      <div><label for="master-profile">Profile</label><select id="master-profile"></select></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What the master controls</h2>
+    <div class="cats">
+      <div class="cat"><input type="checkbox" id="cat-addons" checked /><label for="cat-addons" style="margin:0">Addons</label>
+        <select id="mode-addons"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+      <div class="cat"><input type="checkbox" id="cat-plugins" checked /><label for="cat-plugins" style="margin:0">Plugins</label>
+        <select id="mode-plugins"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+      <div class="cat"><input type="checkbox" id="cat-collections" /><label for="cat-collections" style="margin:0">Collections</label>
+        <select id="mode-collections"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+      <div class="cat"><input type="checkbox" id="cat-settings" checked /><label for="cat-settings" style="margin:0">Settings</label></div>
+    </div>
+    <label style="margin-top:12px"><input type="checkbox" id="settings-personal" /> Also copy personal prefs (audio/subtitle languages)</label>
+    <p class="muted"><b>merge</b> adds/updates, never deletes. <b>mirror</b> makes the target match the master exactly (removals shown before apply). Secrets and account logins are never copied.</p>
+  </section>
+
+  <section>
+    <h2>Apply to these profiles</h2>
+    <div id="targets"><p class="muted">Link an account and pick a master first.</p></div>
+  </section>
+
+  <section>
+    <div class="row">
+      <button id="btn-preview">Preview (no changes)</button>
+      <button id="btn-apply" class="ghost" disabled>Apply</button>
+    </div>
+    <div id="global-status" class="status"></div>
+    <div id="confirm-wrap" class="warnbox" style="display:none">
+      <label style="margin:0"><input type="checkbox" id="confirm-removals" /> I understand items will be <b>removed</b> from the profiles above (mirror mode).</label>
+    </div>
+    <div id="results"></div>
+  </section>
+</div>
+
+<script src="engine.js"></script>
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
