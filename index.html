@@ -1,1 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy — Numax</title>
+<style>
+  :root {
+    --bg: #0c0e12;
+    --panel: #14171d;
+    --panel-border: #23262e;
+    --text: #e7e9ee;
+    --text-dim: #9aa0ac;
+    --text-faint: #6b7180;
+    --accent: #e0263f;
+    --accent-dim: #7a1522;
+  }
 
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .top {
+    border-bottom: 1px solid var(--panel-border);
+    padding: 20px max(24px, calc(50% - 380px));
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: rgba(12, 14, 18, 0.92);
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+
+  .brand {
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--text);
+  }
+
+  .brand .chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+  }
+
+  .top .meta {
+    font-size: 12px;
+    color: var(--text-faint);
+  }
+
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+  }
+
+  h1 {
+    font-size: 34px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin: 0 0 10px;
+  }
+
+  .updated {
+    color: var(--text-faint);
+    font-size: 14px;
+    margin: 0 0 40px;
+  }
+
+  .lede {
+    font-size: 17px;
+    color: var(--text-dim);
+    border-left: 3px solid var(--accent-dim);
+    padding-left: 18px;
+    margin: 0 0 48px;
+  }
+
+  h2 {
+    font-size: 20px;
+    font-weight: 700;
+    margin: 48px 0 14px;
+    padding-top: 8px;
+    scroll-margin-top: 90px;
+  }
+
+  h2 .num {
+    color: var(--text-faint);
+    font-weight: 600;
+    margin-right: 10px;
+  }
+
+  p { color: var(--text-dim); margin: 0 0 14px; }
+  strong { color: var(--text); font-weight: 600; }
+
+  ul { margin: 0 0 14px; padding-left: 22px; color: var(--text-dim); }
+  li { margin-bottom: 8px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin: 18px 0;
+  }
+
+  .card p:last-child { margin-bottom: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0 8px;
+    font-size: 14px;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--panel-border);
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--text-faint);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  td:first-child {
+    color: var(--text);
+    font-weight: 600;
+    white-space: nowrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+  }
+
+  td { color: var(--text-dim); }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0 0 48px;
+  }
+
+  .toc a {
+    font-size: 12.5px;
+    color: var(--text-dim);
+    text-decoration: none;
+    border: 1px solid var(--panel-border);
+    padding: 6px 12px;
+    border-radius: 999px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .toc a:hover {
+    border-color: var(--accent-dim);
+    color: var(--text);
+  }
+
+  .contact {
+    margin-top: 56px;
+    padding-top: 28px;
+    border-top: 1px solid var(--panel-border);
+    text-align: center;
+  }
+
+  .contact a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .contact a:hover { text-decoration: underline; }
+
+  .foot {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+    margin-top: 28px;
+  }
+
+  @media (max-width: 640px) {
+    h1 { font-size: 27px; }
+    main { padding: 48px 18px 72px; }
+    table, thead, tbody, th, td, tr { display: block; }
+    th { padding-bottom: 0; }
+    td { border-bottom: none; padding: 4px 0; }
+    tr { padding-bottom: 16px; border-bottom: 1px solid var(--panel-border); margin-bottom: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <a href="/" class="brand">NUM<span class="chip">▸</span>X</a>
+  <div class="meta">Privacy Policy</div>
+</div>
+
+<main>
+  <p class="eyebrow">Legal</p>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated August 25, 2026</p>
+
+  <p class="lede">
+    Numax is a browser extension that helps Nuvio users save, apply, and back up
+    their Nuvio profile configurations — addons, plugins, collections, settings,
+    watch history, and watch progress — across multiple profiles on the same
+    account. This page explains exactly what Numax accesses, how it's used, and
+    what is never done with it.
+  </p>
+
+  <nav class="toc">
+    <a href="#access">What Numax accesses</a>
+    <a href="#not">What it doesn't do</a>
+    <a href="#storage">Where data lives</a>
+    <a href="#permissions">Permissions</a>
+    <a href="#third-parties">Third parties</a>
+    <a href="#changes">Changes</a>
+    <a href="#contact">Contact</a>
+  </nav>
+
+  <h2 id="access"><span class="num">01</span>What Numax accesses</h2>
+
+  <div class="card">
+    <p><strong>Nuvio session / authentication data.</strong> While you're on nuvio.tv,
+    Numax reads your Nuvio session token from your browser's local storage and uses
+    it to make authenticated requests directly to Nuvio's own API on your behalf.
+    This token is what lets Numax act as you — the same way being logged into
+    nuvio.tv already does. It's never sent anywhere except Nuvio's own API.</p>
+  </div>
+
+  <div class="card">
+    <p><strong>Nuvio profile data, including watch history and watch progress.</strong>
+    Using that session, Numax reads and writes your profile data: addons, plugins,
+    collections, settings, watch history, and watch progress. This is the same
+    data you could view or change by using Nuvio directly — Numax automates
+    copying it between your own profiles rather than collecting anything new.</p>
+  </div>
+
+  <div class="card">
+    <p><strong>Google Drive data — optional.</strong> If you choose to connect Google
+    Drive for backup, Numax requests the <code>drive.file</code> scope. This scope
+    is intentionally narrow: Numax can only see and manage files it creates itself,
+    never any other file in your Drive. This feature is off unless you turn it on.</p>
+  </div>
+
+  <div class="card">
+    <p><strong>Extension status check.</strong> Numax periodically reads a small
+    public JSON file hosted on GitHub to check whether the developer has flagged a
+    critical issue that requires disabling the extension. This is a static status
+    read only — no code is downloaded or executed, and no user data is included.</p>
+  </div>
+
+  <h2 id="not"><span class="num">02</span>What Numax does <em>not</em> do</h2>
+  <ul>
+    <li>Does not collect personally identifiable information — real name, address, government ID, or similar.</li>
+    <li>Does not access health, financial, payment, or personal communications data.</li>
+    <li>Does not track your location.</li>
+    <li>Does not monitor your browsing activity, clicks, or keystrokes on any site.</li>
+    <li>Does not read website content on pages other than nuvio.tv.</li>
+    <li>Does not operate its own servers or database — there is no backend that stores your data.</li>
+    <li>Does not sell, rent, or transfer your data to third parties.</li>
+    <li>Does not use your data for anything beyond the profile management and backup features described above.</li>
+    <li>Does not use your data to determine creditworthiness or for lending purposes.</li>
+  </ul>
+
+  <h2 id="storage"><span class="num">03</span>Where your data lives</h2>
+  <p>
+    Your saved templates, preferences, and session data are stored locally in
+    your browser via Chrome's storage APIs. Nothing is transmitted to any server
+    operated by the developer. Data only ever travels between your browser,
+    Nuvio's own API, and — only if you opt in — your own Google Drive.
+  </p>
+
+  <h2 id="permissions"><span class="num">04</span>Permissions, and why</h2>
+  <table>
+    <thead>
+      <tr><th>Permission</th><th>Why it's needed</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>activeTab</td><td>Reads the Nuvio session token from the tab you're on when you interact with the extension.</td></tr>
+      <tr><td>storage</td><td>Saves your templates and preferences locally in your browser.</td></tr>
+      <tr><td>sidePanel</td><td>Runs the interface as a docked side panel instead of a popup, so it stays open while you work.</td></tr>
+      <tr><td>identity</td><td>Authenticates you with your own Google account for the optional Drive backup feature.</td></tr>
+      <tr><td>nuvio.tv, api.nuvio.tv</td><td>Core function — reading and writing your own profile data via Nuvio's API.</td></tr>
+      <tr><td>googleapis.com, oauth2.googleapis.com</td><td>Only used if you opt into Google Drive backup.</td></tr>
+      <tr><td>raw.githubusercontent.com</td><td>Reads a static status file for the extension's remote kill-switch. No code is executed from this.</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="third-parties"><span class="num">05</span>Third parties</h2>
+  <p>Numax communicates only with:</p>
+  <ul>
+    <li><strong>Nuvio</strong> (api.nuvio.tv, nuvio.tv) — your own account data, at your direction.</li>
+    <li><strong>Google</strong> (googleapis.com, oauth2.googleapis.com) — only if you enable Drive backup, and only within the <code>drive.file</code> scope.</li>
+    <li><strong>GitHub</strong> (raw.githubusercontent.com) — a public, static status file, containing no user data.</li>
+  </ul>
+  <p>No other third party receives any data from Numax.</p>
+
+  <h2 id="changes"><span class="num">06</span>Changes to this policy</h2>
+  <p>
+    If this policy changes, the "Last updated" date above will change, and the
+    current version will always be available at this same URL.
+  </p>
+
+  <div class="contact" id="contact">
+    <p>Questions about this policy or how Numax handles data?</p>
+    <a href="mailto:nuviobaymax@gmail.com">nuviobaymax@gmail.com</a>
+  </div>
+
+  <p class="foot">Numax is an independent project and is not affiliated with, endorsed by, or supported by Nuvio.</p>
+</main>
+
+</body>
+</html>
