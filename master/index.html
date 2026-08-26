@@ -8,114 +8,166 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#0b0b0d; --bg2:#111114; --card:#141417; --card2:#191920; --line:#26262e; --line2:#33333d;
-    --fg:#fafafa; --mut:#9a9aa5; --dim:#616169;
-    --red:#f5344e; --red-deep:#d21f3c; --red-ink:#1b0207;
-    --green:#35c26b; --blue:#5b8dff; --amber:#f0b23a; --purple:#a879ff; --teal:#38c8bf;
-    --rad:15px; --f:"Inter",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --bg:#0a0a0c; --bg2:#101014; --card:#141418; --card2:#17171d; --line:#242430; --line2:#31313d;
+    --fg:#f6f6f8; --mut:#9797a3; --dim:#5f5f69;
+    --red:#f5344e; --red-deep:#d21f3c;
+    --green:#34c76a; --blue:#5b8dff; --amber:#f0b23a; --purple:#a879ff; --teal:#38c8bf;
+    --rad:16px; --f:"Inter",ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   }
   *{box-sizing:border-box}
   html,body{margin:0}
   body{background:
-      radial-gradient(900px 420px at 82% -6%, rgba(245,52,78,.10), transparent 60%),
-      radial-gradient(700px 380px at 8% 2%, rgba(91,141,255,.06), transparent 55%),
+      radial-gradient(1000px 480px at 84% -8%, rgba(245,52,78,.10), transparent 60%),
+      radial-gradient(760px 420px at 6% 0%, rgba(91,141,255,.06), transparent 55%),
       var(--bg);
     color:var(--fg);font:15px/1.55 var(--f);-webkit-font-smoothing:antialiased;min-height:100vh}
-  .wrap{max-width:1280px;margin:0 auto;padding:26px 22px 90px}
+  .wrap{max-width:1320px;margin:0 auto;padding:30px 24px 110px}
 
   /* header */
-  .top{display:flex;align-items:baseline;gap:14px;margin-bottom:3px}
-  .logo{font-weight:800;font-size:22px;letter-spacing:.02em}
+  .top{display:flex;align-items:baseline;gap:14px;margin-bottom:4px}
+  .logo{font-weight:800;font-size:23px;letter-spacing:.02em}
   .logo .tri{color:var(--red)}
   .top h1{font-size:15px;font-weight:600;color:var(--mut);margin:0;letter-spacing:.02em}
-  .tag{font-size:13px;color:var(--mut);margin:0 0 24px}
+  .tag{font-size:13px;color:var(--mut);margin:0 0 26px;max-width:720px}
 
   /* two-pane */
-  .grid{display:grid;grid-template-columns:minmax(360px,430px) 1fr;gap:20px;align-items:start}
-  @media(max-width:960px){.grid{grid-template-columns:1fr}}
+  .grid{display:grid;grid-template-columns:minmax(380px,440px) 1fr;gap:22px;align-items:start}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
 
   section{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);
-    border-radius:var(--rad);padding:17px 19px;margin-bottom:16px}
-  .sec-h{display:flex;align-items:center;gap:10px;margin:0 0 14px}
-  .sec-h h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--mut);margin:0;font-weight:700}
+    border-radius:var(--rad);padding:18px 20px;margin-bottom:18px}
+  .sec-h{display:flex;align-items:center;gap:10px;margin:0 0 15px}
+  .sec-h h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--mut);margin:0;font-weight:700}
   .sec-h .tick{width:5px;height:15px;border-radius:3px;background:var(--red)}
-  .sec-h .tick.blue{background:var(--blue)} .sec-h .tick.amber{background:var(--amber)} .sec-h .tick.teal{background:var(--teal)}
+  .sec-h .tick.blue{background:var(--blue)} .sec-h .tick.amber{background:var(--amber)} .sec-h .tick.teal{background:var(--teal)} .sec-h .tick.purple{background:var(--purple)}
   .sec-h .spacer{flex:1}
-  .pill{font-size:11px;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:2px 9px}
+  .pill{font-size:11px;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:2px 10px}
 
-  label{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
+  label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 5px}
   input,select{width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--fg);
-    border-radius:10px;padding:10px 11px;font:inherit;outline:none;transition:border-color .12s,box-shadow .12s}
+    border-radius:11px;padding:11px 12px;font:inherit;outline:none;transition:border-color .12s,box-shadow .12s}
   input:focus,select:focus{border-color:var(--red);box-shadow:0 0 0 3px rgba(245,52,78,.16)}
   input::placeholder{color:var(--dim)}
-  .row{display:flex;gap:11px;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
-  button{background:var(--red);color:#fff;border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:650;
-    cursor:pointer;transition:filter .12s,opacity .12s,background .12s}
+  .row{display:flex;gap:11px;flex-wrap:wrap}.row>*{flex:1;min-width:130px}
+  button{background:var(--red);color:#fff;border:0;border-radius:11px;padding:11px 16px;font:inherit;font-weight:650;
+    cursor:pointer;transition:filter .12s,opacity .12s,background .12s,border-color .12s}
   button:hover{filter:brightness(1.07)}
   button.ghost{background:transparent;color:var(--fg);border:1px solid var(--line2);font-weight:550}
   button.ghost:hover{border-color:var(--red);color:#fff}
   button:disabled{opacity:.4;cursor:not-allowed;filter:none}
   button.sm{padding:7px 12px;font-size:13px}
+  .linkbtn{background:none;border:0;color:var(--mut);font-size:12px;padding:0;font-weight:600;cursor:pointer}
+  .linkbtn:hover{color:var(--fg);filter:none}
 
-  .acct{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
-  .acct:first-child{border-top:0}.acct .em{flex:1;font-weight:550}
-  .status{font-size:13px;margin-top:10px;min-height:18px;color:var(--mut)}
+  .status{font-size:13px;margin-top:11px;min-height:18px;color:var(--mut)}
   .status.err{color:var(--red)} .status.ok{color:var(--green)}
-  details.adv{margin-top:12px}details.adv summary{cursor:pointer;color:var(--mut);font-size:12px}
+  details.adv{margin-top:13px}details.adv summary{cursor:pointer;color:var(--mut);font-size:12px}
   code{background:var(--bg2);padding:1px 5px;border-radius:5px;font-size:12px}
+  .hint{color:var(--mut);font-size:12px;margin-top:12px;line-height:1.55}
+  .empty{color:var(--dim);font-size:12.5px;padding:10px 2px}
 
-  .ctl{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+  /* linked accounts */
+  .acct{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+  .acct:first-child{border-top:0}
+  .acct .abody{flex:1;min-width:0}
+  .acct .aname{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .acct .amail{font-size:11.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* avatar */
+  .av{position:relative;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;
+    overflow:hidden;flex:0 0 auto;line-height:1;letter-spacing:.01em}
+  .av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+
+  /* profile chips (Copy from / Clone into) */
+  .chips{display:flex;flex-wrap:wrap;gap:8px 16px}
+  .chipacc{width:100%;font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.07em;margin:8px 0 -2px}
+  .pchip{display:flex;flex-direction:column;align-items:center;gap:8px;width:76px;cursor:pointer;
+    background:none;border:0;padding:4px 0;color:var(--fg)}
+  .pchip:hover{filter:none}
+  .pchip .ring{position:relative;padding:3px;border-radius:50%;border:2px solid transparent;transition:border-color .12s}
+  .pchip .av{width:54px;height:54px;font-size:19px}
+  .pchip.on .ring{border-color:var(--red)}
+  .pchip.on .av{box-shadow:0 0 0 3px rgba(245,52,78,.18)}
+  .pchip.multi.on .ring{border-color:var(--teal)}
+  .pchip.multi.on .av{box-shadow:0 0 0 3px rgba(56,200,191,.18)}
+  .pchip .check{position:absolute;right:-1px;top:-1px;width:19px;height:19px;border-radius:50%;
+    background:var(--red);color:#fff;display:none;place-items:center;font-size:12px;border:2px solid var(--card)}
+  .pchip.multi .check{background:var(--teal)}
+  .pchip.on .check{display:grid}
+  .pchip .lbl{font-size:12px;color:var(--mut);max-width:74px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:550}
+  .pchip.on .lbl{color:var(--fg)}
+
+  /* category controls */
+  .ctl{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
   .ctl:first-of-type{border-top:0}
-  .ctl input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;accent-color:var(--red)}
-  .ctl .dotc{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+  .ctl input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;accent-color:var(--red);cursor:pointer}
+  .ctl .dotc{width:8px;height:8px;border-radius:3px;flex:0 0 auto}
   .ctl .nm{font-weight:600}
-  .ctl .chip{font-size:11px;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:1px 8px}
+  .ctl .chip{font-size:11px;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:1px 9px;white-space:nowrap}
   .ctl .sp{flex:1}
-  .ctl select{width:auto;padding:6px 9px;font-size:13px}
-  .hint{color:var(--mut);font-size:12px;margin-top:13px;line-height:1.5}
-  .opt{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13px;color:var(--fg)}
-  .opt input{width:17px;height:17px;accent-color:var(--red)}
+  .ctl select{width:auto;padding:6px 9px;font-size:13px;border-radius:9px}
+  .ctl .choose{background:none;border:1px solid var(--line2);color:var(--mut);border-radius:9px;padding:5px 10px;font-size:12px;font-weight:600}
+  .ctl .choose:hover{border-color:var(--red);color:var(--fg);filter:none}
+  .itembox{border-top:1px dashed var(--line);margin-top:2px;padding:8px 0 4px 29px;display:none}
+  .itembox.open{display:block}
+  .itembox .allrow{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+  .itembox .allrow .linkbtn{font-size:11.5px}
+  .item{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;min-width:0}
+  .item input{width:15px;height:15px;flex:0 0 auto;accent-color:var(--red);cursor:pointer}
+  .item .it-body{min-width:0;flex:1}
+  .item .it-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .it-sub{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .item .it-tag{font-size:10.5px;color:var(--dim);border:1px solid var(--line2);border-radius:999px;padding:1px 7px;flex:0 0 auto}
+  .mode-note{color:var(--amber);font-size:11.5px;margin:6px 0 0 29px;display:none}
+  .mode-note.show{display:block}
 
-  .tgroup .ghead{font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin:12px 0 2px}
-  .target{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
-  .target input{width:17px;height:17px;accent-color:var(--red)}.target .nm{flex:1;font-weight:550}
-
+  /* actions / reports */
   .actions{display:flex;gap:11px}
-  .warnbox{border:1px solid var(--amber);background:rgba(240,178,58,.09);border-radius:11px;padding:11px 13px;margin-top:14px;font-size:13px}
-  .report{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:11px;background:var(--bg2)}
+  .warnbox{border:1px solid var(--amber);background:rgba(240,178,58,.09);border-radius:12px;padding:11px 13px;margin-top:14px;font-size:13px}
+  .opt{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--fg)}
+  .opt input{width:17px;height:17px;accent-color:var(--red)}
+  .report{border:1px solid var(--line);border-radius:13px;padding:12px 14px;margin-top:11px;background:var(--bg2)}
   .report h3{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
   .badge{font-size:10.5px;font-weight:700;border-radius:999px;padding:2px 8px;letter-spacing:.02em}
-  .badge.chg{background:rgba(245,52,78,.14);color:var(--red)} .badge.no{background:rgba(154,154,165,.12);color:var(--mut)}
+  .badge.chg{background:rgba(245,52,78,.14);color:var(--red)} .badge.no{background:rgba(151,151,163,.12);color:var(--mut)}
   .sumline{font-size:13px;margin:3px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .sumline .k{color:var(--mut);min-width:78px}
+  .sumline .k{color:var(--mut);min-width:80px}
   .tag-a{color:var(--green);font-weight:600} .tag-u{color:var(--blue);font-weight:600}
   .tag-r{color:var(--red);font-weight:600} .tag-k{color:var(--dim)} .tag-h{color:var(--amber)}
 
-  /* live preview pane */
-  .preview{position:sticky;top:20px}
+  /* preview pane */
+  .preview{position:sticky;top:22px}
   .pv-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-  .pv-head h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--mut);margin:0;font-weight:700;display:flex;align-items:center;gap:10px}
+  .pv-head h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--mut);margin:0;font-weight:700;display:flex;align-items:center;gap:10px}
   .pv-head .tick{width:5px;height:15px;border-radius:3px;background:var(--red)}
   .pv-head .grow{flex:1}
-  #preview-profile{width:auto;min-width:170px;max-width:240px}
-  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+  .pv-selwrap{display:flex;align-items:center;gap:9px;min-width:0}
+  .pv-selwrap .av{width:26px;height:26px;font-size:11px}
+  #preview-profile{width:auto;min-width:150px;max-width:240px}
+  .seg{display:inline-flex;border:1px solid var(--line2);border-radius:10px;overflow:hidden}
   .seg button{background:transparent;color:var(--mut);border:0;border-radius:0;padding:7px 13px;font-size:12.5px;font-weight:600}
   .seg button.on{background:var(--red);color:#fff}
   .seg button:not(.on):hover{color:var(--fg);filter:none}
 
+  .tabs{display:inline-flex;gap:4px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px}
+  .tabs button{background:transparent;color:var(--mut);border:0;border-radius:9px;padding:7px 14px;font-size:13px;font-weight:600}
+  .tabs button.on{background:var(--card);color:var(--fg);box-shadow:0 1px 0 rgba(0,0,0,.3)}
+  .tabs button:not(.on):hover{color:var(--fg);filter:none}
+  .subtoggle{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+
   .pv-cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  @media(max-width:1180px){.pv-cols{grid-template-columns:1fr}}
-  .pv-card{border:1px solid var(--line);border-radius:12px;background:var(--bg2);overflow:hidden}
+  @media(max-width:1220px){.pv-cols{grid-template-columns:1fr}}
+  .pv-card{border:1px solid var(--line);border-radius:13px;background:var(--bg2);overflow:hidden}
   .pv-card .h{display:flex;align-items:center;gap:9px;padding:11px 13px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:700}
   .pv-card .h .dotc{width:8px;height:8px;border-radius:3px}
   .pv-card .h .n{margin-left:auto;font-size:11px;color:var(--mut);font-weight:600}
-  .pv-list{display:flex;flex-direction:column;padding:6px 0;max-height:230px;overflow:auto}
+  .pv-list{display:flex;flex-direction:column;padding:6px 0;max-height:250px;overflow:auto}
   .pv-item{display:flex;align-items:center;gap:9px;padding:6px 13px;font-size:13px;min-width:0}
   .pv-item .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .pv-item .sub{margin-left:auto;color:var(--dim);font-size:11px;font-family:ui-monospace,Menlo,monospace;max-width:44%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pv-item .sub{margin-left:auto;color:var(--dim);font-size:11px;font-family:ui-monospace,Menlo,monospace;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .pv-item .dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex:0 0 auto}
   .pv-item .dot.off{background:var(--dim)}
-  .pv-item.added{background:rgba(53,194,107,.10)}
+  .pv-item.added{background:rgba(52,199,106,.10)}
   .pv-item.added .mk{color:var(--green);font-weight:800}
   .pv-item.removed{background:rgba(245,52,78,.09)}
   .pv-item.removed .txt{text-decoration:line-through;color:var(--mut)}
@@ -123,65 +175,130 @@
   .pv-item .mk{width:10px;flex:0 0 auto;text-align:center;color:transparent}
   .pv-empty{color:var(--dim);font-size:12px;padding:12px 13px}
   .pv-note{font-size:12px;color:var(--mut);margin:0 0 12px}
-  .pv-blank{border:1px dashed var(--line2);border-radius:12px;padding:26px;text-align:center;color:var(--dim);font-size:13px}
+  .pv-blank{border:1px dashed var(--line2);border-radius:13px;padding:30px;text-align:center;color:var(--dim);font-size:13px}
+
+  /* watched / progress rows */
+  .wrow{display:flex;align-items:center;gap:12px;padding:10px 13px;border-bottom:1px solid var(--line);font-size:13px}
+  .wrow:last-child{border-bottom:0}
+  .wrow .wbody{min-width:0;flex:1}
+  .wrow .wtitle{font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .wrow .wsub{font-size:11px;color:var(--dim)}
+  .wrow .wmeta{font-size:11.5px;color:var(--mut);flex:0 0 auto;font-variant-numeric:tabular-nums}
+  .wtype{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--dim);border:1px solid var(--line2);border-radius:999px;padding:1px 7px;flex:0 0 auto}
+  .prog{width:96px;flex:0 0 auto}
+  .prog .bar{height:5px;border-radius:3px;background:var(--line2);overflow:hidden}
+  .prog .bar > span{display:block;height:100%;background:var(--teal)}
+  .prog .pct{font-size:10.5px;color:var(--mut);text-align:right;margin-top:2px}
+  .wcard{border:1px solid var(--line);border-radius:13px;background:var(--bg2);overflow:hidden;max-height:560px;overflow-y:auto}
+
+  /* settings modal */
+  .modal{position:fixed;inset:0;background:rgba(6,6,9,.66);backdrop-filter:blur(3px);z-index:40;
+    display:none;align-items:center;justify-content:center;padding:26px}
+  .modal.open{display:flex}
+  .sheet{width:min(720px,100%);max-height:86vh;display:flex;flex-direction:column;
+    background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line2);border-radius:18px;overflow:hidden}
+  .sheet-h{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+  .sheet-h h3{margin:0;font-size:15px;font-weight:700}
+  .sheet-h .sub{font-size:12px;color:var(--mut);margin-top:1px}
+  .sheet-h .x{margin-left:auto;background:none;border:0;color:var(--mut);font-size:22px;line-height:1;padding:2px 6px}
+  .sheet-h .x:hover{color:var(--fg);filter:none}
+  .plat-tabs{display:flex;gap:4px;padding:12px 22px 0}
+  .plat-tabs button{background:var(--bg2);color:var(--mut);border:1px solid var(--line);border-radius:9px;padding:6px 13px;font-size:12.5px;font-weight:600}
+  .plat-tabs button.on{background:var(--card);color:var(--fg);border-color:var(--line2)}
+  .sheet-body{padding:14px 22px;overflow:auto;flex:1}
+  .sgroup{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--bg2);overflow:hidden}
+  .sgroup-h{display:flex;align-items:center;gap:10px;padding:11px 13px;cursor:pointer}
+  .sgroup-h .chev{color:var(--dim);transition:transform .12s;font-size:12px}
+  .sgroup.open .sgroup-h .chev{transform:rotate(90deg)}
+  .sgroup-h .gname{font-weight:650;font-size:13.5px}
+  .sgroup-h .gcount{margin-left:auto;font-size:11px;color:var(--mut)}
+  .sgroup-h input{width:16px;height:16px;accent-color:var(--red);cursor:pointer}
+  .sgroup-body{display:none;border-top:1px solid var(--line);padding:4px 13px 8px}
+  .sgroup.open .sgroup-body{display:block}
+  .sleaf{display:flex;align-items:center;gap:11px;padding:7px 0;font-size:13px;min-width:0;border-bottom:1px solid var(--line)}
+  .sleaf:last-child{border-bottom:0}
+  .sleaf input{width:15px;height:15px;flex:0 0 auto;accent-color:var(--red);cursor:pointer}
+  .sleaf .lname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sleaf .lval{font-size:11.5px;color:var(--mut);font-family:ui-monospace,Menlo,monospace;max-width:38%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 0 auto}
+  .sleaf.locked{opacity:.66}
+  .sleaf.locked .lname{color:var(--mut)}
+  .ltag{font-size:10px;border-radius:999px;padding:1px 7px;flex:0 0 auto;text-transform:uppercase;letter-spacing:.04em}
+  .ltag.secret{background:rgba(245,52,78,.14);color:var(--red)}
+  .ltag.account{background:rgba(240,178,58,.14);color:var(--amber)}
+  .ltag.personal{background:rgba(168,121,255,.16);color:var(--purple)}
+  .sheet-f{display:flex;align-items:center;gap:12px;padding:14px 22px;border-top:1px solid var(--line)}
+  .sheet-f .count{font-size:13px;color:var(--mut)} .sheet-f .grow{flex:1}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="top"><span class="logo">NUM<span class="tri">&#9656;</span>X</span><h1>Master Profile</h1></div>
-  <p class="tag">On-device. Your logins never leave this browser. Nothing is written until you Preview, then Apply.</p>
+  <p class="tag">On-device. Your logins never leave this browser. Pick one profile as the master, choose exactly what to copy, then Preview before anything is written.</p>
 
   <div class="grid">
     <!-- LEFT: controls -->
     <div>
       <section>
         <div class="sec-h"><span class="tick"></span><h2>Linked accounts</h2><span class="spacer"></span><span class="pill" id="acct-count">0</span></div>
-        <div id="accounts"><p class="pv-empty">No accounts linked yet.</p></div>
-        <div class="row" style="margin-top:14px">
+        <div id="accounts"><p class="empty">No accounts linked yet.</p></div>
+        <div style="margin-top:14px">
+          <label class="fld" for="link-name">Name this account</label>
+          <input id="link-name" type="text" placeholder="e.g. Mum&#39;s account" autocomplete="off" />
+        </div>
+        <div class="row" style="margin-top:10px">
           <input id="link-email" type="email" placeholder="Nuvio email" autocomplete="off" />
           <input id="link-password" type="password" placeholder="Password" autocomplete="off" />
         </div>
-        <div class="row" style="margin-top:9px"><button id="btn-link">Link account</button></div>
+        <div class="row" style="margin-top:10px"><button id="btn-link">Link account</button></div>
         <div id="link-status" class="status"></div>
         <details class="adv">
           <summary>Advanced: link by pasting a session token instead</summary>
-          <label for="paste-json" style="margin-top:8px">Paste the JSON from <code>localStorage["nuvio.supabase.session"]</code></label>
+          <label class="fld" for="paste-json" style="margin-top:8px">Paste the JSON from <code>localStorage["nuvio.supabase.session"]</code></label>
           <div class="row"><input id="paste-json" type="text" placeholder='{"access_token":"...","refresh_token":"..."}' />
             <button id="btn-link-paste" class="ghost sm" style="flex:0 0 auto">Link</button></div>
         </details>
       </section>
 
       <section>
-        <div class="sec-h"><span class="tick blue"></span><h2>Master profile</h2></div>
-        <div class="row">
-          <div><label for="master-account">Account</label><select id="master-account"></select></div>
-          <div><label for="master-profile">Profile</label><select id="master-profile"></select></div>
-        </div>
+        <div class="sec-h"><span class="tick blue"></span><h2>Copy from &mdash; master profile</h2></div>
+        <label class="fld" for="master-account">Account</label>
+        <select id="master-account"></select>
+        <div class="chips" id="master-profiles" style="margin-top:14px"><p class="empty">Link an account to choose a master.</p></div>
       </section>
 
       <section>
-        <div class="sec-h"><span class="tick amber"></span><h2>What the master controls</h2></div>
-        <div class="ctl"><input type="checkbox" id="cat-addons" checked /><span class="dotc" style="background:var(--blue)"></span><span class="nm">Addons</span><span class="chip" id="cnt-addons">&mdash;</span><span class="sp"></span><select id="mode-addons"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-        <div class="ctl"><input type="checkbox" id="cat-plugins" checked /><span class="dotc" style="background:var(--purple)"></span><span class="nm">Plugins</span><span class="chip" id="cnt-plugins">&mdash;</span><span class="sp"></span><select id="mode-plugins"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-        <div class="ctl"><input type="checkbox" id="cat-collections" /><span class="dotc" style="background:var(--teal)"></span><span class="nm">Collections</span><span class="chip" id="cnt-collections">&mdash;</span><span class="sp"></span><select id="mode-collections"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
-        <div class="ctl"><input type="checkbox" id="cat-settings" checked /><span class="dotc" style="background:var(--amber)"></span><span class="nm">Settings</span><span class="chip" id="cnt-settings">&mdash;</span><span class="sp"></span></div>
-        <label class="opt"><input type="checkbox" id="settings-personal" /> Also copy personal prefs (audio / subtitle languages)</label>
-        <p class="hint"><b style="color:var(--fg)">merge</b> adds &amp; updates, never deletes. <b style="color:var(--fg)">mirror</b> makes the target match the master exactly. Secrets and account logins are never copied.</p>
+        <div class="sec-h"><span class="tick amber"></span><h2>What to copy</h2></div>
+
+        <div class="ctl"><input type="checkbox" id="cat-addons" checked /><span class="dotc" style="background:var(--blue)"></span><span class="nm">Addons</span><span class="chip" id="cnt-addons">&mdash;</span><span class="sp"></span><button class="choose" id="choose-addons" type="button">Choose&hellip;</button><select id="mode-addons"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+        <div class="itembox" id="items-addons"></div>
+        <div class="mode-note" id="note-addons">Mirror will remove any addon on the targets that isn&#39;t ticked above.</div>
+
+        <div class="ctl"><input type="checkbox" id="cat-plugins" checked /><span class="dotc" style="background:var(--purple)"></span><span class="nm">Plugins</span><span class="chip" id="cnt-plugins">&mdash;</span><span class="sp"></span><button class="choose" id="choose-plugins" type="button">Choose&hellip;</button><select id="mode-plugins"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+        <div class="itembox" id="items-plugins"></div>
+        <div class="mode-note" id="note-plugins">Mirror will remove any plugin on the targets that isn&#39;t ticked above.</div>
+
+        <div class="ctl"><input type="checkbox" id="cat-collections" /><span class="dotc" style="background:var(--teal)"></span><span class="nm">Collections</span><span class="chip" id="cnt-collections">&mdash;</span><span class="sp"></span><button class="choose" id="choose-collections" type="button">Choose&hellip;</button><select id="mode-collections"><option value="merge">merge</option><option value="mirror">mirror</option></select></div>
+        <div class="itembox" id="items-collections"></div>
+        <div class="mode-note" id="note-collections">Mirror will remove any collection on the targets that isn&#39;t ticked above.</div>
+
+        <div class="ctl"><input type="checkbox" id="cat-settings" checked /><span class="dotc" style="background:var(--amber)"></span><span class="nm">Settings</span><span class="chip" id="cnt-settings">&mdash;</span><span class="sp"></span><button class="choose" id="choose-settings" type="button">Choose settings&hellip;</button></div>
+
+        <p class="hint"><b style="color:var(--fg)">merge</b> adds &amp; updates, never deletes. <b style="color:var(--fg)">mirror</b> makes a target match the master exactly. API keys, account logins and PINs are never copied.</p>
       </section>
 
       <section>
-        <div class="sec-h"><span class="tick teal"></span><h2>Apply to these profiles</h2></div>
-        <div id="targets"><p class="pv-empty">Link an account and pick a master first.</p></div>
+        <div class="sec-h"><span class="tick teal"></span><h2>Clone into &mdash; target profiles</h2></div>
+        <div class="chips" id="targets"><p class="empty">Link an account and pick a master first.</p></div>
       </section>
 
       <section>
         <div class="actions">
-          <button id="btn-preview">Preview (no changes)</button>
+          <button id="btn-preview">Preview</button>
           <button id="btn-apply" class="ghost" disabled>Apply</button>
         </div>
         <div id="global-status" class="status"></div>
         <div id="confirm-wrap" class="warnbox" style="display:none">
-          <label class="opt" style="margin:0"><input type="checkbox" id="confirm-removals" /> I understand items will be <b>removed</b> from the profiles above (mirror mode).</label>
+          <label class="opt" style="margin:0"><input type="checkbox" id="confirm-removals" /> I understand items will be <b>removed</b> from the target profiles (mirror mode).</label>
         </div>
         <div id="results"></div>
       </section>
@@ -192,18 +309,47 @@
       <section class="preview">
         <div class="pv-head">
           <h2><span class="tick"></span>Live preview</h2><span class="grow"></span>
-          <select id="preview-profile"></select>
+          <div class="pv-selwrap"><span class="av" id="preview-av" style="display:none"></span><select id="preview-profile"></select></div>
+        </div>
+        <div class="tabs" id="pv-tabs">
+          <button data-tab="overview" class="on">Overview</button>
+          <button data-tab="watched">Watched</button>
+          <button data-tab="progress">Watch progress</button>
+        </div>
+        <div class="subtoggle" id="overview-toggle">
           <div class="seg"><button id="pv-current" class="on">Current</button><button id="pv-after">After apply</button></div>
         </div>
         <div id="preview-body"><div class="pv-blank">Link an account to preview a profile.</div></div>
+        <div id="watched-body" style="display:none"></div>
+        <div id="progress-body" style="display:none"></div>
       </section>
     </aside>
+  </div>
+</div>
+
+<!-- Settings selector -->
+<div class="modal" id="settings-modal">
+  <div class="sheet">
+    <div class="sheet-h">
+      <div><h3>Choose settings to copy</h3><div class="sub" id="settings-sub">From the master profile</div></div>
+      <button class="x" id="settings-close" type="button" aria-label="Close">&times;</button>
+    </div>
+    <div class="plat-tabs" id="settings-platforms"></div>
+    <div class="sheet-body" id="settings-tree"></div>
+    <div class="sheet-f">
+      <span class="count" id="settings-count">0 selected</span>
+      <span class="grow"></span>
+      <button class="ghost sm" id="settings-selall" type="button">Select all shareable</button>
+      <button class="ghost sm" id="settings-none" type="button">Clear</button>
+      <button class="sm" id="btn-settings-done" type="button">Done</button>
+    </div>
   </div>
 </div>
 
 <script src="engine.js"></script>
 <script src="store.js"></script>
 <script src="api.js"></script>
+<script src="meta.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
