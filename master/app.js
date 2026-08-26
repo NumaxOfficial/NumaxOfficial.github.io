@@ -1,817 +1,657 @@
-// ============================================================
-// Numax app controller  (app.js)
-//
-// Vault (store) + client (api) + engine + Cinemeta (meta), wired to the
-// two-pane UI. Adds: per-item selection of what the master copies
-// (addons / plugins / collections / individual settings leaves), avatar
-// profile pickers, and a live preview with Overview / Watched / Watch-
-// progress tabs. Nothing writes until Preview -> (confirm) -> Apply.
-// ============================================================
-(function () {
-  const E = window.NumaxEngine, A = window.NumaxApi, S = window.NumaxStore, M = window.NumaxMeta;
-  const store = S.makeStore(window.localStorage);
-  const $ = (id) => document.getElementById(id);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Numax — Your Nuvio companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+  :root{
+    /* palette drawn from the toucan */
+    --ink:#0b0d13; --ink-2:#0f121a; --card:#151925; --card-2:#1c2130; --line:#262c3a;
+    --paper:#f3eee2; --paper-dim:#b7b3a8; --paper-mute:#807d76;
+    --amber:#ff7a1a; --marigold:#ffc42e; --claret:#d8503a;
+    --teal:#35c6a8; --blue:#5b9dff; --purple:#a98bff; --green:#63d68f;
+    --serif:'Fraunces',Georgia,serif; --sans:'Space Grotesk',system-ui,sans-serif; --mono:'Space Mono',ui-monospace,monospace;
+    --r:14px; --r-sm:10px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    font-family:var(--sans); color:var(--paper); background:var(--ink);
+    /* very subtle texture — not a loud gradient */
+    background-image:
+      radial-gradient(1200px 700px at 80% -10%, rgba(43,52,74,.35), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(30,26,20,.4), transparent 55%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.5;
+  }
+  a{ color:inherit; }
+  h1,h2,h3,h4{ margin:0; font-family:var(--serif); font-weight:600; letter-spacing:-.01em; }
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); }
+  .mono{ font-family:var(--mono); }
+  button{ font-family:var(--sans); cursor:pointer; }
+  input,select{ font-family:var(--sans); }
+  ::selection{ background:var(--amber); color:#1a1206; }
+  :focus-visible{ outline:2px solid var(--marigold); outline-offset:2px; border-radius:6px; }
 
-  const cache = {};        // accountId -> { backup, profiles:[{index,name,avatarUrl,color,avatarId}] }
-  const masterCache = {};  // "acct:idx" -> master snapshot
-  let currentMaster = null;
-  let selection = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
-  const targetsSel = new Set(); // tids that are ticked in Clone-into
-  let lastPlans = null;
-  let previewMode = 'current';       // current | after
-  let previewTab = 'overview';       // overview | watched | progress
-  let previewTid = null;
+  /* ---------------- buttons / fields ---------------- */
+  .btn{ display:inline-flex; align-items:center; gap:9px; justify-content:center; border:none; border-radius:var(--r-sm);
+        padding:11px 18px; font-size:14px; font-weight:600; color:var(--paper); background:var(--card-2); transition:.15s; }
+  .btn:hover{ background:#242a3a; }
+  .btn.primary{ background:var(--amber); color:#1a1206; }
+  .btn.primary:hover{ background:#ff8c38; }
+  .btn.primary:disabled{ background:#3a2f22; color:#8a7d6a; cursor:not-allowed; }
+  .btn.ghost{ background:transparent; border:1px solid var(--line); color:var(--paper); }
+  .btn.ghost:hover{ background:var(--card); }
+  .btn.ghost.sm{ padding:6px 11px; font-size:12.5px; border-radius:8px; }
+  .linkbtn{ background:none; border:none; color:var(--amber); font-size:12.5px; font-weight:600; padding:2px 0; }
+  .linkbtn:hover{ text-decoration:underline; }
+  .linkbtn:disabled{ color:var(--paper-mute); cursor:not-allowed; text-decoration:none; }
+  label.fld{ display:block; margin:0 0 10px; }
+  label.fld span{ display:block; font-size:12px; color:var(--paper-dim); margin-bottom:5px; }
+  input[type=text],input[type=email],input[type=password],textarea,select{
+    width:100%; background:var(--ink-2); color:var(--paper); border:1px solid var(--line);
+    border-radius:9px; padding:10px 12px; font-size:14px; }
+  textarea{ resize:vertical; min-height:76px; font-family:var(--mono); font-size:12.5px; }
+  input:focus,select:focus,textarea:focus{ border-color:var(--amber); outline:none; }
+  .status{ font-size:12.5px; color:var(--paper-mute); min-height:16px; }
+  .status.ok{ color:var(--green); } .status.err{ color:var(--claret); }
+  .empty{ color:var(--paper-mute); font-style:italic; font-size:13px; margin:6px 0; }
 
-  // secret / account / personal classification (mirrors engine.js)
-  const SECRET_LEAF = E.SECRET_LEAF || /(api_?key|client_id|token|secret|access_token|refresh|password)/i;
-  const ACCOUNT_GROUP_RE = /^trakt_/i;
-  const PERSONAL_GROUP_RE = /^track_preference$/i;
+  /* ---------------- google gate ---------------- */
+  .gate{ position:fixed; inset:0; z-index:50; display:grid; grid-template-columns:1.05fr .95fr; background:var(--ink);
+         background-image:radial-gradient(900px 600px at 78% 30%, rgba(43,52,74,.5), transparent 60%); }
+  .gate.hide{ display:none; }
+  .gate-hero{ position:relative; display:flex; align-items:center; justify-content:center; border-right:1px solid var(--line); overflow:hidden; }
+  .gate-hero .glow{ position:absolute; width:520px; height:520px; border-radius:50%;
+        background:radial-gradient(circle, rgba(255,122,26,.18), transparent 62%); filter:blur(6px); }
+  .hero-bird{ position:relative; width:340px; z-index:1; transform-origin:60% 80%; animation:settle 1s cubic-bezier(.2,1,.3,1) both; }
+  .hero-bird .inner{ transform-origin:60% 80%; }
+  @keyframes settle{ from{ transform:translateY(-14px) rotate(-3deg); opacity:0; } to{ transform:none; opacity:1; } }
+  .gate-panel{ display:flex; flex-direction:column; justify-content:center; padding:0 8% 0 7%; max-width:560px; }
+  .gate-panel .brand{ display:flex; align-items:center; gap:10px; margin-bottom:34px; }
+  .gate-panel .display{ font-family:var(--serif); font-size:clamp(30px,3.6vw,46px); line-height:1.05; font-weight:600; margin-top:14px; }
+  .gate-panel .display em{ font-style:italic; color:var(--marigold); }
+  .gate-panel .lede{ color:var(--paper-dim); font-size:16px; margin:18px 0 0; max-width:44ch; }
+  .gate-panel .tiny{ color:var(--paper-mute); font-size:12.5px; margin-top:16px; max-width:46ch; }
+  .btn-google{ background:var(--paper); color:#1c1c1c; margin-top:28px; align-self:flex-start; padding:12px 20px; }
+  .btn-google:hover{ background:#fff; }
 
-  const CAT_COLOR = { addons: 'var(--blue)', plugins: 'var(--purple)', collections: 'var(--teal)', settings: 'var(--amber)' };
+  /* brand mark */
+  .brand b{ font-family:var(--serif); font-size:21px; font-weight:600; letter-spacing:-.02em; }
+  .brand .dot{ color:var(--amber); }
+  .markhead{ width:26px; height:26px; flex:none; }
 
-  // ---------- small utils ----------
-  const setStatus = (el, m, c) => { el.textContent = m || ''; el.className = 'status' + (c ? ' ' + c : ''); };
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const host = (u) => { try { return new URL(u).host; } catch { return String(u || ''); } };
-  const clear = (el) => { while (el.firstChild) el.removeChild(el.firstChild); };
-  const elx = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
+  /* ---------------- app shell ---------------- */
+  .app{ display:none; min-height:100vh; }
+  .app.on{ display:block; }
+  .topbar{ position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
+           padding:14px 30px; border-bottom:1px solid var(--line);
+           background:rgba(11,13,19,.72); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3); }
+  .topbar .brand{ display:flex; align-items:center; gap:9px; }
+  .who{ display:flex; align-items:center; gap:14px; font-size:13px; color:var(--paper-dim); }
+  .who .gmail{ font-family:var(--mono); font-size:12px; }
+  #drivePill{ display:inline-flex; align-items:center; gap:7px; }
+  #drivePill.ok{ color:var(--green); } #drivePill.fail{ color:var(--claret); }
 
-  const accountLabel = (id) => { const r = store.get(id); return (r && (r.label || r.email)) || (id.slice(0, 8) + '\u2026'); };
-  const accountEmail = (id) => { const r = store.get(id); return (r && r.email) || ''; };
-  const profileMeta = (id, idx) => { const c = cache[id]; return (c && c.profiles.find((x) => x.index === idx)) || { index: idx, name: 'Profile ' + idx }; };
-  const profileName = (id, idx) => profileMeta(id, idx).name || ('Profile ' + idx);
-  const labelForTid = (tid) => { const [id, i] = tid.split(':'); return profileName(id, parseInt(i, 10)) + ' \u2014 ' + accountLabel(id); };
+  .wrap{ max-width:1320px; margin:0 auto; padding:30px; }
+  .pane-grid{ display:grid; grid-template-columns:minmax(400px,460px) 1fr; gap:30px; align-items:start; }
 
-  const collKey = (c) => (c && typeof c === 'object')
-    ? (c.id != null ? 'id:' + c.id : (c.title != null ? 'title:' + c.title : 'json:' + JSON.stringify(c)))
-    : 'json:' + JSON.stringify(c);
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:22px; margin-bottom:22px; }
+  .card > .card-h{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:16px; }
+  .card-h h2{ font-size:19px; }
+  .card-h .count{ font-family:var(--mono); font-size:12px; color:var(--paper-mute); }
+  .card .sub{ color:var(--paper-dim); font-size:13px; margin:-8px 0 16px; }
+  .divider{ height:1px; background:var(--line); margin:18px 0; border:0; }
 
-  const humanize = (key) => (key || '')
-    .replace(/_v\d+$/i, '').replace(/_settings$/i, '').replace(/_payload$/i, '')
-    .replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2')
-    .replace(/\b\w/g, (c) => c.toUpperCase()).trim() || key;
-  const leafValue = (l) => (l && typeof l === 'object' && 'value' in l && 'type' in l) ? l.value : l;
-  const formatVal = (val) => {
-    const v = leafValue(val);
-    if (v === null || v === undefined) return '\u2014';
-    if (typeof v === 'boolean') return v ? 'On' : 'Off';
-    if (typeof v === 'number') return String(v);
-    if (typeof v === 'string') return v ? (v.length > 40 ? v.slice(0, 37) + '\u2026' : v) : '(empty)';
-    if (Array.isArray(v)) return '[' + v.length + ' item' + (v.length === 1 ? '' : 's') + ']';
-    return JSON.stringify(v).slice(0, 40);
+  /* accounts */
+  #accounts{ display:flex; flex-direction:column; gap:9px; margin-bottom:4px; }
+  .acct{ display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 12px; }
+  .abody{ flex:1; min-width:0; }
+  .aname{ font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .amail{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .link-form{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .link-form .full{ grid-column:1 / -1; }
+  .paste-toggle{ margin-top:12px; }
+  #paste-wrap{ display:none; margin-top:12px; }
+  #paste-wrap.open{ display:block; }
+
+  /* profile chips */
+  .chips{ display:flex; flex-wrap:wrap; gap:12px; }
+  .pchip{ background:none; border:none; padding:4px; display:flex; flex-direction:column; align-items:center; gap:7px; width:82px; }
+  .pchip .ring{ position:relative; width:60px; height:60px; border-radius:50%; display:grid; place-items:center;
+                border:2px solid transparent; transition:.15s; }
+  .pchip:hover .ring{ border-color:var(--line); }
+  .pchip.on .ring{ border-color:var(--amber); }
+  .pchip .check{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--amber);
+                 color:#1a1206; font-size:12px; font-weight:700; display:none; place-items:center; border:2px solid var(--card); }
+  .pchip.on .check{ display:grid; }
+  .pchip.multi .check{ background:var(--blue); }
+  .pchip .lbl{ font-size:12px; color:var(--paper-dim); max-width:82px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+  .pchip.on .lbl{ color:var(--paper); }
+  .av{ position:relative; border-radius:50%; display:inline-grid; place-items:center; color:#fff; font-family:var(--sans); font-weight:600; overflow:hidden; }
+  .av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+
+  /* category rows */
+  .cat{ border:1px solid var(--line); border-radius:var(--r-sm); padding:14px; margin-bottom:12px; background:var(--ink-2); }
+  .cat-top{ display:flex; align-items:center; gap:12px; }
+  .cat-top .swatch{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .cat-top .cname{ font-weight:600; font-size:14.5px; flex:1; }
+  .cat-top .cnt{ font-family:var(--mono); font-size:11.5px; color:var(--paper-mute); }
+  .switch{ position:relative; width:42px; height:24px; flex:none; }
+  .switch input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .switch .track{ position:absolute; inset:0; background:#333a4c; border-radius:999px; transition:.18s; pointer-events:none; }
+  .switch .knob{ position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.18s; pointer-events:none; }
+  .switch input:checked ~ .track{ background:var(--amber); }
+  .switch input:checked ~ .knob{ transform:translateX(18px); }
+  .cat-ctl{ display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap; }
+  .cat-ctl select{ width:auto; padding:6px 10px; font-size:12.5px; }
+  .cat-ctl .mode-lbl{ font-size:12px; color:var(--paper-mute); }
+  .note{ display:none; margin-top:10px; font-size:12px; color:var(--claret); }
+  .note.show{ display:block; }
+  .items{ display:none; margin-top:12px; border-top:1px solid var(--line); padding-top:12px; max-height:280px; overflow:auto; }
+  .items.open{ display:block; }
+  .allrow{ display:flex; gap:16px; margin-bottom:8px; }
+  .item{ display:flex; align-items:center; gap:10px; padding:7px 2px; cursor:pointer; }
+  .item input{ width:16px; height:16px; accent-color:var(--amber); flex:none; }
+  .it-body{ flex:1; min-width:0; }
+  .it-name{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-sub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-tag{ font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--paper-mute); border:1px solid var(--line); border-radius:4px; padding:2px 5px; }
+
+  /* targets */
+  #targets{ display:flex; flex-wrap:wrap; gap:12px; }
+  .chipacc{ width:100%; font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--paper-mute); margin-top:6px; }
+
+  /* actions / reports */
+  .actionbar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  #confirm-wrap{ display:none; margin:14px 0; padding:12px 14px; border:1px solid var(--claret); border-radius:var(--r-sm); background:rgba(216,80,58,.08); }
+  #confirm-wrap label{ display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#f0b3a6; }
+  #confirm-wrap input{ margin-top:2px; accent-color:var(--claret); }
+  #results{ margin-top:16px; display:flex; flex-direction:column; gap:12px; }
+  .report{ border:1px solid var(--line); border-radius:var(--r-sm); padding:14px; background:var(--ink-2); }
+  .report h3{ font-family:var(--sans); font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .badge{ font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; padding:2px 7px; border-radius:5px; }
+  .badge.chg{ background:rgba(255,122,26,.16); color:var(--amber); }
+  .badge.no{ background:#22272f; color:var(--paper-mute); }
+  .sumline{ display:flex; align-items:center; gap:8px; font-size:12.5px; margin-top:6px; flex-wrap:wrap; }
+  .sumline .k{ color:var(--paper-dim); min-width:88px; }
+  .tag-a,.tag-u,.tag-r,.tag-k,.tag-h{ font-family:var(--mono); font-size:11px; padding:1px 6px; border-radius:4px; }
+  .tag-a{ color:var(--green); background:rgba(99,214,143,.12); }
+  .tag-u{ color:var(--marigold); background:rgba(255,196,46,.12); }
+  .tag-r{ color:var(--claret); background:rgba(216,80,58,.14); }
+  .tag-k{ color:var(--paper-dim); background:#22272f; }
+  .tag-h{ color:var(--blue); background:rgba(91,157,255,.12); }
+
+  /* preview pane */
+  .pv-head{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .pv-head .selwrap{ display:flex; align-items:center; gap:9px; flex:1; min-width:220px; }
+  .pv-head select{ flex:1; }
+  #pv-tabs{ display:flex; gap:4px; background:var(--ink-2); padding:4px; border-radius:10px; }
+  #pv-tabs button{ border:none; background:none; color:var(--paper-dim); font-size:13px; font-weight:600; padding:7px 14px; border-radius:7px; }
+  #pv-tabs button.on{ background:var(--card-2); color:var(--paper); }
+  #overview-toggle{ display:flex; gap:4px; margin-bottom:14px; }
+  #overview-toggle button{ border:1px solid var(--line); background:none; color:var(--paper-dim); font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; }
+  #overview-toggle button.on{ background:var(--amber); color:#1a1206; border-color:var(--amber); }
+  .pv-note{ font-size:13px; color:var(--paper-dim); margin:0 0 14px; }
+  .pv-note b{ color:var(--paper); }
+  .pv-blank{ color:var(--paper-mute); font-style:italic; padding:40px 0; text-align:center; }
+  .pv-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pv-card{ border:1px solid var(--line); border-radius:var(--r-sm); background:var(--ink-2); overflow:hidden; }
+  .pv-card .h{ display:flex; align-items:center; gap:8px; padding:11px 14px; border-bottom:1px solid var(--line); font-family:var(--sans); font-weight:600; font-size:13.5px; }
+  .pv-card .h .dotc{ width:8px; height:8px; border-radius:50%; }
+  .pv-card .h .n{ margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .pv-list{ padding:6px 10px; max-height:240px; overflow:auto; }
+  .pv-item{ display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px; }
+  .pv-item .mk{ font-family:var(--mono); width:12px; text-align:center; color:var(--paper-mute); }
+  .pv-item.added .mk{ color:var(--green); } .pv-item.added .txt{ color:var(--green); }
+  .pv-item.removed .mk{ color:var(--claret); } .pv-item.removed .txt{ color:var(--claret); text-decoration:line-through; opacity:.8; }
+  .pv-item .dot{ width:6px; height:6px; border-radius:50%; background:var(--paper-mute); flex:none; }
+  .pv-item .dot.off{ background:transparent; border:1px solid var(--paper-mute); }
+  .pv-item .txt{ flex:none; }
+  .pv-item .sub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pv-empty{ color:var(--paper-mute); font-style:italic; font-size:12.5px; padding:10px 4px; }
+
+  /* watched / progress cards */
+  .wcard{ border:1px solid var(--line); border-radius:var(--r-sm); background:var(--ink-2); padding:6px 12px; }
+  .wrow{ display:flex; align-items:center; gap:12px; padding:10px 2px; border-top:1px solid var(--line); font-size:13px; }
+  .wrow:first-child{ border-top:none; }
+  .wbody{ flex:1; min-width:0; }
+  .wtitle{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wsub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .wtype{ font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--paper-mute); border:1px solid var(--line); border-radius:4px; padding:2px 6px; }
+  .prog{ display:flex; align-items:center; gap:8px; width:150px; flex:none; }
+  .prog .bar{ flex:1; height:5px; background:#2a3040; border-radius:3px; overflow:hidden; }
+  .prog .bar span{ display:block; height:100%; background:var(--amber); }
+  .prog .pct{ font-family:var(--mono); font-size:11px; color:var(--paper-dim); width:34px; text-align:right; }
+
+  /* ---------------- settings modal ---------------- */
+  #settings-modal{ position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
+                   background:rgba(6,7,11,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); padding:24px; }
+  #settings-modal.open{ display:flex; }
+  .modal-card{ width:min(640px,100%); max-height:86vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+  .modal-h{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); }
+  .modal-h h3{ font-size:18px; } .modal-h .sub{ font-size:12px; color:var(--paper-mute); margin-top:2px; }
+  .modal-x{ background:none; border:none; color:var(--paper-dim); font-size:22px; line-height:1; }
+  #settings-platforms{ display:flex; gap:4px; padding:12px 22px 0; }
+  #settings-platforms button{ border:1px solid var(--line); background:none; color:var(--paper-dim); font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; }
+  #settings-platforms button.on{ background:var(--card-2); color:var(--paper); border-color:var(--card-2); }
+  #settings-tree{ padding:14px 22px; overflow:auto; flex:1; }
+  .sgroup{ border:1px solid var(--line); border-radius:var(--r-sm); margin-bottom:8px; overflow:hidden; }
+  .sgroup-h{ display:flex; align-items:center; gap:10px; padding:11px 13px; cursor:pointer; background:var(--ink-2); }
+  .sgroup-h input{ width:16px; height:16px; accent-color:var(--amber); }
+  .sgroup-h .chev{ color:var(--paper-mute); transition:.15s; display:inline-block; }
+  .sgroup.open .sgroup-h .chev{ transform:rotate(90deg); }
+  .sgroup-h .gname{ font-weight:600; font-size:13.5px; flex:1; }
+  .sgroup-h .gcount{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .sgroup-body{ display:none; padding:4px 13px 10px; }
+  .sgroup.open .sgroup-body{ display:block; }
+  .sleaf{ display:flex; align-items:center; gap:10px; padding:6px 2px; font-size:13px; }
+  .sleaf input{ width:15px; height:15px; accent-color:var(--amber); }
+  .sleaf.locked{ opacity:.72; }
+  .sleaf .lname{ flex:1; }
+  .sleaf .lval{ font-family:var(--mono); font-size:11px; color:var(--paper-dim); }
+  .ltag{ font-family:var(--mono); font-size:10px; text-transform:uppercase; padding:2px 6px; border-radius:4px; }
+  .ltag.secret{ color:var(--claret); background:rgba(216,80,58,.12); }
+  .ltag.account{ color:var(--blue); background:rgba(91,157,255,.12); }
+  .ltag.personal{ color:var(--marigold); background:rgba(255,196,46,.12); }
+  .modal-f{ display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-top:1px solid var(--line); }
+  #settings-count{ font-family:var(--mono); font-size:12px; color:var(--paper-dim); }
+
+  /* toucan blink lid */
+  #t-lid{ transform-box:fill-box; transform-origin:center; transform:scaleY(0); }
+  #t-lid.blink{ animation:blink .22s ease; }
+  @keyframes blink{ 0%,100%{ transform:scaleY(0); } 45%{ transform:scaleY(1); } }
+
+  /* responsive: collapse to one column on laptops narrower than the two-pane comfortably fits */
+  @media (max-width:1080px){
+    .pane-grid{ grid-template-columns:1fr; }
+    .gate{ grid-template-columns:1fr; }
+    .gate-hero{ display:none; }
+    .gate-panel{ max-width:none; padding:0 8%; }
+  }
+  @media (max-width:640px){
+    .wrap{ padding:18px; } .pv-cols{ grid-template-columns:1fr; } .link-form{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hero-bird{ animation:none; } #t-lid.blink{ animation:none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ GOOGLE FRONT DOOR ============ -->
+<div class="gate" id="gate">
+  <div class="gate-hero">
+    <div class="glow"></div>
+    <div class="hero-bird"><div class="inner" id="heroInner">
+  <svg viewBox="0 0 260 280" width="100%" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="beak" x1="0" y1="0" x2="1" y2="0.25">
+        <stop offset="0" stop-color="#ff6a00"/>
+        <stop offset="0.35" stop-color="#ff9e12"/>
+        <stop offset="0.6" stop-color="#ffb020"/>
+        <stop offset="0.82" stop-color="#ff7a10"/>
+        <stop offset="1" stop-color="#ff6a00"/>
+      </linearGradient>
+      <linearGradient id="chest" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f6f0e2"/>
+        <stop offset="0.4" stop-color="#fbe27a"/>
+        <stop offset="0.72" stop-color="#ffc42e"/>
+        <stop offset="1" stop-color="#f0a80e"/>
+      </linearGradient>
+      <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#20222b"/>
+        <stop offset="0.5" stop-color="#0d0e13"/>
+        <stop offset="1" stop-color="#050507"/>
+      </linearGradient>
+      <linearGradient id="wingg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#2a2c35"/>
+        <stop offset="0.6" stop-color="#121319"/>
+        <stop offset="1" stop-color="#060608"/>
+      </linearGradient>
+    </defs>
+
+    <!-- branch (perch) -->
+    <g id="t-branch">
+      <path d="M20 250 Q120 232 244 258 L244 268 Q120 244 20 262 Z" fill="#6b4f38"/>
+      <path d="M20 250 Q120 232 244 258" fill="none" stroke="#836348" stroke-width="2"/>
+    </g>
+
+    <!-- tail -->
+    <path d="M96 168 Q70 210 74 262 Q86 250 104 224 Q112 196 108 172 Z" fill="url(#body)"/>
+    <path d="M138 214 q4 12 -2 20" stroke="#c6402e" stroke-width="7" stroke-linecap="round" fill="none"/>
+
+    <!-- feet -->
+    <g stroke="#4a4d55" stroke-width="6" stroke-linecap="round" fill="none">
+      <path d="M118 236 l-6 18 M118 236 l4 20 M118 236 l12 16"/>
+      <path d="M150 236 l-4 20 M150 236 l6 18 M150 236 l14 14"/>
+    </g>
+
+    <!-- body -->
+    <path d="M96 118 Q78 150 90 200 Q108 244 152 240 Q188 236 190 188 Q190 150 172 122 Z" fill="url(#body)"/>
+
+    <!-- chest -->
+    <path d="M138 108 Q112 120 108 172 Q106 214 140 226 Q176 224 180 176 Q182 132 160 110 Q150 104 138 108 Z" fill="url(#chest)"/>
+    <path d="M138 108 Q122 116 116 150 Q140 132 160 138 Q158 120 148 110 Q143 105 138 108 Z" fill="#f6f0e2" opacity=".95"/>
+
+    <!-- wing (animatable) -->
+    <g id="t-wing">
+      <path d="M104 116 Q80 138 84 186 Q92 226 130 232 Q120 200 118 168 Q118 138 128 118 Z" fill="url(#wingg)"/>
+      <g stroke="#000" stroke-opacity=".35" stroke-width="1.4" fill="none">
+        <path d="M100 140 Q100 172 116 208"/>
+        <path d="M92 158 Q94 186 110 216"/>
+      </g>
+    </g>
+
+    <!-- head -->
+    <path d="M118 78 Q112 108 142 118 Q176 122 182 96 Q186 72 168 60 Q140 50 124 62 Q118 68 118 78 Z" fill="url(#body)"/>
+
+    <!-- eye -->
+    <ellipse cx="150" cy="80" rx="12.5" ry="12" fill="#ff8a00" opacity=".55"/>
+    <circle cx="150" cy="80" r="8.5" fill="#0a0a0a"/>
+    <circle cx="150" cy="80" r="8.5" fill="none" stroke="#ff8a00" stroke-width="1.6"/>
+    <circle cx="153" cy="77" r="2.6" fill="#fff"/>
+    <rect id="t-lid" x="139.5" y="72" width="21" height="16" rx="8" fill="#141014"/>
+
+    <!-- beak -->
+    <path d="M166 66 Q214 60 250 92 Q244 104 224 108 Q210 96 178 96 Q168 84 166 66 Z" fill="url(#beak)"/>
+    <path d="M172 98 Q206 96 224 108 Q206 116 184 112 Q174 108 172 98 Z" fill="#ff7a10"/>
+    <path d="M250 92 Q258 100 250 110 Q240 112 224 108 Q244 104 250 92 Z" fill="#171412"/>
+    <path d="M166 66 Q210 62 246 90" stroke="#ffd27a" stroke-width="2" fill="none" opacity=".6"/>
+    <path d="M175 96 Q205 94 223 105" stroke="#5a2c00" stroke-width="1.4" fill="none" opacity=".5"/>
+  </svg>
+    </div></div>
+  </div>
+  <div class="gate-panel">
+    <div class="brand"><span class="markhead"><svg viewBox="0 0 32 32" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M6 12 Q5 22 14 24 Q22 24 22 15 Q22 8 15 7 Q8 7 6 12 Z" fill="#12141b"/><path d="M18 9 Q29 8 31 15 Q29 18 24 18 Q20 14 18 9 Z" fill="#ff7a1a"/><path d="M31 15 Q32 17 30 19 Q27 18 24 18 Q29 17 31 15 Z" fill="#171412"/><circle cx="15" cy="13" r="2.4" fill="#0a0a0a"/><circle cx="15" cy="13" r="2.4" fill="none" stroke="#ff9e12" stroke-width="1"/></svg></span><b>Numax<span class="dot">.</span></b></div>
+    <span class="eyebrow">Your Nuvio companion</span>
+    <div class="display">Set one profile up right,<br>then hand it to <em>everyone.</em></div>
+    <p class="lede">Sign in once with Google. Numax remembers the Nuvio accounts you link, so your setup is waiting on every device.</p>
+    <button class="btn btn-google" id="btnGoogle" onclick="numaxSignIn()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+      Continue with Google
+    </button>
+    <p class="tiny">Google signs you in to Numax and (optionally) backs up your list of linked accounts to your Drive. Your Nuvio data itself is read straight from Nuvio once you link an account inside.</p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand"><span class="markhead"><svg viewBox="0 0 32 32" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M6 12 Q5 22 14 24 Q22 24 22 15 Q22 8 15 7 Q8 7 6 12 Z" fill="#12141b"/><path d="M18 9 Q29 8 31 15 Q29 18 24 18 Q20 14 18 9 Z" fill="#ff7a1a"/><path d="M31 15 Q32 17 30 19 Q27 18 24 18 Q29 17 31 15 Z" fill="#171412"/><circle cx="15" cy="13" r="2.4" fill="#0a0a0a"/><circle cx="15" cy="13" r="2.4" fill="none" stroke="#ff9e12" stroke-width="1"/></svg></span><b>Numax<span class="dot">.</span></b></div>
+    <div class="who">
+      <span id="drivePill"></span>
+      <span class="gmail" id="gmail"></span>
+      <button class="btn ghost sm" id="btnBackupVault" onclick="backupVault()">Back up list</button>
+      <button class="btn ghost sm" onclick="numaxSignOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="pane-grid">
+
+      <!-- ---------- LEFT: config ---------- -->
+      <div class="col-left">
+
+        <!-- accounts -->
+        <div class="card">
+          <div class="card-h"><h2>Nuvio accounts</h2><span class="count"><span id="acct-count">0</span> linked</span></div>
+          <p class="sub">Link each family member's Nuvio account. Sessions stay on this device.</p>
+          <div id="accounts"></div>
+          <hr class="divider">
+          <div class="link-form">
+            <label class="fld full"><span>Label (optional)</span><input type="text" id="link-name" placeholder="e.g. Mum's account" maxlength="40"></label>
+            <label class="fld"><span>Nuvio email</span><input type="email" id="link-email" placeholder="name@email.com" autocomplete="off"></label>
+            <label class="fld"><span>Password</span><input type="password" id="link-password" placeholder="••••••••" autocomplete="off"></label>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary" id="btn-link">Link account</button>
+            <button class="linkbtn" id="paste-toggle-btn" type="button">Paste a session token instead</button>
+          </div>
+          <div id="paste-wrap">
+            <label class="fld full" style="margin-top:12px;"><span>Session JSON (access_token + refresh_token)</span><textarea id="paste-json" placeholder='{"access_token":"...","refresh_token":"..."}'></textarea></label>
+            <button class="btn ghost sm" id="btn-link-paste">Link from token</button>
+          </div>
+          <p class="status" id="link-status" style="margin-top:10px;"></p>
+        </div>
+
+        <!-- master -->
+        <div class="card">
+          <div class="card-h"><h2>Master profile</h2></div>
+          <p class="sub">The profile everything else copies from.</p>
+          <label class="fld"><span>Account</span><select id="master-account"></select></label>
+          <div id="master-profiles" class="chips" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- what to copy -->
+        <div class="card">
+          <div class="card-h"><h2>What to copy</h2></div>
+          <p class="sub">Pick surfaces, choose exactly which items, and how they merge.</p>
+
+          <!-- addons -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--blue)"></span>
+              <span class="cname">Addons</span>
+              <span class="cnt" id="cnt-addons">0</span>
+              <label class="switch"><input type="checkbox" id="cat-addons"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-addons"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-addons" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-addons">Mirror with a subset will remove their other addons.</div>
+            <div class="items" id="items-addons"></div>
+          </div>
+
+          <!-- plugins -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--purple)"></span>
+              <span class="cname">Plugins</span>
+              <span class="cnt" id="cnt-plugins">0</span>
+              <label class="switch"><input type="checkbox" id="cat-plugins"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-plugins"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-plugins" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-plugins">Mirror with a subset will remove their other plugins.</div>
+            <div class="items" id="items-plugins"></div>
+          </div>
+
+          <!-- collections -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--teal)"></span>
+              <span class="cname">Collections</span>
+              <span class="cnt" id="cnt-collections">0</span>
+              <label class="switch"><input type="checkbox" id="cat-collections"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-collections"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-collections" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-collections">Mirror with a subset will remove their other collections.</div>
+            <div class="items" id="items-collections"></div>
+          </div>
+
+          <!-- settings -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--amber)"></span>
+              <span class="cname">Settings</span>
+              <span class="cnt" id="cnt-settings">0 selected</span>
+              <label class="switch"><input type="checkbox" id="cat-settings"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <button class="linkbtn" id="choose-settings" type="button" disabled>Choose fields…</button>
+              <span class="mode-lbl">API keys &amp; account fields are always held back.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- targets -->
+        <div class="card">
+          <div class="card-h"><h2>Apply to</h2></div>
+          <p class="sub">Every other profile is ticked by default. Untick any you want to leave alone.</p>
+          <div id="targets"></div>
+        </div>
+
+        <!-- actions -->
+        <div class="card">
+          <div class="actionbar">
+            <button class="btn ghost" id="btn-preview">Preview changes</button>
+            <button class="btn primary" id="btn-apply" disabled>Apply</button>
+          </div>
+          <div id="confirm-wrap"><label><input type="checkbox" id="confirm-removals"><span>Some profiles will have items <b>removed</b> (mirror mode). I've reviewed the preview and want to proceed.</span></label></div>
+          <p class="status" id="global-status" style="margin-top:12px;"></p>
+          <div id="results"></div>
+        </div>
+
+      </div>
+
+      <!-- ---------- RIGHT: preview ---------- -->
+      <div class="col-right">
+        <div class="card" style="position:sticky; top:88px;">
+          <div class="pv-head">
+            <div class="selwrap">
+              <span class="av" id="preview-av" style="width:26px;height:26px;font-size:11px;background:#5b3fa0;"></span>
+              <select id="preview-profile"></select>
+            </div>
+            <div id="pv-tabs">
+              <button data-tab="overview" class="on">Overview</button>
+              <button data-tab="watched">Watched</button>
+              <button data-tab="progress">In progress</button>
+            </div>
+          </div>
+          <div id="overview-toggle">
+            <button id="pv-current" class="on">Current</button>
+            <button id="pv-after">After apply</button>
+          </div>
+          <div id="preview-body"></div>
+          <div id="watched-body" style="display:none;"></div>
+          <div id="progress-body" style="display:none;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ============ SETTINGS MODAL ============ -->
+<div id="settings-modal">
+  <div class="modal-card">
+    <div class="modal-h">
+      <div><h3>Choose settings to copy</h3><div class="sub" id="settings-sub"></div></div>
+      <button class="modal-x" id="settings-close">×</button>
+    </div>
+    <div id="settings-platforms"></div>
+    <div id="settings-tree"></div>
+    <div class="modal-f">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <button class="linkbtn" id="settings-selall" type="button">Select all shareable</button>
+        <button class="linkbtn" id="settings-none" type="button">Clear</button>
+        <span id="settings-count">0 selected</span>
+      </div>
+      <button class="btn primary" id="btn-settings-done">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ GOOGLE + SHELL GLUE ============ -->
+<script>
+  const GOOGLE = {
+    clientId: '841898218953-c5f3ide5lcsg8g2opn1ucrekvlq335rs.apps.googleusercontent.com',
+    scope: 'openid email profile https://www.googleapis.com/auth/drive.file',
+    backupName: 'numax-vault.json'
   };
+  let googleToken = null, googleClient = null;
 
-  // ---------- avatars & chips ----------
-  function makeAvatar(p, size) {
-    const span = elx('span', 'av');
-    span.style.width = size + 'px'; span.style.height = size + 'px';
-    span.style.fontSize = Math.round(size * 0.36) + 'px';
-    span.style.background = (p && p.color) || '#5b3fa0';
-    span.textContent = ((p && p.name) ? p.name.trim().charAt(0) : '?').toUpperCase() || '?';
-    if (p && p.avatarUrl) {
-      const img = document.createElement('img');
-      img.src = p.avatarUrl; img.alt = '';
-      img.onerror = () => { img.style.display = 'none'; };
-      span.appendChild(img);
+  function numaxSignIn(){
+    if(!(window.google && google.accounts && google.accounts.oauth2)){
+      // library blocked (offline/preview) — let the app open so linking still works
+      revealApp('(offline — Google unavailable)'); return;
     }
-    return span;
-  }
-  function makeChip(p, opts) {
-    const btn = elx('button', 'pchip' + (opts.multi ? ' multi' : '') + (opts.selected ? ' on' : ''));
-    btn.type = 'button';
-    const ring = elx('span', 'ring');
-    ring.appendChild(makeAvatar(p, 54));
-    const check = elx('span', 'check', '\u2713'); ring.appendChild(check);
-    btn.appendChild(ring);
-    btn.appendChild(elx('span', 'lbl', p.name || ('Profile ' + p.index)));
-    btn.onclick = opts.onClick;
-    return btn;
-  }
-
-  // ---------- linking ----------
-  async function linkWithPassword() {
-    const label = $('link-name').value.trim();
-    const email = $('link-email').value.trim(), password = $('link-password').value;
-    if (!email || !password) return setStatus($('link-status'), 'Enter email and password.', 'err');
-    setStatus($('link-status'), 'Signing in\u2026');
-    try {
-      const session = await A.signIn(email, password);
-      store.add(session, { email, label });
-      $('link-name').value = ''; $('link-email').value = ''; $('link-password').value = '';
-      setStatus($('link-status'), 'Linked ' + (label || email) + '.', 'ok');
-      await refreshAccounts();
-    } catch (e) { setStatus($('link-status'), e.message, 'err'); }
-  }
-  async function linkWithPaste() {
-    const label = $('link-name').value.trim();
-    let raw; try { raw = JSON.parse($('paste-json').value); } catch { return setStatus($('link-status'), 'That is not valid JSON.', 'err'); }
-    try {
-      store.add(raw, { label });
-      $('paste-json').value = ''; $('link-name').value = '';
-      setStatus($('link-status'), 'Linked' + (label ? ' ' + label : '') + ' from token.', 'ok');
-      await refreshAccounts();
-    } catch (e) { setStatus($('link-status'), e.message, 'err'); }
-  }
-
-  // ---------- data ----------
-  async function loadAccount(accountId) {
-    if (cache[accountId]) return cache[accountId];
-    const c = A.client(store, accountId);
-    const backup = await c.exportBackup();
-    const profiles = (backup.profiles || [])
-      .map((p) => ({
-        index: p.profile_index,
-        name: p.name || ('Profile ' + p.profile_index),
-        avatarUrl: p.avatar_url || null,
-        color: p.avatar_color_hex || null,
-        avatarId: p.avatar_id || null,
-      }))
-      .sort((a, b) => a.index - b.index);
-    cache[accountId] = { backup, profiles };
-    return cache[accountId];
-  }
-
-  function displayState(accountId, idx) {
-    const backup = (cache[accountId] || {}).backup || {};
-    const pick = (arr) => (Array.isArray(arr) ? arr.filter((r) => r.profile_id === idx) : []);
-    const collRow = pick(backup.collections)[0];
-    const sBlobs = {};
-    pick(backup.profile_settings_blobs).forEach((r) => { if (r.settings_json) sBlobs[r.platform] = r.settings_json; });
-    const groups = new Set();
-    Object.values(sBlobs).forEach((b) => Object.keys((b && b.features) || {}).forEach((g) => groups.add(g)));
-    return {
-      addons: pick(backup.addons), plugins: pick(backup.plugins),
-      collections: (collRow && collRow.collections_json) || [],
-      settingGroups: [...groups].sort(),
-    };
-  }
-
-  function sliceWatch(accountId, idx) {
-    const b = (cache[accountId] || {}).backup || {};
-    const p = (arr) => (Array.isArray(arr) ? arr.filter((r) => r.profile_id === idx) : []);
-    return { watched: p(b.watched_items), progress: p(b.watch_progress) };
-  }
-
-  async function buildMaster(accountId, profileIndex) {
-    const key = accountId + ':' + profileIndex;
-    if (masterCache[key]) return masterCache[key];
-    const c = A.client(store, accountId);
-    const { backup } = await loadAccount(accountId);
-    const base = c.sliceProfile(backup, profileIndex);
-    const settings = {};
-    for (const platform of ['tv', 'mobile']) { const row = await c.pullSettings(profileIndex, platform); if (row && row.settings_json) settings[platform] = row.settings_json; }
-    const snap = { addons: base.addons, plugins: base.plugins, collections: base.collections, settings };
-    masterCache[key] = snap; return snap;
-  }
-
-  // ---------- accounts panel ----------
-  async function refreshAccounts() {
-    const list = store.list();
-    $('acct-count').textContent = list.length;
-    const box = $('accounts'); clear(box);
-    if (!list.length) { box.appendChild(elx('p', 'empty', 'No accounts linked yet.')); }
-    else list.forEach((rec) => {
-      const div = elx('div', 'acct');
-      const body = elx('div', 'abody');
-      const name = elx('div', 'aname', rec.label || rec.email || rec.accountId.slice(0, 10));
-      body.appendChild(name);
-      if (rec.email && rec.label) body.appendChild(elx('div', 'amail', rec.email));
-      div.appendChild(body);
-      const ren = elx('button', 'linkbtn', 'Rename'); ren.style.marginRight = '10px';
-      ren.onclick = () => startRename(div, body, name, rec.accountId);
-      div.appendChild(ren);
-      const rm = elx('button', 'ghost sm', 'Unlink');
-      rm.onclick = () => { store.remove(rec.accountId); delete cache[rec.accountId]; refreshAccounts(); };
-      div.appendChild(rm);
-      box.appendChild(div);
-    });
-    await rebuildMasterAccountOptions();
-  }
-
-  function startRename(row, body, nameEl, accountId) {
-    const input = elx('input'); input.type = 'text'; input.value = nameEl.textContent;
-    input.style.margin = '0'; input.maxLength = 40;
-    body.replaceChild(input, nameEl); input.focus(); input.select();
-    const commit = () => { const v = input.value.trim(); store.setLabel(accountId, v || null); refreshAccounts(); };
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') refreshAccounts(); });
-    input.addEventListener('blur', commit);
-  }
-
-  async function rebuildMasterAccountOptions() {
-    const list = store.list(); const ma = $('master-account'); const prev = ma.value;
-    ma.innerHTML = list.map((r) => '<option value="' + esc(r.accountId) + '">' + esc(r.label || r.email || r.accountId.slice(0, 10)) + '</option>').join('');
-    if (prev && list.some((r) => r.accountId === prev)) ma.value = prev;
-    await onMasterAccountChanged(true);
-  }
-
-  async function onMasterAccountChanged(reset) {
-    const accountId = $('master-account').value;
-    const box = $('master-profiles'); clear(box);
-    if (!accountId) { box.appendChild(elx('p', 'empty', 'Link an account to choose a master.')); currentMaster = null; await rebuildTargets(); await populatePreview(); return; }
-    let profiles = [];
-    try { profiles = (await loadAccount(accountId)).profiles; } catch (e) { setStatus($('global-status'), 'Could not load profiles: ' + e.message, 'err'); }
-    if (!profiles.length) { box.appendChild(elx('p', 'empty', 'This account has no profiles.')); currentMaster = null; return; }
-    let chosenIdx = (!reset && currentMaster && currentMaster.accountId === accountId) ? currentMaster.profileIndex : profiles[0].index;
-    profiles.forEach((p) => {
-      const chip = makeChip(p, { multi: false, selected: p.index === chosenIdx, onClick: () => selectMaster(accountId, p.index) });
-      box.appendChild(chip);
-    });
-    await selectMaster(accountId, chosenIdx);
-  }
-
-  async function selectMaster(accountId, profileIndex) {
-    document.querySelectorAll('#master-profiles .pchip').forEach((c, i) => {
-      const list = (cache[accountId] || {}).profiles || [];
-      c.classList.toggle('on', list[i] && list[i].index === profileIndex);
-    });
-    await renderMaster(accountId, profileIndex);
-    resetSelections();
-    renderAllItemLists();
-    renderCounts();
-    await rebuildTargets();
-    await populatePreview();
-  }
-
-  async function renderMaster(accountId, profileIndex) {
-    if (isNaN(profileIndex)) { currentMaster = null; return; }
-    setStatus($('global-status'), 'Reading master\u2026');
-    try {
-      const snap = await buildMaster(accountId, profileIndex);
-      currentMaster = { accountId, profileIndex, snapshot: snap };
-      setStatus($('global-status'), '', '');
-    } catch (e) { currentMaster = null; setStatus($('global-status'), 'Could not read master: ' + e.message, 'err'); }
-  }
-
-  // ---------- selection defaults ----------
-  function defaultSettingsTokens(settings) {
-    const tokens = new Set();
-    for (const platform of Object.keys(settings || {})) {
-      const feat = (settings[platform] && settings[platform].features) || {};
-      for (const group of Object.keys(feat)) {
-        const gv = feat[group];
-        if (ACCOUNT_GROUP_RE.test(group)) continue;            // account-linked: never
-        if (typeof gv === 'string') { tokens.add(platform + '::' + group); continue; } // visual payload: on
-        if (!gv || typeof gv !== 'object') continue;
-        if (PERSONAL_GROUP_RE.test(group)) continue;           // personal: off by default
-        for (const leaf of Object.keys(gv)) {
-          if (SECRET_LEAF.test(leaf)) continue;                // secret: never
-          tokens.add(platform + '::' + group + '.' + leaf);
+    if(!googleClient){
+      googleClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE.clientId, scope: GOOGLE.scope,
+        callback: async (resp)=>{
+          if(resp && resp.error){ console.error('[Numax] auth error:', resp.error); return; }
+          googleToken = resp;
+          let email = '';
+          try{
+            const who = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',
+              { headers:{ Authorization:'Bearer '+resp.access_token } }).then(r=>r.json());
+            email = (who && who.email) || '';
+          }catch(e){ console.warn('[Numax] userinfo failed:', e); }
+          revealApp(email);
         }
-      }
-    }
-    return tokens;
-  }
-
-  function resetSelections() {
-    const s = currentMaster ? currentMaster.snapshot : { addons: [], plugins: [], collections: [], settings: {} };
-    selection.addons = new Set((s.addons || []).map((a) => a.url));
-    selection.plugins = new Set((s.plugins || []).map((p) => p.url));
-    selection.collections = new Set((s.collections || []).map(collKey));
-    selection.settings = defaultSettingsTokens(s.settings || {});
-  }
-
-  // ---------- item lists (addons / plugins / collections) ----------
-  function masterList(kind) {
-    const s = currentMaster ? currentMaster.snapshot : null;
-    if (!s) return [];
-    return kind === 'collections' ? (s.collections || []) : (s[kind] || []);
-  }
-  function itemKey(kind, x) { return kind === 'collections' ? collKey(x) : x.url; }
-
-  function renderItemList(kind) {
-    const box = $('items-' + kind); clear(box);
-    const list = masterList(kind);
-    if (!list.length) { box.appendChild(elx('p', 'empty', 'The master profile has no ' + kind + '.')); return; }
-    const all = elx('div', 'allrow');
-    const a = elx('button', 'linkbtn', 'Select all'); const n = elx('button', 'linkbtn', 'Select none');
-    a.onclick = () => { list.forEach((x) => selection[kind].add(itemKey(kind, x))); renderItemList(kind); renderCounts(); refreshPreviewIfAfter(); };
-    n.onclick = () => { selection[kind].clear(); renderItemList(kind); renderCounts(); refreshPreviewIfAfter(); };
-    all.appendChild(a); all.appendChild(n); box.appendChild(all);
-    list.forEach((x) => {
-      const key = itemKey(kind, x);
-      const row = elx('label', 'item');
-      const cb = elx('input'); cb.type = 'checkbox'; cb.checked = selection[kind].has(key);
-      cb.onchange = () => { cb.checked ? selection[kind].add(key) : selection[kind].delete(key); renderCounts(); refreshPreviewIfAfter(); };
-      row.appendChild(cb);
-      const body = elx('div', 'it-body');
-      if (kind === 'collections') {
-        body.appendChild(elx('div', 'it-name', x.title || x.name || '(untitled collection)'));
-        const folders = (x.folders || []).length;
-        body.appendChild(elx('div', 'it-sub', folders ? folders + ' folder' + (folders === 1 ? '' : 's') : 'no folders'));
-      } else {
-        body.appendChild(elx('div', 'it-name', x.name || host(x.url)));
-        body.appendChild(elx('div', 'it-sub', host(x.url)));
-      }
-      row.appendChild(body);
-      if (kind !== 'collections' && x.enabled === false) row.appendChild(elx('span', 'it-tag', 'off'));
-      box.appendChild(row);
-    });
-  }
-  function renderAllItemLists() { ['addons', 'plugins', 'collections'].forEach(renderItemList); }
-
-  function renderCounts() {
-    const s = currentMaster ? currentMaster.snapshot : { addons: [], plugins: [], collections: [], settings: {} };
-    const set = (id, sel, tot) => { $(id).textContent = tot ? (sel + ' / ' + tot) : '0'; };
-    set('cnt-addons', selection.addons.size, (s.addons || []).length);
-    set('cnt-plugins', selection.plugins.size, (s.plugins || []).length);
-    set('cnt-collections', selection.collections.size, (s.collections || []).length);
-    $('cnt-settings').textContent = selection.settings.size + ' selected';
-    // mirror-with-subset warning notes
-    ['addons', 'plugins', 'collections'].forEach((k) => {
-      const total = (k === 'collections' ? (s.collections || []) : (s[k] || [])).length;
-      const partial = $('mode-' + k).value === 'mirror' && selection[k].size < total;
-      $('note-' + k).classList.toggle('show', $('cat-' + k).checked && partial);
-    });
-  }
-
-  // ---------- settings selector modal ----------
-  let modalPlatform = null;
-  function openSettingsModal() {
-    if (!currentMaster) { setStatus($('global-status'), 'Pick a master profile first.', 'err'); return; }
-    const settings = currentMaster.snapshot.settings || {};
-    const platforms = Object.keys(settings).filter((p) => settings[p] && settings[p].features);
-    if (!platforms.length) { setStatus($('global-status'), 'The master has no settings to choose from.', 'err'); return; }
-    $('settings-sub').textContent = 'From ' + profileName(currentMaster.accountId, currentMaster.profileIndex);
-    modalPlatform = platforms.includes(modalPlatform) ? modalPlatform : platforms[0];
-    const tabs = $('settings-platforms'); clear(tabs);
-    platforms.forEach((pl) => {
-      const b = elx('button', pl === modalPlatform ? 'on' : '', pl === 'tv' ? 'TV' : (pl === 'mobile' ? 'Mobile' : humanize(pl)));
-      b.type = 'button'; b.onclick = () => { modalPlatform = pl; renderSettingsTree(); tabs.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); };
-      tabs.appendChild(b);
-    });
-    renderSettingsTree();
-    $('settings-modal').classList.add('open');
-  }
-  function closeSettingsModal() { $('settings-modal').classList.remove('open'); renderCounts(); refreshPreviewIfAfter(); }
-
-  function groupType(group, gv) {
-    if (ACCOUNT_GROUP_RE.test(group)) return 'account';
-    if (typeof gv === 'string') return 'payload';
-    if (PERSONAL_GROUP_RE.test(group)) return 'personal';
-    return 'leaves';
-  }
-
-  function renderSettingsTree() {
-    const tree = $('settings-tree'); clear(tree);
-    const feat = ((currentMaster.snapshot.settings[modalPlatform]) || {}).features || {};
-    const pl = modalPlatform;
-    Object.keys(feat).forEach((group) => {
-      const gv = feat[group];
-      const type = groupType(group, gv);
-      const box = elx('div', 'sgroup');
-      const head = elx('div', 'sgroup-h');
-      const chev = elx('span', 'chev', '\u203a');
-
-      if (type === 'leaves' || type === 'payload' || type === 'personal') {
-        // selectable groups get a header checkbox
-        const gcb = elx('input'); gcb.type = 'checkbox';
-        gcb.onclick = (e) => e.stopPropagation();
-        if (type === 'payload') {
-          const tok = pl + '::' + group; gcb.checked = selection.settings.has(tok);
-          gcb.onchange = () => { gcb.checked ? selection.settings.add(tok) : selection.settings.delete(tok); updateSettingsCount(); };
-        } else if (type === 'personal') {
-          const tok = pl + '::' + group; gcb.checked = selection.settings.has(tok);
-          gcb.onchange = () => { gcb.checked ? selection.settings.add(tok) : selection.settings.delete(tok); updateSettingsCount(); };
-        } else {
-          const leafKeys = Object.keys(gv).filter((l) => !SECRET_LEAF.test(l));
-          const selCount = leafKeys.filter((l) => selection.settings.has(pl + '::' + group + '.' + l)).length;
-          gcb.checked = selCount > 0 && selCount === leafKeys.length;
-          gcb.indeterminate = selCount > 0 && selCount < leafKeys.length;
-          gcb.onchange = () => {
-            leafKeys.forEach((l) => { const t = pl + '::' + group + '.' + l; gcb.checked ? selection.settings.add(t) : selection.settings.delete(t); });
-            renderSettingsTree(); updateSettingsCount();
-          };
-        }
-        head.appendChild(gcb);
-      } else {
-        head.appendChild(elx('span', '', '')); // spacer for locked account group
-      }
-
-      head.appendChild(chev);
-      head.appendChild(elx('span', 'gname', humanize(group)));
-      const counter = elx('span', 'gcount');
-      head.appendChild(counter);
-      head.onclick = () => box.classList.toggle('open');
-      box.appendChild(head);
-
-      const body = elx('div', 'sgroup-body');
-      if (type === 'account') {
-        counter.textContent = 'account-linked';
-        const leaves = (typeof gv === 'string') ? [{ leaf: group, val: gv }] : Object.keys(gv).map((l) => ({ leaf: l, val: gv[l] }));
-        leaves.forEach(({ leaf, val }) => {
-          const row = elx('div', 'sleaf locked');
-          const spacer = elx('span'); spacer.style.width = '15px'; row.appendChild(spacer);
-          row.appendChild(elx('span', 'lname', typeof gv === 'string' ? 'Whole payload' : humanize(leaf)));
-          row.appendChild(elx('span', 'ltag account', 'account'));
-          body.appendChild(row);
-        });
-      } else if (type === 'payload') {
-        counter.textContent = 'whole payload';
-        const row = elx('div', 'sleaf');
-        const spacer = elx('span'); spacer.style.width = '15px'; row.appendChild(spacer);
-        let keys = 0; try { keys = Object.keys(JSON.parse(gv || '{}')).length; } catch { keys = 0; }
-        row.appendChild(elx('span', 'lname', 'Copied as a whole' + (keys ? ' \u00b7 ' + keys + ' option' + (keys === 1 ? '' : 's') : '')));
-        body.appendChild(row);
-      } else if (type === 'personal') {
-        const n = Object.keys(gv).length;
-        counter.textContent = 'personal';
-        const row = elx('div', 'sleaf');
-        const spacer = elx('span'); spacer.style.width = '15px'; row.appendChild(spacer);
-        row.appendChild(elx('span', 'lname', 'Per-title playback prefs \u00b7 ' + n + ' entr' + (n === 1 ? 'y' : 'ies')));
-        row.appendChild(elx('span', 'ltag personal', 'personal'));
-        body.appendChild(row);
-      } else { // leaves
-        const total = Object.keys(gv).length;
-        const selectable = Object.keys(gv).filter((l) => !SECRET_LEAF.test(l));
-        const sel = selectable.filter((l) => selection.settings.has(pl + '::' + group + '.' + l)).length;
-        counter.textContent = sel + '/' + selectable.length;
-        Object.keys(gv).forEach((leaf) => {
-          const isSecret = SECRET_LEAF.test(leaf);
-          const row = elx('div', 'sleaf' + (isSecret ? ' locked' : ''));
-          if (isSecret) { const sp = elx('span'); sp.style.width = '15px'; row.appendChild(sp); }
-          else {
-            const cb = elx('input'); cb.type = 'checkbox';
-            const tok = pl + '::' + group + '.' + leaf;
-            cb.checked = selection.settings.has(tok);
-            cb.onchange = () => { cb.checked ? selection.settings.add(tok) : selection.settings.delete(tok); renderSettingsTree(); updateSettingsCount(); };
-            row.appendChild(cb);
-          }
-          row.appendChild(elx('span', 'lname', humanize(leaf)));
-          if (isSecret) row.appendChild(elx('span', 'ltag secret', 'key'));
-          else row.appendChild(elx('span', 'lval', formatVal(gv[leaf])));
-          body.appendChild(row);
-        });
-        if (total) box.classList.add('open');
-      }
-      box.appendChild(body);
-      tree.appendChild(box);
-    });
-    updateSettingsCount();
-  }
-
-  function updateSettingsCount() {
-    $('settings-count').textContent = selection.settings.size + ' selected';
-    $('cnt-settings').textContent = selection.settings.size + ' selected';
-  }
-
-  function settingsSelectAllShareable() {
-    // add every shareable token on the CURRENT platform (leaves + visual payloads; not secrets/account/personal)
-    const feat = ((currentMaster.snapshot.settings[modalPlatform]) || {}).features || {};
-    Object.keys(feat).forEach((group) => {
-      const gv = feat[group];
-      if (ACCOUNT_GROUP_RE.test(group)) return;
-      if (typeof gv === 'string') { selection.settings.add(modalPlatform + '::' + group); return; }
-      if (PERSONAL_GROUP_RE.test(group)) return;
-      if (gv && typeof gv === 'object') Object.keys(gv).forEach((l) => { if (!SECRET_LEAF.test(l)) selection.settings.add(modalPlatform + '::' + group + '.' + l); });
-    });
-    renderSettingsTree();
-  }
-  function settingsClear() {
-    // clear only the CURRENT platform's tokens
-    [...selection.settings].forEach((t) => { if (t.startsWith(modalPlatform + '::')) selection.settings.delete(t); });
-    renderSettingsTree();
-  }
-
-  // ---------- targets (clone into) ----------
-  async function rebuildTargets() {
-    const box = $('targets'); clear(box);
-    const list = store.list();
-    if (!list.length) { box.appendChild(elx('p', 'empty', 'Link an account and pick a master first.')); return; }
-    const mAcct = currentMaster && currentMaster.accountId;
-    const mIdx = currentMaster && currentMaster.profileIndex;
-    targetsSel.clear();
-    let any = false;
-    for (const rec of list) {
-      let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
-      const targetable = profiles.filter((p) => !(rec.accountId === mAcct && p.index === mIdx));
-      if (!targetable.length) continue;
-      box.appendChild(elx('div', 'chipacc', rec.label || rec.email || rec.accountId.slice(0, 10)));
-      targetable.forEach((p) => {
-        const tid = rec.accountId + ':' + p.index;
-        targetsSel.add(tid); any = true;
-        const chip = makeChip(p, {
-          multi: true, selected: true,
-          onClick: () => { const on = targetsSel.has(tid); on ? targetsSel.delete(tid) : targetsSel.add(tid); chip.classList.toggle('on', !on); },
-        });
-        box.appendChild(chip);
       });
     }
-    if (!any) box.appendChild(elx('p', 'empty', 'No other profiles to apply to yet.'));
+    googleClient.requestAccessToken();
   }
 
-  // ---------- options + filtered master ----------
-  function readOptions() {
-    return {
-      categories: { addons: $('cat-addons').checked, plugins: $('cat-plugins').checked, collections: $('cat-collections').checked, settings: $('cat-settings').checked },
-      modes: { addons: $('mode-addons').value, plugins: $('mode-plugins').value, collections: $('mode-collections').value },
-      settings: { includePersonal: true }, // selection is the gate now
-      originClientId: 'numax-web',
-    };
+  function revealApp(email){
+    document.getElementById('gmail').textContent = email || '';
+    document.getElementById('gate').classList.add('hide');
+    document.getElementById('app').classList.add('on');
+  }
+  function numaxSignOut(){
+    googleToken = null;
+    document.getElementById('app').classList.remove('on');
+    document.getElementById('gate').classList.remove('hide');
   }
 
-  function filteredMaster() {
-    const s = currentMaster.snapshot;
-    const out = { addons: [], plugins: [], collections: [], settings: {} };
-    out.addons = (s.addons || []).filter((a) => selection.addons.has(a.url));
-    out.plugins = (s.plugins || []).filter((p) => selection.plugins.has(p.url));
-    out.collections = (s.collections || []).filter((c) => selection.collections.has(collKey(c)));
-    for (const platform of Object.keys(s.settings || {})) {
-      const blob = s.settings[platform]; const feat = (blob && blob.features) || {};
-      const outFeat = {};
-      for (const group of Object.keys(feat)) {
-        const gv = feat[group];
-        const groupTok = platform + '::' + group;
-        if (selection.settings.has(groupTok)) { outFeat[group] = gv; continue; } // payload / personal whole group
-        if (gv && typeof gv === 'object' && typeof gv !== 'string') {
-          const picked = {};
-          for (const leaf of Object.keys(gv)) if (selection.settings.has(platform + '::' + group + '.' + leaf)) picked[leaf] = gv[leaf];
-          if (Object.keys(picked).length) outFeat[group] = picked;
-        }
-      }
-      if (Object.keys(outFeat).length) out.settings[platform] = { version: blob.version, features: outFeat };
+  // Back up the linked-account list (labels/emails only — never tokens) to Drive.
+  async function backupVault(){
+    const pill = document.getElementById('drivePill');
+    if(!googleToken){ pill.className='fail'; pill.textContent='Sign in with Google to back up'; setTimeout(()=>pill.textContent='',2600); return; }
+    pill.className=''; pill.textContent='Backing up…';
+    try{
+      const raw = JSON.parse(localStorage.getItem('numax.accounts.v1') || '{}');
+      const safe = Object.values(raw).map(r=>({ accountId:r.accountId, label:r.label, email:r.email, addedAt:r.addedAt }));
+      const res = await saveToDrive({ savedAt:new Date().toISOString(), accounts:safe });
+      if(res && res.id){ pill.className='ok'; pill.textContent='List backed up ✓'; }
+      else { pill.className='fail'; pill.textContent='Backup failed'; }
+    }catch(e){ console.error(e); pill.className='fail'; pill.textContent='Backup failed'; }
+    setTimeout(()=>{ pill.textContent=''; pill.className=''; }, 2600);
+  }
+  async function saveToDrive(dataObj){
+    const auth={ Authorization:'Bearer '+googleToken.access_token };
+    const q=encodeURIComponent(`name='${GOOGLE.backupName}' and trashed=false`);
+    const found=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`,{headers:auth}).then(r=>r.json()).catch(()=>({}));
+    const id=found&&found.files&&found.files[0]&&found.files[0].id;
+    const boundary='numax'+Date.now();
+    const body=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`+JSON.stringify({name:GOOGLE.backupName,mimeType:'application/json'})+`\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n`+JSON.stringify(dataObj,null,2)+`\r\n--${boundary}--`;
+    const url=id?`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`:`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    return fetch(url,{method:id?'PATCH':'POST',headers:{...auth,'Content-Type':`multipart/related; boundary=${boundary}`},body}).then(r=>r.json());
+  }
+
+  // paste-token disclosure + occasional toucan blink
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const pt=document.getElementById('paste-toggle-btn'), pw=document.getElementById('paste-wrap');
+    if(pt&&pw) pt.onclick=()=>pw.classList.toggle('open');
+    const lid=document.getElementById('t-lid');
+    if(lid && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      setInterval(()=>{ lid.classList.remove('blink'); void lid.offsetWidth; lid.classList.add('blink'); }, 5600);
     }
-    return out;
-  }
-
-  // ---------- live preview ----------
-  async function populatePreview() {
-    const sel = $('preview-profile'); const list = store.list();
-    const opts = [];
-    for (const rec of list) { let ps; try { ps = (await loadAccount(rec.accountId)).profiles; } catch { continue; } ps.forEach((p) => opts.push(rec.accountId + ':' + p.index)); }
-    const prev = sel.value;
-    sel.innerHTML = opts.map((tid) => '<option value="' + esc(tid) + '">' + esc(labelForTid(tid)) + '</option>').join('');
-    if (prev && opts.includes(prev)) sel.value = prev;
-    else if (currentMaster) sel.value = currentMaster.accountId + ':' + currentMaster.profileIndex;
-    previewTid = sel.value || null;
-    renderPreviewArea();
-  }
-
-  function planForTid(tid) { return lastPlans && lastPlans.find((p) => p.tid === tid); }
-  function afterListFrom(plan, surface, current) {
-    if (!plan) return current;
-    const op = plan.plan.operations.find((o) => o.surface === surface);
-    if (!op) return current;
-    if (surface === 'addons') return op.params.p_addons;
-    if (surface === 'plugins') return op.params.p_plugins;
-    if (surface === 'collections') return op.params.p_collections_json;
-    return current;
-  }
-  function diffRows(current, after, keyFn, labelFn, subFn) {
-    const cur = new Map((current || []).map((x) => [keyFn(x), x]));
-    const aft = new Map((after || []).map((x) => [keyFn(x), x]));
-    const rows = [];
-    (after || []).forEach((x) => rows.push({ label: labelFn(x), sub: subFn ? subFn(x) : '', enabled: x.enabled !== false, state: cur.has(keyFn(x)) ? 'same' : 'added' }));
-    (current || []).forEach((x) => { if (!aft.has(keyFn(x))) rows.push({ label: labelFn(x), sub: subFn ? subFn(x) : '', enabled: x.enabled !== false, state: 'removed' }); });
-    return rows;
-  }
-  function rowHtml(r) {
-    const mk = r.state === 'added' ? '+' : r.state === 'removed' ? '\u2212' : '';
-    return '<div class="pv-item ' + r.state + '"><span class="mk">' + mk + '</span>' +
-      (r.state === 'removed' ? '' : '<span class="dot' + (r.enabled ? '' : ' off') + '"></span>') +
-      '<span class="txt">' + esc(r.label) + '</span>' + (r.sub ? '<span class="sub">' + esc(r.sub) + '</span>' : '') + '</div>';
-  }
-  function pvCard(title, color, count, rowsHtml, emptyMsg) {
-    return '<div class="pv-card"><div class="h"><span class="dotc" style="background:' + color + '"></span>' + esc(title) +
-      '<span class="n">' + count + '</span></div><div class="pv-list">' +
-      (rowsHtml || '<div class="pv-empty">' + esc(emptyMsg) + '</div>') + '</div></div>';
-  }
-  function renderCards(st, plan) {
-    const aA = afterListFrom(plan, 'addons', st.addons);
-    const aP = afterListFrom(plan, 'plugins', st.plugins);
-    const aC = afterListFrom(plan, 'collections', st.collections);
-    const addonRows = diffRows(st.addons, aA, (x) => x.url, (x) => x.name || host(x.url), (x) => host(x.url));
-    const pluginRows = diffRows(st.plugins, aP, (x) => x.url, (x) => x.name || host(x.url), (x) => host(x.url));
-    const collRows = diffRows(st.collections, aC, collKey, (x) => x.title || x.name || x.id);
-    let settingsCard;
-    if (plan && plan.plan.report.settings) {
-      const s = plan.plan.report.settings; const parts = [];
-      for (const plat of Object.keys(s)) parts.push('<div class="pv-item"><span class="mk">+</span><span class="txt">' + plat + ': <span class="tag-u">' + s[plat].changed.length + ' changed</span>' + (s[plat].skippedSecrets.length ? ' &middot; <span class="tag-h">' + s[plat].skippedSecrets.length + ' held back</span>' : '') + '</span></div>');
-      settingsCard = pvCard('Settings', CAT_COLOR.settings, '', parts.join(''), 'No settings changes.');
-    } else {
-      const rows = st.settingGroups.map((g) => '<div class="pv-item"><span class="mk"></span><span class="dot"></span><span class="txt">' + esc(humanize(g)) + '</span></div>').join('');
-      settingsCard = pvCard('Settings groups', CAT_COLOR.settings, st.settingGroups.length, rows, 'No settings configured.');
-    }
-    return '<div class="pv-cols">' +
-      pvCard('Addons', CAT_COLOR.addons, (st.addons || []).length, addonRows.map(rowHtml).join(''), 'No addons.') +
-      pvCard('Plugins', CAT_COLOR.plugins, (st.plugins || []).length, pluginRows.map(rowHtml).join(''), 'No plugins.') +
-      pvCard('Collections', CAT_COLOR.collections, (st.collections || []).length, collRows.map(rowHtml).join(''), 'No collections.') +
-      settingsCard + '</div>';
-  }
-
-  function renderPreviewArea() {
-    const tid = previewTid;
-    // set the little avatar next to the selector
-    const av = $('preview-av');
-    if (tid) {
-      const [id, i] = tid.split(':');
-      const a = makeAvatar(profileMeta(id, parseInt(i, 10)), 26);
-      av.replaceWith(a); a.id = 'preview-av'; a.classList.add('av');
-    } else { av.style.display = 'none'; }
-
-    $('overview-toggle').style.display = previewTab === 'overview' ? 'flex' : 'none';
-    $('preview-body').style.display = previewTab === 'overview' ? 'block' : 'none';
-    $('watched-body').style.display = previewTab === 'watched' ? 'block' : 'none';
-    $('progress-body').style.display = previewTab === 'progress' ? 'block' : 'none';
-
-    if (previewTab === 'overview') renderOverview(tid);
-    else if (previewTab === 'watched') renderWatched(tid);
-    else renderProgress(tid);
-  }
-
-  function renderOverview(tid) {
-    const body = $('preview-body');
-    if (!tid) { body.innerHTML = '<div class="pv-blank">Link an account to preview a profile.</div>'; return; }
-    const [accountId, idxStr] = tid.split(':'); const idx = parseInt(idxStr, 10);
-    const st = displayState(accountId, idx);
-    const after = previewMode === 'after';
-    const plan = after ? planForTid(tid) : null;
-    if (after && !plan) {
-      body.innerHTML = '<p class="pv-note">Showing <b>' + esc(labelForTid(tid)) + '</b>. No projected changes \u2014 run <b>Preview</b> with this profile ticked as a target.</p>' + renderCards(st, null);
-      return;
-    }
-    const note = after
-      ? '<p class="pv-note">Projected state of <b>' + esc(labelForTid(tid)) + '</b> after applying. <span class="tag-a">green = added</span>, <span class="tag-r">red = removed</span>.</p>'
-      : '<p class="pv-note">Current state of <b>' + esc(labelForTid(tid)) + '</b>.</p>';
-    body.innerHTML = note + renderCards(st, plan);
-  }
-
-  function renderWatched(tid) {
-    const body = $('watched-body'); clear(body);
-    if (!tid) { body.innerHTML = '<div class="pv-blank">Pick a profile.</div>'; return; }
-    const [id, i] = tid.split(':'); const { watched } = sliceWatch(id, parseInt(i, 10));
-    body.appendChild(elx('p', 'pv-note', watched.length ? watched.length + ' watched item' + (watched.length === 1 ? '' : 's') + ' for ' + profileName(id, parseInt(i, 10)) + '.' : 'Nothing in watched history for ' + profileName(id, parseInt(i, 10)) + '.'));
-    if (!watched.length) return;
-    const card = elx('div', 'wcard'); const queue = [];
-    watched.slice(0, 60).forEach((w) => {
-      const row = elx('div', 'wrow');
-      const wbody = elx('div', 'wbody');
-      const se = [w.season_number ? 'S' + w.season_number : '', w.episode_number ? 'E' + w.episode_number : ''].filter(Boolean).join('');
-      const title = elx('div', 'wtitle', (w.title || w.content_id || '(unknown)') + (se ? ' \u00b7 ' + se : ''));
-      wbody.appendChild(title);
-      if (!w.title && w.content_id) wbody.appendChild(elx('div', 'wsub', w.content_id));
-      row.appendChild(wbody);
-      if (w.content_type) row.appendChild(elx('span', 'wtype', w.content_type));
-      card.appendChild(row);
-      if (!w.title && M.isImdbId(w.content_id)) queue.push({ id: w.content_id, type: (w.content_type || '').toLowerCase() === 'series' ? 'series' : undefined, title, se });
-    });
-    if (watched.length > 60) card.appendChild(elx('div', 'wrow', '\u2026 and ' + (watched.length - 60) + ' more'));
-    body.appendChild(card);
-    if (queue.length) M.resolveBatch(queue.map(({ id, type }) => ({ id, type })), (rid, res) => { if (!res) return; queue.forEach((q) => { if (q.id === rid) q.title.textContent = res.name + (q.se ? ' \u00b7 ' + q.se : ''); }); });
-  }
-
-  function renderProgress(tid) {
-    const body = $('progress-body'); clear(body);
-    if (!tid) { body.innerHTML = '<div class="pv-blank">Pick a profile.</div>'; return; }
-    const [id, i] = tid.split(':'); const { progress } = sliceWatch(id, parseInt(i, 10));
-    body.appendChild(elx('p', 'pv-note', progress.length ? progress.length + ' item' + (progress.length === 1 ? '' : 's') + ' in progress for ' + profileName(id, parseInt(i, 10)) + '.' : 'Nothing in progress for ' + profileName(id, parseInt(i, 10)) + '.'));
-    if (!progress.length) return;
-    const card = elx('div', 'wcard'); const queue = [];
-    progress.slice(0, 60).forEach((w) => {
-      const row = elx('div', 'wrow');
-      const wbody = elx('div', 'wbody');
-      const title = elx('div', 'wtitle', w.title || w.content_id || w.progress_key || '(unknown)');
-      wbody.appendChild(title);
-      const posMin = Math.round((w.position || 0) / 60000), durMin = Math.round((w.duration || 0) / 60000);
-      const pct = (w.duration > 0) ? Math.min(100, Math.round((w.position / w.duration) * 100)) : 0;
-      wbody.appendChild(elx('div', 'wsub', posMin + 'm / ' + durMin + 'm'));
-      row.appendChild(wbody);
-      const prog = elx('div', 'prog');
-      const bar = elx('div', 'bar'); const fill = elx('span'); fill.style.width = pct + '%'; bar.appendChild(fill); prog.appendChild(bar);
-      prog.appendChild(elx('div', 'pct', pct + '%'));
-      row.appendChild(prog);
-      card.appendChild(row);
-      if (!w.title && M.isImdbId(w.content_id)) queue.push({ id: w.content_id, type: (w.content_type || '').toLowerCase() === 'series' ? 'series' : undefined, title });
-    });
-    if (progress.length > 60) card.appendChild(elx('div', 'wrow', '\u2026 and ' + (progress.length - 60) + ' more'));
-    body.appendChild(card);
-    if (queue.length) M.resolveBatch(queue.map(({ id, type }) => ({ id, type })), (rid, res) => { if (!res) return; queue.forEach((q) => { if (q.id === rid) q.title.textContent = res.name; }); });
-  }
-
-  function setPreviewMode(mode) {
-    previewMode = mode;
-    $('pv-current').classList.toggle('on', mode === 'current');
-    $('pv-after').classList.toggle('on', mode === 'after');
-    if (previewTab === 'overview') renderOverview(previewTid);
-  }
-  function setPreviewTab(tab) {
-    previewTab = tab;
-    document.querySelectorAll('#pv-tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
-    renderPreviewArea();
-  }
-  function refreshPreviewIfAfter() { if (previewTab === 'overview' && previewMode === 'after') renderOverview(previewTid); }
-
-  // ---------- preview (plan) / apply ----------
-  async function preview() {
-    setStatus($('global-status'), 'Reading profiles\u2026');
-    $('results').innerHTML = ''; $('btn-apply').disabled = true;
-    $('confirm-wrap').style.display = 'none'; $('confirm-removals').checked = false; lastPlans = null;
-    if (!currentMaster) return setStatus($('global-status'), 'Pick a master profile.', 'err');
-    const targets = [...targetsSel];
-    if (!targets.length) return setStatus($('global-status'), 'Tick at least one target profile.', 'err');
-    const opts = readOptions();
-    const master = filteredMaster();
-    try {
-      const plans = []; let anyRemovals = false;
-      for (const tid of targets) {
-        const [accountId, idxStr] = tid.split(':'); const profileIndex = parseInt(idxStr, 10);
-        const c = A.client(store, accountId); const { backup } = await loadAccount(accountId);
-        const state = c.sliceProfile(backup, profileIndex); state.settings = {}; const updatedAt = {};
-        if (opts.categories.settings) for (const platform of ['tv', 'mobile']) {
-          const row = await c.pullSettings(profileIndex, platform);
-          if (row && row.settings_json) { state.settings[platform] = row.settings_json; updatedAt[platform] = row.updated_at; }
-        }
-        const plan = E.planTarget(master, state, { ...opts, profileId: profileIndex, settingsUpdatedAt: updatedAt });
-        if (plan.hasRemovals) anyRemovals = true;
-        plans.push({ accountId, tid, plan });
-      }
-      lastPlans = plans; renderReports(plans);
-      if (anyRemovals) $('confirm-wrap').style.display = 'block';
-      setStatus($('global-status'), 'Preview ready \u2014 review, then Apply.', 'ok');
-      updateApplyGate();
-      const firstChanged = plans.find((p) => p.plan.hasChanges) || plans[0];
-      if (firstChanged) { $('preview-profile').value = firstChanged.tid; previewTid = firstChanged.tid; setPreviewTab('overview'); setPreviewMode('after'); renderPreviewArea(); }
-    } catch (e) { setStatus($('global-status'), e.message, 'err'); }
-  }
-
-  function chgTag(cls, sign, arr) { return (arr && arr.length) ? '<span class="' + cls + '">' + sign + arr.length + '</span>' : ''; }
-  function renderReports(plans) {
-    const box = $('results'); box.innerHTML = '';
-    plans.forEach(({ tid, plan }) => {
-      const r = plan.report; const div = document.createElement('div'); div.className = 'report';
-      let html = '<h3>' + esc(labelForTid(tid)) + (plan.hasChanges ? '<span class="badge chg">changes</span>' : '<span class="badge no">no changes</span>') + '</h3>';
-      const catLine = (name, o) => {
-        if (!o) return '';
-        const bits = [chgTag('tag-a', '+', o.added), chgTag('tag-u', '~', o.updated), chgTag('tag-r', '\u2212', o.removed),
-          (o.keptLocal && o.keptLocal.length ? '<span class="tag-k">keep ' + o.keptLocal.length + '</span>' : '')].filter(Boolean);
-        return bits.length ? '<div class="sumline"><span class="k">' + name + '</span>' + bits.join(' &middot; ') + '</div>' : '';
-      };
-      html += catLine('Addons', r.addons) + catLine('Plugins', r.plugins) + catLine('Collections', r.collections);
-      if (r.settings) {
-        let ch = 0, held = 0; for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; held += r.settings[p].skippedSecrets.length; }
-        if (ch || held) html += '<div class="sumline"><span class="k">Settings</span>' +
-          (ch ? '<span class="tag-u">' + ch + ' fields</span>' : '') + (held ? '<span class="tag-h">' + held + ' held back</span>' : '') + '</div>';
-      }
-      if (!plan.hasChanges) html += '<div class="sumline"><span class="tag-k">Nothing to change for this profile.</span></div>';
-      div.innerHTML = html; box.appendChild(div);
-    });
-  }
-  function updateApplyGate() {
-    const needs = $('confirm-wrap').style.display === 'block';
-    $('btn-apply').disabled = !lastPlans || (needs && !$('confirm-removals').checked);
-  }
-  async function apply() {
-    if (!lastPlans) return;
-    $('btn-apply').disabled = true; setStatus($('global-status'), 'Applying\u2026');
-    let ok = 0, fail = 0;
-    for (const { accountId, plan } of lastPlans) {
-      if (!plan.hasChanges) continue;
-      const res = await A.client(store, accountId).applyPlan(plan, { dryRun: false });
-      (res.results || []).forEach((r) => { r.ok ? ok++ : fail++; });
-    }
-    Object.keys(cache).forEach((k) => delete cache[k]);
-    Object.keys(masterCache).forEach((k) => delete masterCache[k]);
-    setStatus($('global-status'), 'Done. ' + ok + ' change(s) applied' + (fail ? ', ' + fail + ' failed (see console).' : '.'), fail ? 'err' : 'ok');
-    lastPlans = null;
-    if (currentMaster) { await renderMaster(currentMaster.accountId, currentMaster.profileIndex); }
-    await rebuildTargets(); await populatePreview();
-  }
-
-  // ---------- category toggles ----------
-  function wireCategory(kind) {
-    const cat = $('cat-' + kind);
-    const choose = $('choose-' + kind);
-    const box = $('items-' + kind);
-    choose.disabled = !cat.checked;
-    cat.addEventListener('change', () => { choose.disabled = !cat.checked; if (!cat.checked) box.classList.remove('open'); renderCounts(); refreshPreviewIfAfter(); });
-    choose.addEventListener('click', () => { box.classList.toggle('open'); });
-    $('mode-' + kind).addEventListener('change', () => { renderCounts(); refreshPreviewIfAfter(); });
-  }
-
-  // ---------- wire ----------
-  window.addEventListener('DOMContentLoaded', () => {
-    $('btn-link').onclick = linkWithPassword;
-    $('btn-link-paste').onclick = linkWithPaste;
-    $('link-password').addEventListener('keydown', (e) => { if (e.key === 'Enter') linkWithPassword(); });
-    $('master-account').addEventListener('change', () => onMasterAccountChanged(true));
-    ['addons', 'plugins', 'collections'].forEach(wireCategory);
-    $('cat-settings').addEventListener('change', () => { $('choose-settings').disabled = !$('cat-settings').checked; });
-
-    $('choose-settings').onclick = openSettingsModal;
-    $('settings-close').onclick = closeSettingsModal;
-    $('btn-settings-done').onclick = closeSettingsModal;
-    $('settings-selall').onclick = settingsSelectAllShareable;
-    $('settings-none').onclick = settingsClear;
-    $('settings-modal').addEventListener('click', (e) => { if (e.target === $('settings-modal')) closeSettingsModal(); });
-
-    $('preview-profile').addEventListener('change', () => { previewTid = $('preview-profile').value || null; renderPreviewArea(); });
-    document.querySelectorAll('#pv-tabs button').forEach((b) => { b.onclick = () => setPreviewTab(b.dataset.tab); });
-    $('pv-current').onclick = () => setPreviewMode('current');
-    $('pv-after').onclick = () => setPreviewMode('after');
-
-    $('btn-preview').onclick = preview;
-    $('btn-apply').onclick = apply;
-    $('confirm-removals').onchange = updateApplyGate;
-
-    refreshAccounts();
   });
-})();
+</script>
+
+<!-- real Nuvio modules (unchanged) + app controller -->
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="meta.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
