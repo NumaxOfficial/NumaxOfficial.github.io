@@ -6,419 +6,289 @@
 <title>Numax — Your Nuvio companion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,500;1,9..144,600&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
 <style>
   :root{
-    /* --- palette drawn from the toucan --- */
-    --ink:        #0b0d13;   /* near-black warm navy: the stage */
-    --ink-2:      #0f121a;   /* app surface */
-    --card:       #161a24;   /* raised card */
-    --card-2:     #1d222e;   /* hover / higher surface */
-    --line:       #262c3a;   /* hairlines */
-    --paper:      #f3eee2;   /* warm off-white: the throat */
-    --paper-dim:  #b7b3a8;   /* secondary text */
-    --paper-mute: #7d7c78;   /* tertiary text */
-    --amber:      #ff7a1a;   /* the beak */
-    --amber-soft: #ff9c47;
-    --marigold:   #ffc42e;   /* the chest */
-    --claret:     #d8503a;   /* the under-tail patch: warnings */
-    --teal:       #3ea6a0;
-    --branch:     #6b4f38;
-    --ok:         #52c07a;
-    --shadow:     rgba(0,0,0,.5);
-
-    --sans: "Space Grotesk", system-ui, -apple-system, sans-serif;
-    --serif:"Fraunces", Georgia, "Times New Roman", serif;
-    --mono: "Space Mono", ui-monospace, SFMono-Regular, monospace;
-
-    --r-lg: 30px;
-    --r-md: 18px;
-    --r-sm: 12px;
+    /* palette drawn from the toucan */
+    --ink:#0b0d13; --ink-2:#0f121a; --card:#151925; --card-2:#1c2130; --line:#262c3a;
+    --paper:#f3eee2; --paper-dim:#b7b3a8; --paper-mute:#807d76;
+    --amber:#ff7a1a; --marigold:#ffc42e; --claret:#d8503a;
+    --teal:#35c6a8; --blue:#5b9dff; --purple:#a98bff; --green:#63d68f;
+    --serif:'Fraunces',Georgia,serif; --sans:'Space Grotesk',system-ui,sans-serif; --mono:'Space Mono',ui-monospace,monospace;
+    --r:14px; --r-sm:10px;
   }
-
-  *{ box-sizing:border-box; margin:0; padding:0; }
-  html,body{ height:100%; }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
   body{
-    font-family:var(--sans);
-    color:var(--paper);
-    background:
-      radial-gradient(120% 90% at 50% -10%, #12151f 0%, var(--ink) 55%, #070810 100%);
-    -webkit-font-smoothing:antialiased;
-    overflow:hidden;
+    font-family:var(--sans); color:var(--paper); background:var(--ink);
+    /* very subtle texture — not a loud gradient */
+    background-image:
+      radial-gradient(1200px 700px at 80% -10%, rgba(43,52,74,.35), transparent 60%),
+      radial-gradient(900px 600px at -10% 110%, rgba(30,26,20,.4), transparent 55%);
+    background-attachment:fixed;
+    -webkit-font-smoothing:antialiased; font-size:15px; line-height:1.5;
   }
-
-  /* subtle textured navy — barely-there grain */
-  .grain{
-    position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.05; mix-blend-mode:overlay;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  /* ---------- stage & app surface ---------- */
-  .stage{
-    position:relative; z-index:1;
-    height:100dvh; width:100%;
-    display:grid; place-items:center;
-    padding:24px;
-  }
-  .app{
-    position:relative;
-    width:100%; max-width:452px; height:min(880px, 92dvh);
-    background:linear-gradient(180deg, var(--ink-2), #0a0c12);
-    border:1px solid var(--line);
-    border-radius:var(--r-lg);
-    box-shadow:0 40px 120px -30px var(--shadow), 0 0 0 1px rgba(255,255,255,.02) inset;
-    overflow:hidden;
-  }
-
-  /* screens stack; active one shows */
-  .screen{
-    position:absolute; inset:0;
-    display:flex; flex-direction:column;
-    opacity:0; visibility:hidden; pointer-events:none;
-    transform:translateY(8px);
-    transition:opacity .34s ease, transform .34s ease, visibility 0s .34s;
-  }
-  .screen.active{
-    opacity:1; visibility:visible; pointer-events:auto; transform:none;
-    transition:opacity .4s ease .12s, transform .4s ease .12s;
-  }
-  .scroll{ flex:1; overflow-y:auto; overscroll-behavior:contain; }
-  .scroll::-webkit-scrollbar{ width:0; }
-  .pad{ padding:26px 24px; }
-
-  /* ---------- brand mark (tiny toucan head) ---------- */
-  .brand{ display:flex; align-items:center; gap:9px; }
-  .brand svg{ width:26px; height:26px; display:block; }
-  .brand b{ font-family:var(--sans); font-weight:700; font-size:19px; letter-spacing:-.02em; }
-  .brand .dotmark{ color:var(--amber); }
-
-  /* ---------- type helpers ---------- */
-  .eyebrow{
-    font-size:11px; letter-spacing:.22em; text-transform:uppercase;
-    color:var(--amber); font-weight:600;
-  }
-  .display{
-    font-family:var(--serif); font-weight:600; line-height:1.02;
-    letter-spacing:-.015em; font-size:40px;
-    font-variation-settings:"SOFT" 40,"WONK" 1;
-  }
-  .display em{ font-style:italic; color:var(--marigold); font-variation-settings:"WONK" 1; }
-  .lede{ color:var(--paper-dim); font-size:15.5px; line-height:1.5; }
-  .tiny{ font-size:12.5px; color:var(--paper-mute); line-height:1.45; }
+  a{ color:inherit; }
+  h1,h2,h3,h4{ margin:0; font-family:var(--serif); font-weight:600; letter-spacing:-.01em; }
+  .eyebrow{ font-family:var(--mono); font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--amber); }
   .mono{ font-family:var(--mono); }
+  button{ font-family:var(--sans); cursor:pointer; }
+  input,select{ font-family:var(--sans); }
+  ::selection{ background:var(--amber); color:#1a1206; }
+  :focus-visible{ outline:2px solid var(--marigold); outline-offset:2px; border-radius:6px; }
 
-  /* ---------- buttons ---------- */
-  .btn{
-    font-family:var(--sans); font-weight:600; font-size:15px;
-    border:none; border-radius:14px; padding:15px 18px; cursor:pointer;
-    display:inline-flex; align-items:center; justify-content:center; gap:10px;
-    width:100%; transition:transform .15s ease, background .2s ease, filter .2s ease;
-    color:var(--ink);
-  }
-  .btn:active{ transform:scale(.98); }
-  .btn-primary{ background:var(--amber); color:#1a0e02; }
-  .btn-primary:hover{ filter:brightness(1.05); }
-  .btn-google{ background:var(--paper); color:#1c1c1c; }
-  .btn-ghost{
-    background:transparent; color:var(--paper); border:1px solid var(--line);
-  }
-  .btn-ghost:hover{ background:var(--card); }
-  #driveBtn.ok{ border-color:#3f7d54; color:#8fe0a6; background:rgba(63,125,84,.12); }
-  #driveBtn.fail{ border-color:var(--claret); color:#f0a293; background:rgba(216,80,58,.12); }
-  #driveBtn.ok:hover, #driveBtn.fail:hover{ background:inherit; }
-  .btn:focus-visible, a:focus-visible, .row:focus-visible, .opt:focus-visible,
-  input:focus-visible, .pill:focus-visible, .navbtn:focus-visible{
-    outline:2px solid var(--marigold); outline-offset:2px;
-  }
-  .back{
-    background:none; border:none; color:var(--paper-dim); cursor:pointer;
-    font-family:var(--sans); font-size:14px; display:inline-flex; align-items:center; gap:6px;
-    padding:6px 0;
-  }
-  .back:hover{ color:var(--paper); }
+  /* ---------------- buttons / fields ---------------- */
+  .btn{ display:inline-flex; align-items:center; gap:9px; justify-content:center; border:none; border-radius:var(--r-sm);
+        padding:11px 18px; font-size:14px; font-weight:600; color:var(--paper); background:var(--card-2); transition:.15s; }
+  .btn:hover{ background:#242a3a; }
+  .btn.primary{ background:var(--amber); color:#1a1206; }
+  .btn.primary:hover{ background:#ff8c38; }
+  .btn.primary:disabled{ background:#3a2f22; color:#8a7d6a; cursor:not-allowed; }
+  .btn.ghost{ background:transparent; border:1px solid var(--line); color:var(--paper); }
+  .btn.ghost:hover{ background:var(--card); }
+  .btn.ghost.sm{ padding:6px 11px; font-size:12.5px; border-radius:8px; }
+  .linkbtn{ background:none; border:none; color:var(--amber); font-size:12.5px; font-weight:600; padding:2px 0; }
+  .linkbtn:hover{ text-decoration:underline; }
+  .linkbtn:disabled{ color:var(--paper-mute); cursor:not-allowed; text-decoration:none; }
+  label.fld{ display:block; margin:0 0 10px; }
+  label.fld span{ display:block; font-size:12px; color:var(--paper-dim); margin-bottom:5px; }
+  input[type=text],input[type=email],input[type=password],textarea,select{
+    width:100%; background:var(--ink-2); color:var(--paper); border:1px solid var(--line);
+    border-radius:9px; padding:10px 12px; font-size:14px; }
+  textarea{ resize:vertical; min-height:76px; font-family:var(--mono); font-size:12.5px; }
+  input:focus,select:focus,textarea:focus{ border-color:var(--amber); outline:none; }
+  .status{ font-size:12.5px; color:var(--paper-mute); min-height:16px; }
+  .status.ok{ color:var(--green); } .status.err{ color:var(--claret); }
+  .empty{ color:var(--paper-mute); font-style:italic; font-size:13px; margin:6px 0; }
 
-  /* ============================================================= AUTH */
-  #s-auth .scroll{ display:flex; flex-direction:column; justify-content:flex-end; }
-  #s-auth .pad{ padding-bottom:34px; }
-  .auth-top{ flex:1; }
-  .auth-headline{ margin-top:10px; }
-  .auth-headline .display{ font-size:34px; }
-  .divider-or{
-    display:flex; align-items:center; gap:12px; color:var(--paper-mute);
-    font-size:12px; margin:16px 0;
-  }
-  .divider-or::before,.divider-or::after{ content:""; flex:1; height:1px; background:var(--line); }
+  /* ---------------- google gate ---------------- */
+  .gate{ position:fixed; inset:0; z-index:50; display:grid; grid-template-columns:1.05fr .95fr; background:var(--ink);
+         background-image:radial-gradient(900px 600px at 78% 30%, rgba(43,52,74,.5), transparent 60%); }
+  .gate.hide{ display:none; }
+  .gate-hero{ position:relative; display:flex; align-items:center; justify-content:center; border-right:1px solid var(--line); overflow:hidden; }
+  .gate-hero .glow{ position:absolute; width:520px; height:520px; border-radius:50%;
+        background:radial-gradient(circle, rgba(255,122,26,.18), transparent 62%); filter:blur(6px); }
+  .hero-bird{ position:relative; width:340px; z-index:1; transform-origin:60% 80%; animation:settle 1s cubic-bezier(.2,1,.3,1) both; }
+  .hero-bird .inner{ transform-origin:60% 80%; }
+  @keyframes settle{ from{ transform:translateY(-14px) rotate(-3deg); opacity:0; } to{ transform:none; opacity:1; } }
+  .gate-panel{ display:flex; flex-direction:column; justify-content:center; padding:0 8% 0 7%; max-width:560px; }
+  .gate-panel .brand{ display:flex; align-items:center; gap:10px; margin-bottom:34px; }
+  .gate-panel .display{ font-family:var(--serif); font-size:clamp(30px,3.6vw,46px); line-height:1.05; font-weight:600; margin-top:14px; }
+  .gate-panel .display em{ font-style:italic; color:var(--marigold); }
+  .gate-panel .lede{ color:var(--paper-dim); font-size:16px; margin:18px 0 0; max-width:44ch; }
+  .gate-panel .tiny{ color:var(--paper-mute); font-size:12.5px; margin-top:16px; max-width:46ch; }
+  .btn-google{ background:var(--paper); color:#1c1c1c; margin-top:28px; align-self:flex-start; padding:12px 20px; }
+  .btn-google:hover{ background:#fff; }
 
-  /* ============================================================= GREETING */
-  .greet-head{ margin-bottom:22px; }
-  .greet-head .display{ margin:12px 0 10px; }
-  .opt{
-    display:block; width:100%; text-align:left; cursor:pointer;
-    background:var(--card); border:1px solid var(--line); border-radius:var(--r-md);
-    padding:20px; margin-bottom:14px; transition:border-color .2s, background .2s, transform .15s;
-    color:inherit; font-family:var(--sans);
-  }
-  .opt:hover{ border-color:var(--amber); background:var(--card-2); }
-  .opt:active{ transform:scale(.99); }
-  .opt-top{ display:flex; align-items:center; justify-content:space-between; }
-  .opt-badge{
-    font-size:11px; letter-spacing:.12em; text-transform:uppercase;
-    padding:4px 9px; border-radius:999px; font-weight:600;
-  }
-  .badge-single{ background:rgba(255,196,46,.14); color:var(--marigold); }
-  .badge-multi{ background:rgba(255,122,26,.16); color:var(--amber-soft); }
-  .opt h3{ font-family:var(--serif); font-weight:600; font-size:23px; margin:14px 0 6px; letter-spacing:-.01em; }
-  .opt p{ color:var(--paper-dim); font-size:14px; line-height:1.5; }
-  .opt .arrow{ color:var(--paper-mute); font-size:20px; transition:transform .2s, color .2s; }
-  .opt:hover .arrow{ color:var(--amber); transform:translateX(4px); }
+  /* brand mark */
+  .brand b{ font-family:var(--serif); font-size:21px; font-weight:600; letter-spacing:-.02em; }
+  .brand .dot{ color:var(--amber); }
+  .markhead{ width:26px; height:26px; flex:none; }
 
-  /* ============================================================= LISTS / ROWS */
-  .sec-label{
-    font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--paper-mute);
-    margin:22px 4px 12px; font-weight:600;
-  }
-  .row{
-    display:flex; align-items:center; gap:14px; width:100%;
-    background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:14px 16px; margin-bottom:10px; cursor:pointer; color:inherit;
-    font-family:var(--sans); text-align:left; transition:border-color .2s, background .2s;
-  }
-  .row:hover{ border-color:var(--amber); background:var(--card-2); }
-  .avatar{
-    width:42px; height:42px; border-radius:12px; flex:none;
-    display:grid; place-items:center; font-weight:700; font-size:16px; color:#12141c;
-  }
-  .row .meta{ flex:1; min-width:0; }
-  .row .meta b{ font-weight:600; font-size:15px; display:block; }
-  .row .meta span{ color:var(--paper-mute); font-size:12.5px; }
-  .row .chev{ color:var(--paper-mute); }
+  /* ---------------- app shell ---------------- */
+  .app{ display:none; min-height:100vh; }
+  .app.on{ display:block; }
+  .topbar{ position:sticky; top:0; z-index:20; display:flex; align-items:center; justify-content:space-between;
+           padding:14px 30px; border-bottom:1px solid var(--line);
+           background:rgba(11,13,19,.72); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3); }
+  .topbar .brand{ display:flex; align-items:center; gap:9px; }
+  .who{ display:flex; align-items:center; gap:14px; font-size:13px; color:var(--paper-dim); }
+  .who .gmail{ font-family:var(--mono); font-size:12px; }
+  #drivePill{ display:inline-flex; align-items:center; gap:7px; }
+  #drivePill.ok{ color:var(--green); } #drivePill.fail{ color:var(--claret); }
 
-  /* ============================================================= EDITOR */
-  .ed-header{ padding:22px 24px 14px; }
-  .ed-header .top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-  .profile-switch{ display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; }
-  .profile-switch::-webkit-scrollbar{ height:0; }
-  .pill{
-    flex:none; display:flex; align-items:center; gap:8px; cursor:pointer;
-    background:var(--card); border:1px solid var(--line); color:var(--paper-dim);
-    border-radius:999px; padding:7px 13px 7px 8px; font-family:var(--sans);
-    font-size:13.5px; font-weight:500; transition:.2s;
-  }
-  .pill .dot{ width:22px; height:22px; border-radius:50%; display:grid; place-items:center; font-size:11px; font-weight:700; color:#12141c; }
-  .pill.on{ border-color:var(--amber); color:var(--paper); background:var(--card-2); }
+  .wrap{ max-width:1320px; margin:0 auto; padding:30px; }
+  .pane-grid{ display:grid; grid-template-columns:minmax(400px,460px) 1fr; gap:30px; align-items:start; }
 
-  .search{
-    display:flex; align-items:center; gap:10px; margin-top:14px;
-    background:var(--card); border:1px solid var(--line); border-radius:13px; padding:11px 14px;
-  }
-  .search svg{ flex:none; }
-  .search input{
-    flex:1; background:none; border:none; color:var(--paper); font-family:var(--sans);
-    font-size:14.5px; outline:none;
-  }
-  .search input::placeholder{ color:var(--paper-mute); }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:var(--r); padding:22px; margin-bottom:22px; }
+  .card > .card-h{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:16px; }
+  .card-h h2{ font-size:19px; }
+  .card-h .count{ font-family:var(--mono); font-size:12px; color:var(--paper-mute); }
+  .card .sub{ color:var(--paper-dim); font-size:13px; margin:-8px 0 16px; }
+  .divider{ height:1px; background:var(--line); margin:18px 0; border:0; }
 
-  .sec-head{ display:flex; align-items:baseline; justify-content:space-between; margin:26px 4px 14px; }
-  .sec-head h2{ font-family:var(--serif); font-weight:600; font-size:21px; letter-spacing:-.01em; }
-  .sec-head a{ color:var(--amber); font-size:13px; text-decoration:none; font-weight:500; cursor:pointer; }
+  /* accounts */
+  #accounts{ display:flex; flex-direction:column; gap:9px; margin-bottom:4px; }
+  .acct{ display:flex; align-items:center; gap:10px; background:var(--ink-2); border:1px solid var(--line); border-radius:var(--r-sm); padding:10px 12px; }
+  .abody{ flex:1; min-width:0; }
+  .aname{ font-weight:600; font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .amail{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .link-form{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .link-form .full{ grid-column:1 / -1; }
+  .paste-toggle{ margin-top:12px; }
+  #paste-wrap{ display:none; margin-top:12px; }
+  #paste-wrap.open{ display:block; }
 
-  /* continue watching */
-  .rail{ display:flex; gap:12px; overflow-x:auto; padding:2px 24px 6px; scroll-snap-type:x mandatory; }
-  .rail::-webkit-scrollbar{ height:0; }
-  .poster{
-    flex:none; width:118px; scroll-snap-align:start; cursor:pointer;
-    transition:transform .2s ease;
-  }
-  .poster:hover{ transform:translateY(-4px); }
-  .poster .art{
-    height:168px; border-radius:14px; position:relative; overflow:hidden;
-    box-shadow:0 12px 26px -12px rgba(0,0,0,.7);
-    border:1px solid rgba(255,255,255,.06);
-    display:flex; align-items:flex-end; padding:11px;
-  }
-  .poster .art b{ font-family:var(--serif); font-weight:600; font-size:15px; line-height:1.1; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.6); }
-  .poster .bar{ height:3px; border-radius:2px; background:rgba(255,255,255,.22); margin-top:9px; overflow:hidden; }
-  .poster .bar i{ display:block; height:100%; background:var(--amber); }
-  .poster small{ color:var(--paper-mute); font-size:11.5px; display:block; margin-top:6px; }
+  /* profile chips */
+  .chips{ display:flex; flex-wrap:wrap; gap:12px; }
+  .pchip{ background:none; border:none; padding:4px; display:flex; flex-direction:column; align-items:center; gap:7px; width:82px; }
+  .pchip .ring{ position:relative; width:60px; height:60px; border-radius:50%; display:grid; place-items:center;
+                border:2px solid transparent; transition:.15s; }
+  .pchip:hover .ring{ border-color:var(--line); }
+  .pchip.on .ring{ border-color:var(--amber); }
+  .pchip .check{ position:absolute; right:-2px; bottom:-2px; width:20px; height:20px; border-radius:50%; background:var(--amber);
+                 color:#1a1206; font-size:12px; font-weight:700; display:none; place-items:center; border:2px solid var(--card); }
+  .pchip.on .check{ display:grid; }
+  .pchip.multi .check{ background:var(--blue); }
+  .pchip .lbl{ font-size:12px; color:var(--paper-dim); max-width:82px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center; }
+  .pchip.on .lbl{ color:var(--paper); }
+  .av{ position:relative; border-radius:50%; display:inline-grid; place-items:center; color:#fff; font-family:var(--sans); font-weight:600; overflow:hidden; }
+  .av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 
-  /* collections grid */
-  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:0 24px; }
-  .coll{
-    border-radius:16px; padding:16px; min-height:104px; cursor:pointer;
-    border:1px solid rgba(255,255,255,.06); display:flex; flex-direction:column; justify-content:space-between;
-    transition:transform .2s;
-  }
-  .coll:hover{ transform:translateY(-3px); }
-  .coll b{ font-weight:600; font-size:15px; }
-  .coll span{ font-size:12px; color:rgba(255,255,255,.7); }
+  /* category rows */
+  .cat{ border:1px solid var(--line); border-radius:var(--r-sm); padding:14px; margin-bottom:12px; background:var(--ink-2); }
+  .cat-top{ display:flex; align-items:center; gap:12px; }
+  .cat-top .swatch{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .cat-top .cname{ font-weight:600; font-size:14.5px; flex:1; }
+  .cat-top .cnt{ font-family:var(--mono); font-size:11.5px; color:var(--paper-mute); }
+  .switch{ position:relative; width:42px; height:24px; flex:none; }
+  .switch input{ position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+  .switch .track{ position:absolute; inset:0; background:#333a4c; border-radius:999px; transition:.18s; pointer-events:none; }
+  .switch .knob{ position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.18s; pointer-events:none; }
+  .switch input:checked ~ .track{ background:var(--amber); }
+  .switch input:checked ~ .knob{ transform:translateX(18px); }
+  .cat-ctl{ display:flex; align-items:center; gap:12px; margin-top:12px; flex-wrap:wrap; }
+  .cat-ctl select{ width:auto; padding:6px 10px; font-size:12.5px; }
+  .cat-ctl .mode-lbl{ font-size:12px; color:var(--paper-mute); }
+  .note{ display:none; margin-top:10px; font-size:12px; color:var(--claret); }
+  .note.show{ display:block; }
+  .items{ display:none; margin-top:12px; border-top:1px solid var(--line); padding-top:12px; max-height:280px; overflow:auto; }
+  .items.open{ display:block; }
+  .allrow{ display:flex; gap:16px; margin-bottom:8px; }
+  .item{ display:flex; align-items:center; gap:10px; padding:7px 2px; cursor:pointer; }
+  .item input{ width:16px; height:16px; accent-color:var(--amber); flex:none; }
+  .it-body{ flex:1; min-width:0; }
+  .it-name{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-sub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .it-tag{ font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--paper-mute); border:1px solid var(--line); border-radius:4px; padding:2px 5px; }
 
-  /* addon rows */
-  .addon{
-    display:flex; align-items:center; gap:13px; padding:14px 24px; border-top:1px solid var(--line);
-  }
-  .addon:first-of-type{ border-top:none; }
-  .addon .ico{ width:38px; height:38px; border-radius:11px; background:var(--card-2); display:grid; place-items:center; flex:none; }
-  .addon .info{ flex:1; min-width:0; }
-  .addon .info b{ font-weight:600; font-size:14.5px; display:block; }
-  .addon .info span{ font-size:11.5px; color:var(--paper-mute); }
-  .addon .info .id{ font-family:var(--mono); font-size:10.5px; color:var(--paper-mute); }
+  /* targets */
+  #targets{ display:flex; flex-wrap:wrap; gap:12px; }
+  .chipacc{ width:100%; font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--paper-mute); margin-top:6px; }
 
-  /* iOS-style switch, tinted amber */
-  .sw{ width:44px; height:26px; border-radius:999px; background:var(--card-2); border:1px solid var(--line); position:relative; cursor:pointer; flex:none; transition:.22s; }
-  .sw i{ position:absolute; top:2px; left:2px; width:20px; height:20px; border-radius:50%; background:var(--paper); transition:.22s; box-shadow:0 1px 3px rgba(0,0,0,.4); }
-  .sw.on{ background:var(--amber); border-color:var(--amber); }
-  .sw.on i{ transform:translateX(18px); background:#fff; }
+  /* actions / reports */
+  .actionbar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  #confirm-wrap{ display:none; margin:14px 0; padding:12px 14px; border:1px solid var(--claret); border-radius:var(--r-sm); background:rgba(216,80,58,.08); }
+  #confirm-wrap label{ display:flex; gap:10px; align-items:flex-start; font-size:13px; color:#f0b3a6; }
+  #confirm-wrap input{ margin-top:2px; accent-color:var(--claret); }
+  #results{ margin-top:16px; display:flex; flex-direction:column; gap:12px; }
+  .report{ border:1px solid var(--line); border-radius:var(--r-sm); padding:14px; background:var(--ink-2); }
+  .report h3{ font-family:var(--sans); font-size:14px; font-weight:600; display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+  .badge{ font-family:var(--mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em; padding:2px 7px; border-radius:5px; }
+  .badge.chg{ background:rgba(255,122,26,.16); color:var(--amber); }
+  .badge.no{ background:#22272f; color:var(--paper-mute); }
+  .sumline{ display:flex; align-items:center; gap:8px; font-size:12.5px; margin-top:6px; flex-wrap:wrap; }
+  .sumline .k{ color:var(--paper-dim); min-width:88px; }
+  .tag-a,.tag-u,.tag-r,.tag-k,.tag-h{ font-family:var(--mono); font-size:11px; padding:1px 6px; border-radius:4px; }
+  .tag-a{ color:var(--green); background:rgba(99,214,143,.12); }
+  .tag-u{ color:var(--marigold); background:rgba(255,196,46,.12); }
+  .tag-r{ color:var(--claret); background:rgba(216,80,58,.14); }
+  .tag-k{ color:var(--paper-dim); background:#22272f; }
+  .tag-h{ color:var(--blue); background:rgba(91,157,255,.12); }
 
-  /* empty state */
-  .empty{ text-align:center; padding:40px 30px; }
-  .empty .glyph{ font-size:34px; margin-bottom:14px; opacity:.9; }
-  .empty h4{ font-family:var(--serif); font-weight:600; font-size:19px; margin-bottom:8px; }
-  .empty p{ color:var(--paper-dim); font-size:14px; line-height:1.5; margin-bottom:18px; }
-  .empty .btn{ width:auto; padding:12px 22px; display:inline-flex; }
+  /* preview pane */
+  .pv-head{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .pv-head .selwrap{ display:flex; align-items:center; gap:9px; flex:1; min-width:220px; }
+  .pv-head select{ flex:1; }
+  #pv-tabs{ display:flex; gap:4px; background:var(--ink-2); padding:4px; border-radius:10px; }
+  #pv-tabs button{ border:none; background:none; color:var(--paper-dim); font-size:13px; font-weight:600; padding:7px 14px; border-radius:7px; }
+  #pv-tabs button.on{ background:var(--card-2); color:var(--paper); }
+  #overview-toggle{ display:flex; gap:4px; margin-bottom:14px; }
+  #overview-toggle button{ border:1px solid var(--line); background:none; color:var(--paper-dim); font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; }
+  #overview-toggle button.on{ background:var(--amber); color:#1a1206; border-color:var(--amber); }
+  .pv-note{ font-size:13px; color:var(--paper-dim); margin:0 0 14px; }
+  .pv-note b{ color:var(--paper); }
+  .pv-blank{ color:var(--paper-mute); font-style:italic; padding:40px 0; text-align:center; }
+  .pv-cols{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .pv-card{ border:1px solid var(--line); border-radius:var(--r-sm); background:var(--ink-2); overflow:hidden; }
+  .pv-card .h{ display:flex; align-items:center; gap:8px; padding:11px 14px; border-bottom:1px solid var(--line); font-family:var(--sans); font-weight:600; font-size:13.5px; }
+  .pv-card .h .dotc{ width:8px; height:8px; border-radius:50%; }
+  .pv-card .h .n{ margin-left:auto; font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .pv-list{ padding:6px 10px; max-height:240px; overflow:auto; }
+  .pv-item{ display:flex; align-items:center; gap:8px; padding:6px 4px; font-size:13px; }
+  .pv-item .mk{ font-family:var(--mono); width:12px; text-align:center; color:var(--paper-mute); }
+  .pv-item.added .mk{ color:var(--green); } .pv-item.added .txt{ color:var(--green); }
+  .pv-item.removed .mk{ color:var(--claret); } .pv-item.removed .txt{ color:var(--claret); text-decoration:line-through; opacity:.8; }
+  .pv-item .dot{ width:6px; height:6px; border-radius:50%; background:var(--paper-mute); flex:none; }
+  .pv-item .dot.off{ background:transparent; border:1px solid var(--paper-mute); }
+  .pv-item .txt{ flex:none; }
+  .pv-item .sub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); margin-left:auto; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pv-empty{ color:var(--paper-mute); font-style:italic; font-size:12.5px; padding:10px 4px; }
 
-  /* skeleton loading */
-  .skel{ background:linear-gradient(90deg,var(--card) 25%,var(--card-2) 37%,var(--card) 63%); background-size:400% 100%; animation:shimmer 1.3s infinite; border-radius:12px; }
-  @keyframes shimmer{ 0%{ background-position:100% 0 } 100%{ background-position:-100% 0 } }
+  /* watched / progress cards */
+  .wcard{ border:1px solid var(--line); border-radius:var(--r-sm); background:var(--ink-2); padding:6px 12px; }
+  .wrow{ display:flex; align-items:center; gap:12px; padding:10px 2px; border-top:1px solid var(--line); font-size:13px; }
+  .wrow:first-child{ border-top:none; }
+  .wbody{ flex:1; min-width:0; }
+  .wtitle{ font-size:13.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wsub{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .wtype{ font-family:var(--mono); font-size:10px; text-transform:uppercase; color:var(--paper-mute); border:1px solid var(--line); border-radius:4px; padding:2px 6px; }
+  .prog{ display:flex; align-items:center; gap:8px; width:150px; flex:none; }
+  .prog .bar{ flex:1; height:5px; background:#2a3040; border-radius:3px; overflow:hidden; }
+  .prog .bar span{ display:block; height:100%; background:var(--amber); }
+  .prog .pct{ font-family:var(--mono); font-size:11px; color:var(--paper-dim); width:34px; text-align:right; }
 
-  /* bottom glass nav — the one place glass belongs */
-  .nav{
-    position:absolute; left:12px; right:12px; bottom:12px; height:64px;
-    display:flex; align-items:center; justify-content:space-around;
-    background:rgba(18,21,30,.72);
-    -webkit-backdrop-filter:blur(22px) saturate(1.4);
-    backdrop-filter:blur(22px) saturate(1.4);
-    border:1px solid rgba(255,255,255,.08); border-radius:22px;
-    box-shadow:0 12px 40px -12px rgba(0,0,0,.7);
-  }
-  .navbtn{
-    background:none; border:none; cursor:pointer; color:var(--paper-mute);
-    display:flex; flex-direction:column; align-items:center; gap:4px; font-family:var(--sans);
-    font-size:10.5px; font-weight:500; padding:6px 12px; border-radius:12px; transition:.2s;
-  }
-  .navbtn.on{ color:var(--amber); }
-  .navbtn svg{ width:22px; height:22px; }
-  .ed-scroll{ padding-bottom:92px; }
+  /* ---------------- settings modal ---------------- */
+  #settings-modal{ position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
+                   background:rgba(6,7,11,.6); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); padding:24px; }
+  #settings-modal.open{ display:flex; }
+  .modal-card{ width:min(640px,100%); max-height:86vh; display:flex; flex-direction:column; background:var(--card); border:1px solid var(--line); border-radius:var(--r); overflow:hidden; }
+  .modal-h{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--line); }
+  .modal-h h3{ font-size:18px; } .modal-h .sub{ font-size:12px; color:var(--paper-mute); margin-top:2px; }
+  .modal-x{ background:none; border:none; color:var(--paper-dim); font-size:22px; line-height:1; }
+  #settings-platforms{ display:flex; gap:4px; padding:12px 22px 0; }
+  #settings-platforms button{ border:1px solid var(--line); background:none; color:var(--paper-dim); font-size:12.5px; font-weight:600; padding:6px 14px; border-radius:8px; }
+  #settings-platforms button.on{ background:var(--card-2); color:var(--paper); border-color:var(--card-2); }
+  #settings-tree{ padding:14px 22px; overflow:auto; flex:1; }
+  .sgroup{ border:1px solid var(--line); border-radius:var(--r-sm); margin-bottom:8px; overflow:hidden; }
+  .sgroup-h{ display:flex; align-items:center; gap:10px; padding:11px 13px; cursor:pointer; background:var(--ink-2); }
+  .sgroup-h input{ width:16px; height:16px; accent-color:var(--amber); }
+  .sgroup-h .chev{ color:var(--paper-mute); transition:.15s; display:inline-block; }
+  .sgroup.open .sgroup-h .chev{ transform:rotate(90deg); }
+  .sgroup-h .gname{ font-weight:600; font-size:13.5px; flex:1; }
+  .sgroup-h .gcount{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
+  .sgroup-body{ display:none; padding:4px 13px 10px; }
+  .sgroup.open .sgroup-body{ display:block; }
+  .sleaf{ display:flex; align-items:center; gap:10px; padding:6px 2px; font-size:13px; }
+  .sleaf input{ width:15px; height:15px; accent-color:var(--amber); }
+  .sleaf.locked{ opacity:.72; }
+  .sleaf .lname{ flex:1; }
+  .sleaf .lval{ font-family:var(--mono); font-size:11px; color:var(--paper-dim); }
+  .ltag{ font-family:var(--mono); font-size:10px; text-transform:uppercase; padding:2px 6px; border-radius:4px; }
+  .ltag.secret{ color:var(--claret); background:rgba(216,80,58,.12); }
+  .ltag.account{ color:var(--blue); background:rgba(91,157,255,.12); }
+  .ltag.personal{ color:var(--marigold); background:rgba(255,196,46,.12); }
+  .modal-f{ display:flex; align-items:center; justify-content:space-between; padding:16px 22px; border-top:1px solid var(--line); }
+  #settings-count{ font-family:var(--mono); font-size:12px; color:var(--paper-dim); }
 
-  /* ============================================================= MULTI */
-  .master-card{
-    background:linear-gradient(135deg, rgba(255,122,26,.16), rgba(255,196,46,.06));
-    border:1px solid rgba(255,122,26,.3); border-radius:18px; padding:18px; margin-bottom:8px;
-  }
-  .master-card .lab{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--amber); font-weight:600; }
-  .master-pick{ display:flex; align-items:center; gap:12px; margin-top:12px; }
-  .master-pick .avatar{ width:46px; height:46px; }
-  .master-pick b{ font-family:var(--serif); font-size:20px; font-weight:600; }
-  .master-pick span{ display:block; color:var(--paper-dim); font-size:12.5px; }
-  .swap{ margin-left:auto; font-size:12.5px; color:var(--amber); cursor:pointer; font-weight:600; background:none; border:none; font-family:var(--sans); }
-
-  .chip-row{ display:flex; gap:9px; flex-wrap:wrap; margin-top:6px; }
-  .chip{
-    display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none;
-    background:var(--card); border:1px solid var(--line); border-radius:12px;
-    padding:11px 14px; font-size:13.5px; font-weight:500; transition:.2s; flex:1; min-width:120px;
-  }
-  .chip .box{ width:19px; height:19px; border-radius:6px; border:1.5px solid var(--paper-mute); display:grid; place-items:center; flex:none; transition:.2s; }
-  .chip.on{ border-color:var(--amber); background:var(--card-2); }
-  .chip.on .box{ background:var(--amber); border-color:var(--amber); }
-  .chip.on .box svg{ opacity:1; }
-  .chip .box svg{ opacity:0; transition:.2s; }
-
-  .target{
-    display:flex; align-items:center; gap:13px; padding:14px 16px; margin-bottom:10px;
-    background:var(--card); border:1px solid var(--line); border-radius:14px; cursor:pointer;
-    transition:.2s;
-  }
-  .target.on{ border-color:var(--amber); }
-  .target .info{ flex:1; }
-  .target .info b{ font-weight:600; font-size:14.5px; display:block; }
-  .target .info span{ font-size:12px; color:var(--paper-mute); }
-  .target .box{ width:22px; height:22px; border-radius:7px; border:1.5px solid var(--paper-mute); display:grid; place-items:center; transition:.2s; }
-  .target.on .box{ background:var(--amber); border-color:var(--amber); }
-  .target .box svg{ opacity:0; transition:.2s; }
-  .target.on .box svg{ opacity:1; }
-
-  .apply-bar{
-    position:absolute; left:0; right:0; bottom:0; padding:16px 24px 22px;
-    background:linear-gradient(180deg, transparent, var(--ink-2) 34%);
-  }
-  .apply-bar .btn{ box-shadow:0 -2px 30px rgba(255,122,26,.15); }
-
-  /* modal sheet — glass overlay */
-  .sheet-wrap{
-    position:absolute; inset:0; z-index:40; display:flex; align-items:flex-end;
-    background:rgba(6,8,14,.55);
-    -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
-    opacity:0; visibility:hidden; transition:opacity .3s ease, visibility 0s .3s;
-  }
-  .sheet-wrap.open{ opacity:1; visibility:visible; transition:opacity .3s ease; }
-  .sheet{
-    width:100%; background:var(--ink-2); border-top-left-radius:26px; border-top-right-radius:26px;
-    border-top:1px solid var(--line); padding:8px 24px 26px; max-height:82%; overflow-y:auto;
-    transform:translateY(100%); transition:transform .38s cubic-bezier(.2,.8,.2,1);
-  }
-  .sheet-wrap.open .sheet{ transform:none; }
-  .grab{ width:38px; height:4px; border-radius:3px; background:var(--line); margin:8px auto 18px; }
-  .report-row{ display:flex; align-items:center; gap:12px; padding:13px 0; border-top:1px solid var(--line); }
-  .report-row:first-of-type{ border-top:none; }
-  .report-row .st{ width:24px; height:24px; border-radius:50%; display:grid; place-items:center; flex:none; }
-  .st svg{ width:14px; height:14px; }
-  .st.ok{ background:rgba(82,192,122,.16); color:var(--ok); }
-  .st.warn{ background:rgba(216,80,58,.16); color:var(--claret); }
-  .report-row .info{ flex:1; }
-  .report-row .info b{ font-size:14px; font-weight:600; display:block; }
-  .report-row .info span{ font-family:var(--mono); font-size:11px; color:var(--paper-mute); }
-
-  .spinner{ width:18px; height:18px; border:2.5px solid rgba(26,14,2,.25); border-top-color:#1a0e02; border-radius:50%; animation:spin .7s linear infinite; }
-  @keyframes spin{ to{ transform:rotate(360deg) } }
-
-  /* ============================================================= TOUCAN MASCOT */
-  .mascot{
-    position:fixed; left:50%; top:50%; z-index:30;
-    width:230px; pointer-events:none; will-change:transform,opacity;
-    transform:translate(-50%,-50%);
-    filter:drop-shadow(0 24px 30px rgba(0,0,0,.45));
-  }
-  .mascot .inner{ transform-origin:60% 80%; }
-  .mascot.land .inner{ animation:land .5s cubic-bezier(.2,1.4,.4,1); }
-  @keyframes land{
-    0%{ transform:translateY(-6px) rotate(-2deg) }
-    40%{ transform:translateY(3px) scaleY(.96) }
-    70%{ transform:translateY(-1px) }
-    100%{ transform:none }
-  }
-  #t-wing{ transform-box:fill-box; transform-origin:36% 22%; }
-  #t-wing.flap{ animation:flap .26s ease-in-out infinite; }
-  @keyframes flap{
-    0%,100%{ transform:rotate(-4deg) }
-    50%{ transform:rotate(-46deg) translateY(-4px) }
-  }
+  /* toucan blink lid */
   #t-lid{ transform-box:fill-box; transform-origin:center; transform:scaleY(0); }
-  #t-lid.blink{ animation:blink .18s ease; }
-  @keyframes blink{ 0%,100%{ transform:scaleY(0) } 50%{ transform:scaleY(1) } }
-  .perch-shadow{
-    position:absolute; z-index:2; width:120px; height:14px; border-radius:50%;
-    background:radial-gradient(closest-side, rgba(0,0,0,.4), transparent);
-    opacity:0; transition:opacity .3s; pointer-events:none;
-  }
+  #t-lid.blink{ animation:blink .22s ease; }
+  @keyframes blink{ 0%,100%{ transform:scaleY(0); } 45%{ transform:scaleY(1); } }
 
-  @media (max-width:480px){
-    .stage{ padding:0; }
-    .app{ height:100dvh; max-width:100%; border-radius:0; border:none; }
-    .mascot{ width:180px; }
+  /* responsive: collapse to one column on laptops narrower than the two-pane comfortably fits */
+  @media (max-width:1080px){
+    .pane-grid{ grid-template-columns:1fr; }
+    .gate{ grid-template-columns:1fr; }
+    .gate-hero{ display:none; }
+    .gate-panel{ max-width:none; padding:0 8%; }
   }
-  @media (prefers-reduced-motion: reduce){
-    *{ animation-duration:.001ms !important; transition-duration:.12s !important; }
-    #t-wing.flap{ animation:none; }
+  @media (max-width:640px){
+    .wrap{ padding:18px; } .pv-cols{ grid-template-columns:1fr; } .link-form{ grid-template-columns:1fr; }
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hero-bird{ animation:none; } #t-lid.blink{ animation:none; }
   }
 </style>
-<script src="https://accounts.google.com/gsi/client" async></script>
 </head>
 <body>
-<div class="grain"></div>
 
-<!-- ===================== TOUCAN MASCOT (single, flies everywhere) ===================== -->
-<div class="mascot" id="mascot" aria-hidden="true">
-  <div class="inner">
+<!-- ============ GOOGLE FRONT DOOR ============ -->
+<div class="gate" id="gate">
+  <div class="gate-hero">
+    <div class="glow"></div>
+    <div class="hero-bird"><div class="inner" id="heroInner">
   <svg viewBox="0 0 260 280" width="100%" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="beak" x1="0" y1="0" x2="1" y2="0.25">
@@ -495,575 +365,293 @@
     <path d="M166 66 Q210 62 246 90" stroke="#ffd27a" stroke-width="2" fill="none" opacity=".6"/>
     <path d="M175 96 Q205 94 223 105" stroke="#5a2c00" stroke-width="1.4" fill="none" opacity=".5"/>
   </svg>
+    </div></div>
+  </div>
+  <div class="gate-panel">
+    <div class="brand"><span class="markhead"><svg viewBox="0 0 32 32" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M6 12 Q5 22 14 24 Q22 24 22 15 Q22 8 15 7 Q8 7 6 12 Z" fill="#12141b"/><path d="M18 9 Q29 8 31 15 Q29 18 24 18 Q20 14 18 9 Z" fill="#ff7a1a"/><path d="M31 15 Q32 17 30 19 Q27 18 24 18 Q29 17 31 15 Z" fill="#171412"/><circle cx="15" cy="13" r="2.4" fill="#0a0a0a"/><circle cx="15" cy="13" r="2.4" fill="none" stroke="#ff9e12" stroke-width="1"/></svg></span><b>Numax<span class="dot">.</span></b></div>
+    <span class="eyebrow">Your Nuvio companion</span>
+    <div class="display">Set one profile up right,<br>then hand it to <em>everyone.</em></div>
+    <p class="lede">Sign in once with Google. Numax remembers the Nuvio accounts you link, so your setup is waiting on every device.</p>
+    <button class="btn btn-google" id="btnGoogle" onclick="numaxSignIn()">
+      <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
+      Continue with Google
+    </button>
+    <p class="tiny">Google signs you in to Numax and (optionally) backs up your list of linked accounts to your Drive. Your Nuvio data itself is read straight from Nuvio once you link an account inside.</p>
   </div>
 </div>
 
-<div class="stage">
-  <div class="app" id="app">
-
-    <!-- ================= AUTH ================= -->
-    <section class="screen active" id="s-auth">
-      <div class="scroll">
-        <div class="pad auth-top">
-          <div class="brand"><span class="logomark"></span><b>Numax<span class="dotmark">.</span></b></div>
-        </div>
-        <div class="pad">
-          <div class="auth-headline">
-            <span class="eyebrow">Your Nuvio companion</span>
-            <div class="display" style="margin-top:14px;">Your setup shouldn't <em>start over</em> on every profile.</div>
-            <p class="lede" style="margin-top:16px;">Build one profile the way you like it — addons, collections, settings — then hand it to the whole family in a couple of taps.</p>
-          </div>
-
-          <div style="margin-top:30px;">
-            <button class="btn btn-google" onclick="signIn()">
-              <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
-              Continue with Google
-            </button>
-            <p class="tiny" style="margin-top:14px;">We link your Nuvio accounts to your Google sign-in, so you set things up once and they're waiting on every device. Numax only ever touches its own backup file on your Drive.</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= GREETING ================= -->
-    <section class="screen" id="s-greeting">
-      <div class="scroll">
-        <div class="pad greet-head" style="padding-right:104px;">
-          <div class="brand" style="margin-bottom:26px;"><b>Numax<span class="dotmark">.</span></b></div>
-          <span class="eyebrow" id="userEmail">furqan@gmail.com</span>
-          <div class="display">Welcome to <em>Numax.</em></div>
-          <p class="lede">Pick how you want to work today. You can switch any time.</p>
-        </div>
-
-        <div class="pad" style="padding-top:0;">
-          <button class="opt" onclick="goTo('single')">
-            <div class="opt-top">
-              <span class="opt-badge badge-single">One account</span>
-              <span class="arrow">→</span>
-            </div>
-            <h3>Edit a single account</h3>
-            <p>Fine-tune the profiles on one account — the same controls you know from the extension, with more room to work.</p>
-          </button>
-
-          <button class="opt" onclick="goTo('multi')">
-            <div class="opt-top">
-              <span class="opt-badge badge-multi">Many accounts</span>
-              <span class="arrow">→</span>
-            </div>
-            <h3>Edit across accounts</h3>
-            <p>Choose one profile as your master, then push its addons, collections and settings to everyone — with a report on exactly what changed.</p>
-          </button>
-
-          <p class="tiny" style="margin-top:18px;">Either way, nothing is overwritten blindly. Numax pulls the current state first, keeps every profile index intact, and shows you a per-item result.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= SINGLE: account picker ================= -->
-    <section class="screen" id="s-single">
-      <div class="scroll">
-        <div class="pad">
-          <button class="back" onclick="goTo('greeting')">‹ Back</button>
-          <div style="margin-top:14px; padding-right:100px;">
-            <span class="eyebrow">One account</span>
-            <div class="display" style="font-size:30px; margin-top:10px;">Which account?</div>
-            <p class="lede" style="margin-top:8px;">These are the Nuvio logins synced to your Google account.</p>
-          </div>
-
-          <div class="sec-label">Your accounts</div>
-          <button class="row" onclick="openEditor()">
-            <div class="avatar" style="background:linear-gradient(135deg,#ff7a1a,#ffc42e)">F</div>
-            <div class="meta"><b>Furqan's account</b><span>4 profiles · synced 2m ago</span></div>
-            <span class="chev">›</span>
-          </button>
-          <button class="row" onclick="openEditor()">
-            <div class="avatar" style="background:linear-gradient(135deg,#3ea6a0,#2b7a86)">M</div>
-            <div class="meta"><b>Mum's account</b><span>1 profile · synced 1h ago</span></div>
-            <span class="chev">›</span>
-          </button>
-          <button class="row" onclick="openEditor()">
-            <div class="avatar" style="background:linear-gradient(135deg,#8a63d2,#5a3fa0)">D</div>
-            <div class="meta"><b>Dad's account</b><span>2 profiles · synced yesterday</span></div>
-            <span class="chev">›</span>
-          </button>
-          <button class="row" onclick="openEditor()">
-            <div class="avatar" style="background:linear-gradient(135deg,#d8503a,#a83322)">G</div>
-            <div class="meta"><b>Grandpa</b><span>1 profile · needs re-auth</span></div>
-            <span class="chev">›</span>
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= EDITOR (extension-like) ================= -->
-    <section class="screen" id="s-editor">
-      <div class="ed-header">
-        <div class="top" style="justify-content:flex-start;">
-          <button class="back" onclick="goTo('single')">‹ Furqan's account</button>
-        </div>
-        <div class="profile-switch" id="profileSwitch">
-          <button class="pill on" onclick="switchProfile(this,'Furqan')"><span class="dot" style="background:#ff7a1a">F</span>Furqan</button>
-          <button class="pill" onclick="switchProfile(this,'Mum')"><span class="dot" style="background:#3ea6a0">M</span>Mum</button>
-          <button class="pill" onclick="switchProfile(this,'Dad')"><span class="dot" style="background:#8a63d2">D</span>Dad</button>
-          <button class="pill" onclick="switchProfile(this,'Kids')"><span class="dot" style="background:#ffc42e">K</span>Kids</button>
-        </div>
-        <div class="search">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#7d7c78" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-          <input id="searchInput" placeholder="Search titles, addons, collections…" oninput="onSearch(this.value)" />
-        </div>
-      </div>
-
-      <div class="scroll ed-scroll" id="edScroll">
-        <!-- default (home) view -->
-        <div id="edHome">
-          <div class="sec-head" style="padding:0 24px;"><h2 id="cwTitle">Continue watching</h2><a onclick="toggleLoading()">Refresh</a></div>
-          <div class="rail" id="cwRail"></div>
-
-          <div class="sec-head" style="margin-top:24px;"><h2>Collections</h2><a onclick="toggleEmpty()" id="emptyToggle">Show empty</a></div>
-          <div id="collWrap">
-            <div class="grid2" id="collGrid">
-              <div class="coll" style="background:linear-gradient(135deg,#3a2a5a,#1c1430)"><b>Comfort rewatches</b><span>18 titles</span></div>
-              <div class="coll" style="background:linear-gradient(135deg,#5a3320,#2a170c)"><b>Dad's thrillers</b><span>27 titles</span></div>
-              <div class="coll" style="background:linear-gradient(135deg,#1c4a46,#0e2725)"><b>Saturday cartoons</b><span>41 titles</span></div>
-              <div class="coll" style="background:linear-gradient(135deg,#4a3312,#271a08)"><b>Docs to finish</b><span>9 titles</span></div>
-            </div>
-          </div>
-
-          <div class="sec-head" style="margin-top:26px;"><h2>Installed addons</h2><a onclick="openApplyFromEditor()">Save as template</a></div>
-          <div id="addonList"></div>
-        </div>
-
-        <div class="pad" style="padding-top:0;">
-          <button class="btn btn-ghost" id="driveBtn" onclick="backupNow()">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:8px;"><path d="M8 3h8l5 9-4 7H7l-4-7Z"/><path d="M8 3 3 12h8M16 3l-4 7 4 9M11 12h10"/></svg>
-            <span id="driveBtnText">Back up to Drive</span>
-          </button>
-        </div>
-
-        <!-- search results view -->
-        <div id="edSearch" style="display:none;">
-          <div class="sec-head" style="padding:0 24px;"><h2 style="font-size:18px;">Results for “<span id="searchEcho"></span>”</h2></div>
-          <div id="searchResults"></div>
-        </div>
-      </div>
-
-      <nav class="nav">
-        <button class="navbtn on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1Z"/></svg>Home</button>
-        <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="8" height="8" rx="1.5"/><rect x="13" y="4" width="8" height="8" rx="1.5"/><rect x="3" y="14" width="8" height="6" rx="1.5"/><rect x="13" y="14" width="8" height="6" rx="1.5"/></svg>Collections</button>
-        <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/><circle cx="12" cy="12" r="9"/></svg>Addons</button>
-        <button class="navbtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.6-2-3.4-2.3 1a7 7 0 0 0-1.7-1L14.5 3h-5l-.4 2.4a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.6a7 7 0 0 0 0 2l-2 1.6 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.4 2.4h5l.4-2.4a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.6a7 7 0 0 0 .1-1Z"/></svg>Settings</button>
-      </nav>
-    </section>
-
-    <!-- ================= MULTI: master + apply matrix ================= -->
-    <section class="screen" id="s-multi">
-      <div class="scroll" style="padding-bottom:120px;">
-        <div class="pad" style="padding-bottom:8px;">
-          <button class="back" onclick="goTo('greeting')">‹ Back</button>
-          <div style="margin-top:14px; padding-right:96px;">
-            <span class="eyebrow">Many accounts</span>
-            <div class="display" style="font-size:30px; margin-top:10px;">Set your <em>master.</em></div>
-            <p class="lede" style="margin-top:8px;">This is the profile you've perfected. Numax copies from it — and never the other way.</p>
-          </div>
-
-          <div class="master-card" style="margin-top:20px;">
-            <span class="lab">Master profile</span>
-            <div class="master-pick">
-              <div class="avatar" style="background:linear-gradient(135deg,#ff7a1a,#ffc42e)">F</div>
-              <div><b>Furqan</b><span>Furqan's account · 6 addons, 4 collections</span></div>
-              <button class="swap" onclick="pulse(this)">Change</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="pad" style="padding-top:6px;">
-          <div class="sec-label" style="margin-top:8px;">What to copy</div>
-          <div class="chip-row">
-            <div class="chip on" onclick="toggleChip(this)"><span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>Addons</div>
-            <div class="chip on" onclick="toggleChip(this)"><span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>Collections</div>
-            <div class="chip on" onclick="toggleChip(this)"><span class="box"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>Settings</div>
-          </div>
-
-          <div class="sec-label">Apply to</div>
-          <div class="target on" onclick="toggleTarget(this)">
-            <div class="avatar" style="background:linear-gradient(135deg,#3ea6a0,#2b7a86);width:38px;height:38px;">M</div>
-            <div class="info"><b>Mum · Profile 1</b><span>Mum's account</span></div>
-            <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>
-          </div>
-          <div class="target on" onclick="toggleTarget(this)">
-            <div class="avatar" style="background:linear-gradient(135deg,#8a63d2,#5a3fa0);width:38px;height:38px;">D</div>
-            <div class="info"><b>Dad · Profile 1</b><span>Dad's account</span></div>
-            <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>
-          </div>
-          <div class="target on" onclick="toggleTarget(this)">
-            <div class="avatar" style="background:linear-gradient(135deg,#ffc42e,#f0a80e);width:38px;height:38px;color:#1a0e02;">K</div>
-            <div class="info"><b>Kids · Profile 1</b><span>Furqan's account · parental lock on</span></div>
-            <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>
-          </div>
-          <div class="target" onclick="toggleTarget(this)">
-            <div class="avatar" style="background:linear-gradient(135deg,#d8503a,#a83322);width:38px;height:38px;">G</div>
-            <div class="info"><b>Grandpa · Profile 1</b><span>Needs re-auth before applying</span></div>
-            <span class="box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#1a0e02" stroke-width="3.5"><path d="m5 12 5 5 9-11"/></svg></span>
-          </div>
-        </div>
-      </div>
-
-      <div class="apply-bar">
-        <button class="btn btn-primary" id="applyBtn" onclick="runApply()">Apply to <span id="applyCount">3</span> profiles</button>
-      </div>
-    </section>
-
-    <!-- ================= APPLY REPORT SHEET ================= -->
-    <div class="sheet-wrap" id="reportSheet">
-      <div class="sheet">
-        <div class="grab"></div>
-        <span class="eyebrow" id="reportEyebrow">Done</span>
-        <div class="display" style="font-size:26px; margin:8px 0 4px;">Here's what changed.</div>
-        <p class="tiny" style="margin-bottom:16px;">Every profile pulled its current state first. Indexes preserved.</p>
-        <div id="reportBody"></div>
-        <button class="btn btn-ghost" style="margin-top:20px;" onclick="closeSheet()">Done</button>
-      </div>
+<!-- ============ APP ============ -->
+<div class="app" id="app">
+  <div class="topbar">
+    <div class="brand"><span class="markhead"><svg viewBox="0 0 32 32" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M6 12 Q5 22 14 24 Q22 24 22 15 Q22 8 15 7 Q8 7 6 12 Z" fill="#12141b"/><path d="M18 9 Q29 8 31 15 Q29 18 24 18 Q20 14 18 9 Z" fill="#ff7a1a"/><path d="M31 15 Q32 17 30 19 Q27 18 24 18 Q29 17 31 15 Z" fill="#171412"/><circle cx="15" cy="13" r="2.4" fill="#0a0a0a"/><circle cx="15" cy="13" r="2.4" fill="none" stroke="#ff9e12" stroke-width="1"/></svg></span><b>Numax<span class="dot">.</span></b></div>
+    <div class="who">
+      <span id="drivePill"></span>
+      <span class="gmail" id="gmail"></span>
+      <button class="btn ghost sm" id="btnBackupVault" onclick="backupVault()">Back up list</button>
+      <button class="btn ghost sm" onclick="numaxSignOut()">Sign out</button>
     </div>
+  </div>
 
+  <div class="wrap">
+    <div class="pane-grid">
+
+      <!-- ---------- LEFT: config ---------- -->
+      <div class="col-left">
+
+        <!-- accounts -->
+        <div class="card">
+          <div class="card-h"><h2>Nuvio accounts</h2><span class="count"><span id="acct-count">0</span> linked</span></div>
+          <p class="sub">Link each family member's Nuvio account. Sessions stay on this device.</p>
+          <div id="accounts"></div>
+          <hr class="divider">
+          <div class="link-form">
+            <label class="fld full"><span>Label (optional)</span><input type="text" id="link-name" placeholder="e.g. Mum's account" maxlength="40"></label>
+            <label class="fld"><span>Nuvio email</span><input type="email" id="link-email" placeholder="name@email.com" autocomplete="off"></label>
+            <label class="fld"><span>Password</span><input type="password" id="link-password" placeholder="••••••••" autocomplete="off"></label>
+          </div>
+          <div class="actionbar">
+            <button class="btn primary" id="btn-link">Link account</button>
+            <button class="linkbtn" id="paste-toggle-btn" type="button">Paste a session token instead</button>
+          </div>
+          <div id="paste-wrap">
+            <label class="fld full" style="margin-top:12px;"><span>Session JSON (access_token + refresh_token)</span><textarea id="paste-json" placeholder='{"access_token":"...","refresh_token":"..."}'></textarea></label>
+            <button class="btn ghost sm" id="btn-link-paste">Link from token</button>
+          </div>
+          <p class="status" id="link-status" style="margin-top:10px;"></p>
+        </div>
+
+        <!-- master -->
+        <div class="card">
+          <div class="card-h"><h2>Master profile</h2></div>
+          <p class="sub">The profile everything else copies from.</p>
+          <label class="fld"><span>Account</span><select id="master-account"></select></label>
+          <div id="master-profiles" class="chips" style="margin-top:6px;"></div>
+        </div>
+
+        <!-- what to copy -->
+        <div class="card">
+          <div class="card-h"><h2>What to copy</h2></div>
+          <p class="sub">Pick surfaces, choose exactly which items, and how they merge.</p>
+
+          <!-- addons -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--blue)"></span>
+              <span class="cname">Addons</span>
+              <span class="cnt" id="cnt-addons">0</span>
+              <label class="switch"><input type="checkbox" id="cat-addons"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-addons"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-addons" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-addons">Mirror with a subset will remove their other addons.</div>
+            <div class="items" id="items-addons"></div>
+          </div>
+
+          <!-- plugins -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--purple)"></span>
+              <span class="cname">Plugins</span>
+              <span class="cnt" id="cnt-plugins">0</span>
+              <label class="switch"><input type="checkbox" id="cat-plugins"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-plugins"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-plugins" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-plugins">Mirror with a subset will remove their other plugins.</div>
+            <div class="items" id="items-plugins"></div>
+          </div>
+
+          <!-- collections -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--teal)"></span>
+              <span class="cname">Collections</span>
+              <span class="cnt" id="cnt-collections">0</span>
+              <label class="switch"><input type="checkbox" id="cat-collections"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <span class="mode-lbl">Mode</span>
+              <select id="mode-collections"><option value="merge">Merge (keep theirs, add master's)</option><option value="mirror">Mirror (make identical)</option></select>
+              <button class="linkbtn" id="choose-collections" type="button" disabled>Choose items</button>
+            </div>
+            <div class="note" id="note-collections">Mirror with a subset will remove their other collections.</div>
+            <div class="items" id="items-collections"></div>
+          </div>
+
+          <!-- settings -->
+          <div class="cat">
+            <div class="cat-top">
+              <span class="swatch" style="background:var(--amber)"></span>
+              <span class="cname">Settings</span>
+              <span class="cnt" id="cnt-settings">0 selected</span>
+              <label class="switch"><input type="checkbox" id="cat-settings"><span class="track"></span><span class="knob"></span></label>
+            </div>
+            <div class="cat-ctl">
+              <button class="linkbtn" id="choose-settings" type="button" disabled>Choose fields…</button>
+              <span class="mode-lbl">API keys &amp; account fields are always held back.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- targets -->
+        <div class="card">
+          <div class="card-h"><h2>Apply to</h2></div>
+          <p class="sub">Every other profile is ticked by default. Untick any you want to leave alone.</p>
+          <div id="targets"></div>
+        </div>
+
+        <!-- actions -->
+        <div class="card">
+          <div class="actionbar">
+            <button class="btn ghost" id="btn-preview">Preview changes</button>
+            <button class="btn primary" id="btn-apply" disabled>Apply</button>
+          </div>
+          <div id="confirm-wrap"><label><input type="checkbox" id="confirm-removals"><span>Some profiles will have items <b>removed</b> (mirror mode). I've reviewed the preview and want to proceed.</span></label></div>
+          <p class="status" id="global-status" style="margin-top:12px;"></p>
+          <div id="results"></div>
+        </div>
+
+      </div>
+
+      <!-- ---------- RIGHT: preview ---------- -->
+      <div class="col-right">
+        <div class="card" style="position:sticky; top:88px;">
+          <div class="pv-head">
+            <div class="selwrap">
+              <span class="av" id="preview-av" style="width:26px;height:26px;font-size:11px;background:#5b3fa0;"></span>
+              <select id="preview-profile"></select>
+            </div>
+            <div id="pv-tabs">
+              <button data-tab="overview" class="on">Overview</button>
+              <button data-tab="watched">Watched</button>
+              <button data-tab="progress">In progress</button>
+            </div>
+          </div>
+          <div id="overview-toggle">
+            <button id="pv-current" class="on">Current</button>
+            <button id="pv-after">After apply</button>
+          </div>
+          <div id="preview-body"></div>
+          <div id="watched-body" style="display:none;"></div>
+          <div id="progress-body" style="display:none;"></div>
+        </div>
+      </div>
+
+    </div>
   </div>
 </div>
 
-<script>
-/* ---------------- data ---------------- */
-const posters = [
-  {t:"Nightshade County", g:"linear-gradient(160deg,#3a1c2c,#120810)", p:72, s:"S2 · E4"},
-  {t:"The Salt Road",     g:"linear-gradient(160deg,#1c3a44,#0a1518)", p:34, s:"S1 · E7"},
-  {t:"Halcyon",           g:"linear-gradient(160deg,#4a3312,#1a0f04)", p:88, s:"S3 · E1"},
-  {t:"Paper Cities",      g:"linear-gradient(160deg,#2a2350,#100c22)", p:12, s:"S1 · E2"},
-  {t:"Low Tide",          g:"linear-gradient(160deg,#123a30,#061713)", p:57, s:"Film"},
-  {t:"Ember & Ash",       g:"linear-gradient(160deg,#4a1c1c,#1a0808)", p:5,  s:"S1 · E1"}
-];
-const addons = [
-  {n:"Cinemeta", d:"Metadata for films & series", id:"v3-cinemeta.strem.io", on:true},
-  {n:"Subtitles", d:"OpenSubtitles-backed", id:"opensubtitles-v3", on:true},
-  {n:"Trakt Sync", d:"Scrobbling & watch history", id:"trakt.tv", on:true},
-  {n:"Community Catalogs", d:"Extra rows on Home", id:"community-catalogs", on:false},
-  {n:"Local Files", d:"Your own library", id:"local-files", on:true},
-  {n:"Watch Party", d:"Sync playback with family", id:"watch-party", on:false}
-];
-const searchDB = [
-  ...posters.map(p=>({t:p.t, sub:"Title · "+p.s, g:p.g})),
-  {t:"Cinemeta", sub:"Addon · installed", g:"linear-gradient(135deg,#ff7a1a,#ffc42e)"},
-  {t:"Dad's thrillers", sub:"Collection · 27 titles", g:"linear-gradient(135deg,#5a3320,#2a170c)"},
-  {t:"Saturday cartoons", sub:"Collection · 41 titles", g:"linear-gradient(135deg,#1c4a46,#0e2725)"}
-];
-
-/* ---------------- render editor content ---------------- */
-function renderRail(){
-  cwRail.innerHTML = posters.map(p=>`
-    <div class="poster">
-      <div class="art" style="background:${p.g}"><b>${p.t}</b></div>
-      <div class="bar"><i style="width:${p.p}%"></i></div>
-      <small>${p.s}</small>
-    </div>`).join('');
-}
-function renderAddons(){
-  addonList.innerHTML = addons.map((a,i)=>`
-    <div class="addon">
-      <div class="ico">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff9c47" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M8 12h8M12 8v8"/></svg>
+<!-- ============ SETTINGS MODAL ============ -->
+<div id="settings-modal">
+  <div class="modal-card">
+    <div class="modal-h">
+      <div><h3>Choose settings to copy</h3><div class="sub" id="settings-sub"></div></div>
+      <button class="modal-x" id="settings-close">×</button>
+    </div>
+    <div id="settings-platforms"></div>
+    <div id="settings-tree"></div>
+    <div class="modal-f">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <button class="linkbtn" id="settings-selall" type="button">Select all shareable</button>
+        <button class="linkbtn" id="settings-none" type="button">Clear</button>
+        <span id="settings-count">0 selected</span>
       </div>
-      <div class="info"><b>${a.n}</b><span>${a.d}</span><br><span class="id">${a.id}</span></div>
-      <div class="sw ${a.on?'on':''}" onclick="this.classList.toggle('on')"><i></i></div>
-    </div>`).join('');
-}
-renderRail(); renderAddons();
+      <button class="btn primary" id="btn-settings-done">Done</button>
+    </div>
+  </div>
+</div>
 
-/* ---------------- editor interactions ---------------- */
-function switchProfile(el,name){
-  document.querySelectorAll('#profileSwitch .pill').forEach(p=>p.classList.remove('on'));
-  el.classList.add('on');
-  const map={ Furqan:"Continue watching", Mum:"Where Mum left off", Dad:"Dad's queue", Kids:"Kids · Continue watching" };
-  cwTitle.textContent = map[name] || "Continue watching";
-  if(name==="Kids"){
-    // kids profile: a fresh, mostly-empty profile — real product state
-    cwRail.innerHTML = posters.slice(4,6).map(p=>`
-      <div class="poster"><div class="art" style="background:${p.g}"><b>${p.t}</b></div><div class="bar"><i style="width:${p.p}%"></i></div><small>${p.s}</small></div>`).join('');
-  } else { renderRail(); }
-}
-function onSearch(v){
-  const q=v.trim().toLowerCase();
-  if(!q){ edHome.style.display='block'; edSearch.style.display='none'; return; }
-  edHome.style.display='none'; edSearch.style.display='block';
-  searchEcho.textContent=v;
-  const hits=searchDB.filter(x=>x.t.toLowerCase().includes(q));
-  if(!hits.length){
-    searchResults.innerHTML=`<div class="empty"><div class="glyph">🔍</div><h4>No matches</h4><p>Nothing here for “${v}”. Try a title, an addon name, or a collection.</p></div>`;
-    return;
+<!-- ============ GOOGLE + SHELL GLUE ============ -->
+<script>
+  const GOOGLE = {
+    clientId: '841898218953-c5f3ide5lcsg8g2opn1ucrekvlq335rs.apps.googleusercontent.com',
+    scope: 'openid email profile https://www.googleapis.com/auth/drive.file',
+    backupName: 'numax-vault.json'
+  };
+  let googleToken = null, googleClient = null;
+
+  function numaxSignIn(){
+    if(!(window.google && google.accounts && google.accounts.oauth2)){
+      // library blocked (offline/preview) — let the app open so linking still works
+      revealApp('(offline — Google unavailable)'); return;
+    }
+    if(!googleClient){
+      googleClient = google.accounts.oauth2.initTokenClient({
+        client_id: GOOGLE.clientId, scope: GOOGLE.scope,
+        callback: async (resp)=>{
+          if(resp && resp.error){ console.error('[Numax] auth error:', resp.error); return; }
+          googleToken = resp;
+          let email = '';
+          try{
+            const who = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',
+              { headers:{ Authorization:'Bearer '+resp.access_token } }).then(r=>r.json());
+            email = (who && who.email) || '';
+          }catch(e){ console.warn('[Numax] userinfo failed:', e); }
+          revealApp(email);
+        }
+      });
+    }
+    googleClient.requestAccessToken();
   }
-  searchResults.innerHTML = hits.map(h=>`
-    <div class="addon" style="cursor:pointer">
-      <div class="ico" style="background:${h.g}"></div>
-      <div class="info"><b>${h.t}</b><span>${h.sub}</span></div>
-      <span class="chev" style="color:#7d7c78">›</span>
-    </div>`).join('');
-}
-let emptyShown=false;
-function toggleEmpty(){
-  emptyShown=!emptyShown;
-  emptyToggle.textContent = emptyShown ? "Show all" : "Show empty";
-  if(emptyShown){
-    collWrap.innerHTML = `<div class="empty" style="padding:32px 24px"><div class="glyph">📁</div><h4>No collections yet</h4><p>This profile is a blank slate. Pull a collection over from your master profile, or build one from search.</p><button class="btn btn-primary" onclick="toggleEmpty()">Build from master</button></div>`;
-  } else {
-    collWrap.innerHTML = `<div class="grid2" id="collGrid">
-      <div class="coll" style="background:linear-gradient(135deg,#3a2a5a,#1c1430)"><b>Comfort rewatches</b><span>18 titles</span></div>
-      <div class="coll" style="background:linear-gradient(135deg,#5a3320,#2a170c)"><b>Dad's thrillers</b><span>27 titles</span></div>
-      <div class="coll" style="background:linear-gradient(135deg,#1c4a46,#0e2725)"><b>Saturday cartoons</b><span>41 titles</span></div>
-      <div class="coll" style="background:linear-gradient(135deg,#4a3312,#271a08)"><b>Docs to finish</b><span>9 titles</span></div>
-    </div>`;
+
+  function revealApp(email){
+    document.getElementById('gmail').textContent = email || '';
+    document.getElementById('gate').classList.add('hide');
+    document.getElementById('app').classList.add('on');
   }
-}
-let loading=false;
-function toggleLoading(){
-  if(loading) return; loading=true;
-  cwRail.innerHTML = Array(4).fill('<div class="poster"><div class="art skel"></div><div class="bar skel" style="margin-top:9px;height:10px"></div></div>').join('');
-  setTimeout(()=>{ renderRail(); loading=false; }, 1100);
-}
-
-/* ---------------- multi / apply ---------------- */
-function toggleChip(el){ el.classList.toggle('on'); }
-function toggleTarget(el){ el.classList.toggle('on'); updateCount(); }
-function updateCount(){
-  const n=document.querySelectorAll('#s-multi .target.on').length;
-  applyCount.textContent=n;
-  applyBtn.disabled = n===0;
-  applyBtn.style.opacity = n===0 ? .5 : 1;
-}
-function pulse(el){ el.animate([{opacity:.4},{opacity:1}],{duration:300}); }
-
-function runApply(){
-  const targets=[...document.querySelectorAll('#s-multi .target.on')];
-  if(!targets.length) return;
-  const btn=applyBtn;
-  btn.innerHTML='<span class="spinner"></span> Applying…';
-  btn.disabled=true;
-  setTimeout(()=>{
-    // build a per-item report — no silent failures
-    reportBody.innerHTML = targets.map(t=>{
-      const name=t.querySelector('b').textContent;
-      const kids = name.startsWith('Kids');
-      if(kids){
-        return row('warn', name, 'addons ✓  collections ✓  settings skipped — parental lock');
-      }
-      return row('ok', name, 'addons ✓  collections ✓  settings ✓');
-    }).join('');
-    const warned = targets.some(t=>t.querySelector('b').textContent.startsWith('Kids'));
-    reportEyebrow.textContent = warned ? 'Done · 1 item needs a look' : 'Done';
-    reportSheet.classList.add('open');
-    btn.innerHTML='Apply to <span id="applyCount">'+targets.length+'</span> profiles';
-    btn.disabled=false;
-
-    // back up the result to Drive (real call — no-op if signed in via mock)
-    saveToDrive({
-      savedAt: new Date().toISOString(),
-      master: 'furqan',
-      appliedTo: targets.map(t=>t.querySelector('b').textContent)
-    });
-  }, 1600);
-}
-function row(kind, name, detail){
-  const ic = kind==='ok'
-    ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12 5 5 9-11"/></svg>'
-    : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 8v5M12 17h.01"/></svg>';
-  return `<div class="report-row"><div class="st ${kind}">${ic}</div><div class="info"><b>${name}</b><span>${detail}</span></div></div>`;
-}
-function closeSheet(){ reportSheet.classList.remove('open'); }
-function openApplyFromEditor(){ goTo('multi'); }
-
-/* ============================================================
-   GOOGLE SIGN-IN + DRIVE BACKUP  (the only real integration —
-   Nuvio API calls elsewhere stay mocked)
-   ============================================================ */
-const GOOGLE = {
-  clientId: '841898218953-c5f3ide5lcsg8g2opn1ucrekvlq335rs.apps.googleusercontent.com',
-  scope: 'openid email profile https://www.googleapis.com/auth/drive.file',
-  backupName: 'numax-backup.json'   // one fixed file — always overwritten in place
-};
-let googleToken = null;      // { access_token, ... } while the session is live
-let googleClient = null;
-
-/* Sign in: one consent covers identity + Drive. Falls back to the
-   mocked flow if the library isn't loaded (e.g. opened offline). */
-function signIn(){
-  if(!(window.google && google.accounts && google.accounts.oauth2)){
-    console.warn('[Numax] Google library not loaded — running mocked sign-in.');
-    return goTo('greeting');
+  function numaxSignOut(){
+    googleToken = null;
+    document.getElementById('app').classList.remove('on');
+    document.getElementById('gate').classList.remove('hide');
   }
-  if(!googleClient){
-    googleClient = google.accounts.oauth2.initTokenClient({
-      client_id: GOOGLE.clientId,
-      scope: GOOGLE.scope,
-      callback: async (resp)=>{
-        if(resp && resp.error){ console.error('[Numax] auth error:', resp.error); return; }
-        googleToken = resp;
-        try{
-          const who = await fetch('https://www.googleapis.com/oauth2/v3/userinfo',
-            { headers:{ Authorization:'Bearer '+resp.access_token } }).then(r=>r.json());
-          if(who && who.email) document.getElementById('userEmail').textContent = who.email;
-        }catch(e){ console.warn('[Numax] userinfo fetch failed:', e); }
-        goTo('greeting');
-      }
-    });
+
+  // Back up the linked-account list (labels/emails only — never tokens) to Drive.
+  async function backupVault(){
+    const pill = document.getElementById('drivePill');
+    if(!googleToken){ pill.className='fail'; pill.textContent='Sign in with Google to back up'; setTimeout(()=>pill.textContent='',2600); return; }
+    pill.className=''; pill.textContent='Backing up…';
+    try{
+      const raw = JSON.parse(localStorage.getItem('numax.accounts.v1') || '{}');
+      const safe = Object.values(raw).map(r=>({ accountId:r.accountId, label:r.label, email:r.email, addedAt:r.addedAt }));
+      const res = await saveToDrive({ savedAt:new Date().toISOString(), accounts:safe });
+      if(res && res.id){ pill.className='ok'; pill.textContent='List backed up ✓'; }
+      else { pill.className='fail'; pill.textContent='Backup failed'; }
+    }catch(e){ console.error(e); pill.className='fail'; pill.textContent='Backup failed'; }
+    setTimeout(()=>{ pill.textContent=''; pill.className=''; }, 2600);
   }
-  googleClient.requestAccessToken();   // opens the Google popup (needs this click)
-}
-
-/* Write the backup JSON to Drive, always to the SAME file.
-   drive.file only sees files THIS app created, so we look up
-   our own numax-backup.json, then update it or create it. */
-async function saveToDrive(dataObj){
-  if(!googleToken){ console.warn('[Numax] not signed in — skipping Drive backup.'); return null; }
-  const auth = { Authorization:'Bearer '+googleToken.access_token };
-  const body = JSON.stringify(dataObj, null, 2);
-
-  // find our existing backup file (created by this app under drive.file)
-  const q = encodeURIComponent(`name='${GOOGLE.backupName}' and trashed=false`);
-  const found = await fetch(
-    `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id,name)`,
-    { headers: auth }).then(r=>r.json()).catch(()=>({}));
-  const existingId = found && found.files && found.files[0] && found.files[0].id;
-
-  const boundary = 'numax'+Date.now();
-  const meta = { name: GOOGLE.backupName, mimeType:'application/json' };
-  const multipart =
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-    JSON.stringify(meta) +
-    `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` +
-    body + `\r\n--${boundary}--`;
-
-  const url = existingId
-    ? `https://www.googleapis.com/upload/drive/v3/files/${existingId}?uploadType=multipart`
-    : `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
-  const res = await fetch(url, {
-    method: existingId ? 'PATCH' : 'POST',
-    headers: { ...auth, 'Content-Type':`multipart/related; boundary=${boundary}` },
-    body: multipart
-  }).then(r=>r.json()).catch(e=>{ console.error('[Numax] Drive save failed:', e); return null; });
-
-  if(res && res.id) console.log(`[Numax] backup ${existingId?'updated':'created'} in Drive:`, res.id);
-  return res;
-}
-
-function openEditor(){ goTo('editor'); }
-
-/* Explicit "Back up to Drive" button — shows every state, never fails silently. */
-async function backupNow(){
-  const btn = document.getElementById('driveBtn');
-  const txt = document.getElementById('driveBtnText');
-  btn.disabled = true;
-  btn.classList.remove('ok','fail');
-  txt.textContent = 'Backing up…';
-
-  if(!googleToken){
-    // signed in via the mock, or not signed in at all
-    btn.classList.add('fail');
-    txt.textContent = 'Sign in with Google first';
-    setTimeout(reset, 2600); return;
+  async function saveToDrive(dataObj){
+    const auth={ Authorization:'Bearer '+googleToken.access_token };
+    const q=encodeURIComponent(`name='${GOOGLE.backupName}' and trashed=false`);
+    const found=await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&fields=files(id)`,{headers:auth}).then(r=>r.json()).catch(()=>({}));
+    const id=found&&found.files&&found.files[0]&&found.files[0].id;
+    const boundary='numax'+Date.now();
+    const body=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`+JSON.stringify({name:GOOGLE.backupName,mimeType:'application/json'})+`\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n`+JSON.stringify(dataObj,null,2)+`\r\n--${boundary}--`;
+    const url=id?`https://www.googleapis.com/upload/drive/v3/files/${id}?uploadType=multipart`:`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart`;
+    return fetch(url,{method:id?'PATCH':'POST',headers:{...auth,'Content-Type':`multipart/related; boundary=${boundary}`},body}).then(r=>r.json());
   }
-  try{
-    const res = await saveToDrive({
-      savedAt: new Date().toISOString(),
-      source: 'editor',
-      profile: (document.getElementById('cwTitle')?.textContent) || 'current'
-    });
-    if(res && res.id){ btn.classList.add('ok'); txt.textContent = 'Backed up to Drive ✓'; }
-    else { btn.classList.add('fail'); txt.textContent = 'Backup failed — try again'; }
-  }catch(e){
-    console.error('[Numax] backup error:', e);
-    btn.classList.add('fail'); txt.textContent = 'Backup failed — try again';
-  }
-  setTimeout(reset, 2600);
 
-  function reset(){
-    btn.disabled = false;
-    btn.classList.remove('ok','fail');
-    txt.textContent = 'Back up to Drive';
-  }
-}
-
-/* ============================================================
-   TOUCAN FLIGHT — flies out on nav, lands on the next screen
-   ============================================================ */
-const mascot = document.getElementById('mascot');
-const wing   = document.getElementById('t-wing');
-const lid    = document.getElementById('t-lid');
-const branch = document.getElementById('t-branch');
-const inner  = mascot.querySelector('.inner');
-const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-/* resting spot per screen — offsets from viewport centre, in px */
-const perch = {
-  's-auth':     { x:0,    y:-238, s:1.0,  branch:true  },
-  's-greeting': { x:150,  y:-356, s:0.5,  branch:false },
-  's-single':   { x:152,  y:-360, s:0.42, branch:false },
-  's-editor':   { x:160,  y:-402, s:0.34, branch:false },
-  's-multi':    { x:150,  y:-360, s:0.42, branch:false }
-};
-let current = 's-auth';
-
-function restStr(p){ return `translate(calc(-50% + ${p.x}px), calc(-50% + ${p.y}px)) scale(${p.s})`; }
-
-function place(id, instant){
-  const p = perch[id] || perch['s-greeting'];
-  branch.style.display = p.branch ? 'block' : 'none';
-  mascot.style.transform = restStr(p);
-  mascot.style.opacity = 1;
-}
-
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  document.getElementById(id).classList.add('active');
-}
-
-async function goTo(name){
-  const id = 's-'+name;
-  if(id===current) return;
-  if(reduce){
-    showScreen(id); place(id); current=id; return;
-  }
-  const from = perch[current] || perch['s-greeting'];
-  const to   = perch[id] || perch['s-greeting'];
-
-  // fly out — flap + arc up and off to the right
-  wing.classList.add('flap');
-  await mascot.animate([
-    { transform: restStr(from), opacity:1 },
-    { transform:`translate(calc(-50% + ${from.x+420}px), calc(-50% + ${from.y-140}px)) scale(${from.s*0.82}) rotate(-14deg)`, opacity:0 }
-  ], { duration:400, easing:'cubic-bezier(.4,0,.85,.4)', fill:'forwards' }).finished;
-
-  // swap screens while it's off-stage
-  showScreen(id);
-  branch.style.display = to.branch ? 'block' : 'none';
-
-  // fly in from the left and land
-  await mascot.animate([
-    { transform:`translate(calc(-50% + ${to.x-440}px), calc(-50% + ${to.y-120}px)) scale(${to.s*0.82}) rotate(10deg)`, opacity:0 },
-    { transform:`translate(calc(-50% + ${to.x-40}px),  calc(-50% + ${to.y-16}px))  scale(${to.s}) rotate(-2deg)`, opacity:1, offset:.7 },
-    { transform: restStr(to), opacity:1 }
-  ], { duration:520, easing:'cubic-bezier(.2,.8,.25,1)', fill:'forwards' }).finished;
-
-  mascot.style.transform = restStr(to);
-  mascot.style.opacity = 1;
-  wing.classList.remove('flap');
-  inner.classList.remove('land'); void inner.offsetWidth; inner.classList.add('land');
-  current = id;
-  if(name==='multi') updateCount();
-}
-
-/* occasional blink — a small sign of life, not a float */
-setInterval(()=>{
-  if(reduce) return;
-  lid.classList.remove('blink'); void lid.offsetWidth; lid.classList.add('blink');
-}, 5200);
-
-/* initial placement */
-place('s-auth', true);
-window.addEventListener('resize', ()=>place(current, true));
+  // paste-token disclosure + occasional toucan blink
+  document.addEventListener('DOMContentLoaded', ()=>{
+    const pt=document.getElementById('paste-toggle-btn'), pw=document.getElementById('paste-wrap');
+    if(pt&&pw) pt.onclick=()=>pw.classList.toggle('open');
+    const lid=document.getElementById('t-lid');
+    if(lid && !matchMedia('(prefers-reduced-motion: reduce)').matches){
+      setInterval(()=>{ lid.classList.remove('blink'); void lid.offsetWidth; lid.classList.add('blink'); }, 5600);
+    }
+  });
 </script>
+
+<!-- real Nuvio modules (unchanged) + app controller -->
+<script src="store.js"></script>
+<script src="api.js"></script>
+<script src="meta.js"></script>
+<script src="engine.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
