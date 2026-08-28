@@ -153,19 +153,24 @@
   }
 
   // Fetch the built-in avatar catalog (avatar_id -> image URL) from Nuvio.
-  // This is a server table readable with the anon key; no auth needed.
+  // This is an RPC (get_avatar_catalog), not a plain table — it returns rows
+  // with a relative storage_path that must be resolved against the public
+  // storage bucket. Readable with the anon key; no auth needed.
   // Falls back to empty object on failure — never breaks the app.
+  const AVATAR_STORAGE_BASE = 'https://api.nuvio.tv/storage/v1/object/public/avatars/';
   let _avatarCache = null;
   async function fetchAvatarCatalog() {
     if (_avatarCache) return _avatarCache;
     try {
-      const res = await fetch('https://api.nuvio.tv/rest/v1/avatar_catalog?select=id,image_url', {
-        headers: { apikey: ANON }
+      const res = await fetch(REST_BASE + '/get_avatar_catalog', {
+        method: 'POST',
+        headers: { apikey: ANON, 'Content-Type': 'application/json' },
+        body: '{}'
       });
       if (!res.ok) { _avatarCache = {}; return _avatarCache; }
       const rows = await res.json();
       const map = {};
-      if (Array.isArray(rows)) rows.forEach(r => { if (r.id && r.image_url) map[r.id] = r.image_url; });
+      if (Array.isArray(rows)) rows.forEach(r => { if (r.id && r.storage_path) map[r.id] = AVATAR_STORAGE_BASE + r.storage_path; });
       _avatarCache = map;
     } catch { _avatarCache = {}; }
     return _avatarCache;
