@@ -45,15 +45,44 @@
   const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
   const clr = n => { while (n && n.firstChild) n.removeChild(n.firstChild); };
   const status = (n, m, c) => { if (n) { n.textContent = m || ''; n.className = 'inline-status' + (c ? ' ' + c : ''); } };
+
+  // in-app modal — replaces browser confirm/prompt (no native "top" dialogs)
+  function uiModal(opts) {
+    return new Promise(resolve => {
+      const root = $('modal-root'), inp = $('modal-input'), ok = $('modal-ok'), cancel = $('modal-cancel');
+      $('modal-msg').textContent = opts.message || '';
+      if (opts.input) { inp.style.display = ''; inp.value = opts.defaultVal || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30); } else inp.style.display = 'none';
+      ok.textContent = opts.okLabel || 'Confirm'; ok.className = 'btn ' + (opts.danger ? 'danger-btn' : 'btn-primary');
+      cancel.style.display = opts.noCancel ? 'none' : '';
+      root.style.display = '';
+      const done = v => { root.style.display = 'none'; ok.onclick = cancel.onclick = $('modal-bg').onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
+      ok.onclick = () => done(opts.input ? inp.value : true);
+      cancel.onclick = () => done(opts.input ? null : false);
+      $('modal-bg').onclick = () => done(opts.input ? null : false);
+      const onKey = e => { if (e.key === 'Escape') done(opts.input ? null : false); if (e.key === 'Enter') done(opts.input ? inp.value : true); };
+      document.addEventListener('keydown', onKey);
+    });
+  }
+  const uiConfirm = (message, o) => uiModal({ message, okLabel: (o && o.okLabel) || 'Confirm', danger: o && o.danger });
+  const uiPrompt = (message, defaultVal) => uiModal({ message, input: true, defaultVal, okLabel: 'Save' });
+  const uiAlert = message => uiModal({ message, okLabel: 'OK', noCancel: true });
   const accountName = id => { const r = store.get(id); return (r && (r.label || r.email)) || (id ? id.slice(0, 8) + '…' : ''); };
   const collKey = c => (c && typeof c === 'object') ? (c.id != null ? 'id:' + c.id : (c.title != null ? 'title:' + c.title : 'j:' + JSON.stringify(c))) : 'j:' + JSON.stringify(c);
   const collLabel = c => (c && (c.title || c.name || (c.id != null ? 'Collection ' + c.id : null))) || 'Untitled';
 
+  const avatarCatalog = {}; // avatar_id -> imageUrl, filled if a catalog is available
+  function avatarUrlFor(p) {
+    if (!p) return null;
+    const url = (p.avatarUrl || '').trim(); if (url) return url;
+    const id = (p.avatarId || '').trim(); if (id && avatarCatalog[id]) return avatarCatalog[id];
+    return null;
+  }
   function avatar(p, size, cls) {
     const s = el('span', 'av ' + (cls || '')); s.style.width = size + 'px'; s.style.height = size + 'px'; s.style.fontSize = Math.round(size * .4) + 'px';
+    const url = avatarUrlFor(p);
     if (p && p.color) s.style.background = p.color;
-    s.textContent = ((p && p.name) ? p.name.trim()[0] : '?').toUpperCase() || '?';
-    if (p && p.avatarUrl) { const i = document.createElement('img'); i.src = p.avatarUrl; i.onerror = () => i.remove(); s.appendChild(i); }
+    const ini = el('span', 'av-ini', ((p && p.name) ? p.name.trim()[0] : '?').toUpperCase() || '?'); s.appendChild(ini);
+    if (url) { const i = document.createElement('img'); i.alt = ''; i.onload = () => { ini.style.display = 'none'; }; i.onerror = () => { i.remove(); }; i.src = url; s.appendChild(i); }
     return s;
   }
   function normProfiles(raw) {
@@ -267,6 +296,14 @@
     logAct((already ? 'Refreshed ' : 'Linked ') + (label || email), 'ok');
     refreshAccounts();
   }
+  async function reloadAccounts() {
+    if (!gAuth.token) { status($('ac-log'), 'Sign in with Google first.', 'err'); return; }
+    const btn = $('ac-reload'); btn.disabled = true; status($('ac-log'), 'Reloading from Drive…');
+    invalAll();
+    try { await loadRegistry(); status($('ac-log'), 'Reloaded.', 'ok'); logAct('Reloaded accounts and profiles', 'info'); }
+    catch (e) { status($('ac-log'), 'Reload failed: ' + e.message, 'err'); }
+    finally { btn.disabled = false; refreshAccounts(); }
+  }
   async function refreshAccounts() {
     const list = store.list();
     if ($('ac-count')) $('ac-count').textContent = list.length;
@@ -296,7 +333,7 @@
     i.addEventListener('blur', commit);
   }
   async function unlink(id, name) {
-    if (!confirm('Unlink ' + name + '? This removes it from your Numax registry (your Nuvio account is untouched).')) return;
+    if (!(await uiConfirm('Unlink ' + name + '? This removes it from your Numax registry — your Nuvio account is untouched.', { danger: true, okLabel: 'Unlink' }))) return;
     store.remove(id); inval(id); if (pfA === id) { pfA = pfI = pfEdit = null; } if (syA === id) { syA = syI = sySnap = null; }
     await saveRegistry(); logAct('Unlinked ' + name, 'info'); refreshAccounts();
   }
@@ -494,7 +531,7 @@
   async function savePfIdentity() {
     const name = $('pf-name-input').value.trim(); if (!name) { status($('pf-save-status'), 'Give the profile a name.', 'err'); return; }
     if (name === pfEdit.meta.name) { status($('pf-save-status'), 'Name unchanged.', 'info'); return; }
-    if (!confirm('Rename this profile to “' + name + '”?')) return; status($('pf-save-status'), 'Renaming…');
+    status($('pf-save-status'), 'Renaming…');
     try {
       const c = A.client(store, pfA); const live = rawList(await c.pullProfiles()); if (!live.length) throw new Error("Couldn't read profiles.");
       if (!live.find(p => p.profile_index === pfI)) throw new Error('Profile no longer exists.');
@@ -505,7 +542,6 @@
     } catch (e) { status($('pf-save-status'), "Couldn't rename: " + e.message, 'err'); }
   }
   async function savePfList(kind) {
-    if (!confirm('Save the ' + kind + ' list to ' + pfEdit.meta.name + '? Replaces that profile\'s ' + kind + ' with exactly what\'s shown (order included).')) return;
     status($('pf-save-status'), 'Saving ' + kind + '…');
     try {
       const c = A.client(store, pfA);
@@ -515,13 +551,13 @@
     } catch (e) { status($('pf-save-status'), "Couldn't save " + kind + ': ' + e.message, 'err'); }
   }
   async function savePfCollections() {
-    if (!confirm('Save collections (and folder order) to ' + pfEdit.meta.name + '?')) return; status($('pf-save-status'), 'Saving…');
+    status($('pf-save-status'), 'Saving…');
     try { await A.client(store, pfA).rpc('sync_push_collections', { p_profile_id: pfI, p_collections_json: pfEdit.collections, p_origin_client_id: 'numax-web' }); inval(pfA); status($('pf-save-status'), 'Saved collections.', 'ok'); logAct('Saved collections to ' + pfEdit.meta.name, 'ok'); }
     catch (e) { status($('pf-save-status'), "Couldn't save collections: " + e.message, 'err'); }
   }
   async function savePfSettings(plat) {
     const blob = pfEdit.settings[plat]; if (!blob) return;
-    if (!confirm('Save ' + (plat === 'tv' ? 'TV' : 'mobile') + ' settings to ' + pfEdit.meta.name + '?')) return; status($('pf-save-status'), 'Saving settings…');
+    status($('pf-save-status'), 'Saving settings…');
     try {
       const c = A.client(store, pfA);
       await c.rpc('sync_push_profile_settings_blob_guarded', { p_profile_id: pfI, p_settings_json: blob, p_platform: plat, p_expected_updated_at: pfEdit.upd[plat] || null });
@@ -539,9 +575,9 @@
     return out;
   }
   async function saveTemplate(kind) {
-    if (!gAuth.token) { alert('Sign in with Google first.'); return; }
-    if (!pfEdit) { alert('Open a profile first.'); return; }
-    const name = prompt('Template name:', pfEdit.meta.name + ' ' + kind); if (!name) return;
+    if (!gAuth.token) { await uiAlert('Sign in with Google first.'); return; }
+    if (!pfEdit) { await uiAlert('Open a profile first.'); return; }
+    const name = await uiPrompt('Name this template', pfEdit.meta.name + ' ' + kind); if (name == null || !name.trim()) return;
     const payload = { app: 'numax', kind: 'template', tkind: kind, name, savedAt: new Date().toISOString(), from: pfEdit.meta.name };
     if (kind === 'addons') payload.addons = pfEdit.addons;
     else if (kind === 'plugins') payload.plugins = pfEdit.plugins;
@@ -549,8 +585,8 @@
     else if (kind === 'settings') payload.settings = pfSettingsForTemplate();
     else if (kind === 'profile') { payload.addons = pfEdit.addons; payload.plugins = pfEdit.plugins; payload.collections = pfEdit.collections; payload.settings = pfSettingsForTemplate(); }
     status($('pf-save-status'), 'Saving template…');
-    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind: kind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive.', 'ok'); logAct('Saved template "' + name + '" (' + kind + ')', 'ok'); }
-    catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); }
+    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind: kind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Templates tab.', 'ok'); logAct('Saved template "' + name + '" (' + kind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
+    catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); logAct('Template save failed: ' + e.message, 'err'); }
   }
   async function refreshTemplates() {
     const box = $('tpl-list'); clr(box); status($('tpl-status'), '');
@@ -563,7 +599,7 @@
       const row = el('div', 'erow');
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', f.name.replace(/^numax-tpl-/, '').replace(/\.json$/, ''))); b.appendChild(el('div', 'es', kind + ' · ' + (f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''))); row.appendChild(b);
       const ap = el('button', 'btn btn-solid btn-xs', 'Apply'); ap.onclick = () => openTemplateApply(f); row.appendChild(ap);
-      const del = el('button', 'iconbtn', '✕'); del.title = 'Delete template'; del.onclick = async () => { if (!confirm('Delete template?')) return; await driveDelete(f.id); logAct('Deleted a template', 'info'); refreshTemplates(); }; row.appendChild(del);
+      const del = el('button', 'iconbtn', '✕'); del.title = 'Delete template'; del.onclick = async () => { if (!(await uiConfirm('Delete this template?', { danger: true, okLabel: 'Delete' }))) return; await driveDelete(f.id); logAct('Deleted a template', 'info'); refreshTemplates(); }; row.appendChild(del);
       box.appendChild(row);
     });
   }
@@ -659,21 +695,43 @@
     bar.appendChild(all); bar.appendChild(none); box.appendChild(bar);
     list.forEach(x => { const key = syKey(kind, x); const row = el('label', 'pick'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel[kind].has(key); cb.onchange = () => { cb.checked ? sySel[kind].add(key) : sySel[kind].delete(key); updateSyCounts(); }; row.appendChild(cb); const b = el('div', 'pb'); if (kind === 'collections') { b.appendChild(el('div', 'pn', collLabel(x))); } else { b.appendChild(el('div', 'pn', x.name || host(x.url))); b.appendChild(el('div', 'ps', host(x.url))); } row.appendChild(b); box.appendChild(row); });
   }
+  // all copyable tokens actually present in the source for a platform
+  function availTokens(pl) {
+    const t = new Set(); const feat = ((sySnap.settings[pl]) || {}).features || {};
+    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (!SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
+    return t;
+  }
+  // tokens a schema tab would carry (payload groups as whole-group tokens)
+  function schemaTabTokens(pl, tab) {
+    const toks = new Set();
+    (tab.groups || []).forEach(g => g.fields.forEach(f => {
+      if (!f.title || ACCOUNT_GROUP.test(f.feature) || SECRET_LEAF.test(f.key)) return;
+      toks.add(isPayload(f.feature) ? pl + '::' + f.feature : pl + '::' + f.feature + '.' + f.key);
+    }));
+    return toks;
+  }
   function renderSyTree() {
     const tree = $('sy-settings-tree'); clr(tree); const settings = (sySnap && sySnap.settings) || {}; const plats = Object.keys(settings).filter(p => settings[p] && settings[p].features);
     if (!plats.length) { tree.appendChild(el('p', 'empty sm', 'No settings on source.')); return; }
+    const groupRow = (title, sub, eff, extraCls) => {
+      const row = el('label', 'pick' + (extraCls ? ' ' + extraCls : '')); const cb = el('input'); cb.type = 'checkbox';
+      const selN = eff.filter(t => sySel.settings.has(t)).length; cb.checked = eff.length > 0 && selN === eff.length; cb.indeterminate = selN > 0 && selN < eff.length;
+      cb.onchange = () => { eff.forEach(t => cb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); };
+      row.appendChild(cb); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', title)); if (sub) b.appendChild(el('div', 'ps', sub)); row.appendChild(b); return row;
+    };
     plats.forEach(pl => {
       tree.appendChild(el('div', 'set-group-h', pl === 'tv' ? 'TV app' : 'Mobile app'));
-      const feat = settings[pl].features;
-      Object.keys(feat).sort().forEach(g => {
-        const gv = feat[g]; const acct = ACCOUNT_GROUP.test(g), payload = typeof gv === 'string', personal = PERSONAL_GROUP.test(g);
-        const row = el('label', 'pick');
-        if (acct) { row.appendChild(el('span', '', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', humanize(g))); b.appendChild(el('div', 'ps', 'linked to account — never copied')); row.appendChild(b); tree.appendChild(row); return; }
-        const cb = el('input'); cb.type = 'checkbox';
-        if (payload || personal) { const tok = pl + '::' + g; cb.checked = sySel.settings.has(tok); cb.onchange = () => { cb.checked ? sySel.settings.add(tok) : sySel.settings.delete(tok); updateSyCounts(); }; }
-        else { const leaves = Object.keys(gv).filter(l => !SECRET_LEAF.test(l)); const sel = leaves.filter(l => sySel.settings.has(pl + '::' + g + '.' + l)).length; cb.checked = sel > 0 && sel === leaves.length; cb.indeterminate = sel > 0 && sel < leaves.length; cb.onchange = () => { leaves.forEach(l => { const t = pl + '::' + g + '.' + l; cb.checked ? sySel.settings.add(t) : sySel.settings.delete(t); }); updateSyCounts(); }; }
-        row.appendChild(cb); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', humanize(g))); if (personal) b.appendChild(el('div', 'ps', 'personal — off by default')); row.appendChild(b); tree.appendChild(row);
+      const avail = availTokens(pl); const covered = new Set();
+      (SCHEMA[pl] || []).forEach(tab => {
+        const eff = [...schemaTabTokens(pl, tab)].filter(t => avail.has(t)); if (!eff.length) return;
+        eff.forEach(t => covered.add(t));
+        tree.appendChild(groupRow(tab.title, eff.length + ' setting' + (eff.length === 1 ? '' : 's'), eff));
       });
+      const other = [...avail].filter(t => !covered.has(t));
+      if (other.length) tree.appendChild(groupRow('Other settings', other.length + ' more', other));
+      const feat = settings[pl].features;
+      Object.keys(feat).forEach(g => { if (PERSONAL_GROUP.test(g)) tree.appendChild(groupRow('Personal watch preferences', 'off by default', [pl + '::' + g])); });
+      if (Object.keys(feat).some(g => ACCOUNT_GROUP.test(g))) { const row = el('label', 'pick'); row.style.opacity = '.55'; row.appendChild(el('span', 'cb-spacer', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', 'Account-linked (Trakt)')); b.appendChild(el('div', 'ps', 'never copied')); row.appendChild(b); tree.appendChild(row); }
     });
   }
   const humanize = k => (k || '').replace(/_settings$/, '').replace(/_payload$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -783,6 +841,7 @@
     $('btn-google').onclick = () => signIn(enterApp);
     document.querySelectorAll('.navbtn').forEach(b => b.onclick = () => nav(b.dataset.nav));
     $('ac-link-btn').onclick = linkAccount; $('ac-pass').addEventListener('keydown', e => { if (e.key === 'Enter') linkAccount(); });
+    $('ac-reload').onclick = reloadAccounts;
     togWire('ac-readkeys', setReadKeys);
     $('pf-account').onchange = () => renderPfPicker($('pf-account').value); $('pf-save-identity').onclick = savePfIdentity;
     document.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => saveTemplate(b.dataset.tpl)); $('pf-tpl-profile').onclick = () => saveTemplate('profile');
@@ -792,7 +851,7 @@
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
     togWire('st-readkeys', setReadKeys); togWire('st-idle', on => { idleFlight = on; scheduleIdle(); });
-    $('st-signout').onclick = () => { if (!confirm('Sign out of Google on this device?')) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
+    $('st-signout').onclick = async () => { if (!(await uiConfirm('Sign out of Google on this device? Your accounts and templates stay in your Drive.', { danger: true, okLabel: 'Sign out' }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
   window.addEventListener('DOMContentLoaded', () => { wire(); renderActivity(); });
