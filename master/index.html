@@ -18,7 +18,20 @@
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
   html,body{ height:100%; }
+  :root{ color-scheme: dark; }
+  option{ background:#151515; color:#fff; }
   body{ font-family:var(--f); background:var(--bg); color:var(--t); -webkit-font-smoothing:antialiased; }
+  .sync-top{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  .sync-top .card{ margin-bottom:18px; }
+  @media (max-width:900px){ .sync-top{ grid-template-columns:1fr; gap:0; } }
+  .modal-root{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; }
+  .modal-bg{ position:absolute; inset:0; background:rgba(0,0,0,.66); backdrop-filter:blur(2px); }
+  .modal-card{ position:relative; background:#111; border:1px solid var(--line); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  .modal-msg{ font-size:14.5px; line-height:1.5; color:var(--t); }
+  .modal-input{ margin-top:14px; }
+  .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
+  .btn.danger-btn{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.danger-btn:hover{ background:var(--accent-2); }
   button,input,select,textarea{ font-family:inherit; }
   ::selection{ background:rgba(229,57,53,.35); }
 
@@ -165,8 +178,9 @@
   .switch-row .tx span{ display:block; font-size:12px; color:var(--t45); margin-top:2px; }
 
   /* account + profile chips */
-  .av{ display:inline-grid; place-items:center; border-radius:50%; color:#fff; font-weight:700; overflow:hidden; flex:none; background:var(--accent); }
-  .av img{ width:100%; height:100%; object-fit:cover; }
+  .av{ position:relative; display:inline-grid; place-items:center; border-radius:50%; color:#fff; font-weight:700; overflow:hidden; flex:none; background:var(--accent); }
+  .av-ini{ position:relative; z-index:0; line-height:1; }
+  .av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
   .acct{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:14px 16px; margin-bottom:10px; }
   .acct-head{ display:flex; align-items:center; gap:12px; }
   .acct-name{ font-size:14.5px; font-weight:600; }
@@ -384,7 +398,7 @@
         <div class="switch-row" style="margin-top:16px"><div class="tx"><b>Read API keys</b><span>Off keeps provider keys (MDBList, TMDB, debrid, AnimeSkip) out of the app. Keys are never copied between profiles either way.</span></div><button class="tog" id="ac-readkeys" role="switch"></button></div>
       </div>
       <div class="card">
-        <div class="chead"><h3>Linked accounts</h3><span class="spacer"></span><span class="pill-count" id="ac-count">0</span></div>
+        <div class="chead"><h3>Linked accounts</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="ac-reload">Reload</button><span class="pill-count" id="ac-count">0</span></div>
         <div id="ac-list"></div>
       </div>
     </section>
@@ -421,9 +435,12 @@
         <p>Pick a source, choose exactly what to carry, pick which profiles receive it, then preview before anything is written.</p></div>
       <p class="empty" id="sy-empty">Link a Nuvio account to start syncing.</p>
       <div id="sy-body" style="display:none">
+        <div class="sync-top">
         <div class="card"><div class="chead"><h3>Copy from</h3></div>
           <label class="fld" style="max-width:320px;margin-bottom:14px"><span>Account</span><select class="sel" id="sy-account"></select></label>
           <div class="chip-grid" id="sy-source"></div></div>
+        <div class="card"><div class="chead"><h3>Copy into</h3></div><div id="sy-targets"></div></div>
+        </div>
         <div class="card"><div class="chead"><h3>What to carry over</h3></div>
           <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-addons" checked>Add-ons</span><span class="cat-cnt" id="sy-cnt-addons">0</span>
             <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-items-addons">Choose add-ons</button><div class="chooser" id="sy-items-addons"></div></div></div>
@@ -433,7 +450,6 @@
             <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-items-collections">Choose collections</button><div class="chooser" id="sy-items-collections"></div></div></div>
           <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-settings" checked>Settings</span><span class="cat-cnt" id="sy-cnt-settings">0 selected</span>
             <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-settings-tree">Choose settings</button><div class="chooser" id="sy-settings-tree"></div></div></div></div>
-        <div class="card"><div class="chead"><h3>Copy into</h3></div><div id="sy-targets"></div></div>
         <div class="card"><div class="chead"><h3>How to apply</h3></div>
           <div class="row" style="flex-wrap:wrap"><label style="font-size:13px;font-weight:600">Mode</label>
             <select class="sel" id="sy-mode" style="max-width:380px"><option value="merge">Merge — add and update, keep the rest</option><option value="overwrite">Overwrite — make target match source exactly</option></select></div>
@@ -491,6 +507,15 @@
         <button class="btn btn-ghost danger" id="st-signout">Sign out</button></div>
     </section>
   </main>
+</div>
+
+<div class="modal-root" id="modal-root" style="display:none">
+  <div class="modal-bg" id="modal-bg"></div>
+  <div class="modal-card">
+    <div class="modal-msg" id="modal-msg"></div>
+    <input type="text" class="modal-input" id="modal-input" style="display:none">
+    <div class="modal-actions"><button class="btn btn-ghost" id="modal-cancel">Cancel</button><button class="btn btn-primary" id="modal-ok">Confirm</button></div>
+  </div>
 </div>
 
 <script src="https://accounts.google.com/gsi/client" async></script>
