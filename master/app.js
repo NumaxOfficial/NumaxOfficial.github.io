@@ -33,7 +33,7 @@
   let gAuth = { token: null, client: null, user: null };
   let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
   const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings', watchprogress: 'Watch Progress', watched: 'Watched' };
-  const PF_TAB_SAVEABLE = { addons: true, plugins: true, collections: true, settings: true };
+  const PF_TAB_SAVEABLE = { addons: true, plugins: true, collections: true, settings: true, watchprogress: true, watched: true };
   function switchPfEditorTab(kind) {
     pfEditorTab = kind;
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.classList.toggle('on', b.dataset.pftab === kind));
@@ -272,16 +272,23 @@
       head.appendChild(avatar({ name: rec.label || rec.email }, 38));
       const who = el('div'); who.style.minWidth = '0';
       const nmRow = el('div', 'acct-name'); nmRow.textContent = rec.label || rec.email || rec.accountId.slice(0, 10);
-      if (readKeys && cache[rec.accountId] && cache[rec.accountId].keysLoaded) { const badge = el('span', 'api-badge', 'API keys included'); nmRow.appendChild(badge); }
       who.appendChild(nmRow);
       if (rec.email && rec.label) who.appendChild(el('div', 'acct-mail', rec.email)); head.appendChild(who);
       head.appendChild(el('span', 'spacer'));
-      const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(who, nm, rec.accountId);
+      const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(who, nmRow, rec.accountId);
       const rm = el('button', 'btn btn-ghost btn-xs danger', 'Unlink'); rm.onclick = () => unlink(rec.accountId, rec.label || rec.email);
       head.appendChild(ren); head.appendChild(rm); card.appendChild(head);
       const prof = el('div', 'acct-profiles'); prof.appendChild(el('span', 'muted sm', 'Loading profiles…')); card.appendChild(prof); box.appendChild(card);
-      loadAccount(rec.accountId).then(({ profiles }) => { clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
-        profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); }); })
+      loadAccount(rec.accountId).then(({ profiles, keysLoaded }) => {
+        // add API keys badge if this account was loaded WITH keys
+        if (keysLoaded && !nmRow.querySelector('.api-badge')) {
+          const badge = el('span', 'api-badge'); badge.textContent = 'API keys included';
+          const dot = el('span'); dot.textContent = '●'; dot.style.cssText = 'font-size:8px;color:#7bd88f'; badge.insertBefore(dot, badge.firstChild);
+          nmRow.appendChild(badge);
+        }
+        clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
+        profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); });
+      })
         .catch(e => { clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
     }
   }
@@ -327,7 +334,7 @@
   function refreshProfileTab() {
     const list = store.list(); const sel = $('pf-account'); const prev = sel.value;
     sel.innerHTML = list.map(r => `<option value="${esc(r.accountId)}">${esc(accountName(r.accountId))}</option>`).join('');
-    if (!list.length) { $('pf-profiles').innerHTML = ''; $('pf-editor').style.display = 'none'; $('pf-empty').style.display = ''; return; }
+    if (!list.length) { $('pf-profiles').innerHTML = ''; $('pf-editor').classList.remove('open'); $('pf-empty').style.display = ''; return; }
     $('pf-empty').style.display = 'none';
     sel.value = (prev && list.some(r => r.accountId === prev)) ? prev : (pfA && list.some(r => r.accountId === pfA) ? pfA : list[0].accountId);
     renderPfPicker(sel.value);
@@ -343,8 +350,8 @@
   async function openProfile(id, idx, silent) {
     pfA = id; pfI = idx; Object.keys(pfDirty).forEach(k => delete pfDirty[k]);
     document.querySelectorAll('#pf-profiles .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
-    const ed = $('pf-editor'); ed.style.display = ''; $('pf-empty').style.display = 'none'; status($('pf-save-status'), '');
-    let backup, profiles; try { const a = await loadAccount(id); backup = a.backup; profiles = a.profiles; } catch (e) { ed.style.display = 'none'; $('pf-empty').style.display = ''; $('pf-empty').textContent = "Couldn't read account: " + e.message; return; }
+    const ed = $('pf-editor'); ed.classList.add('open'); $('pf-empty').style.display = 'none'; status($('pf-save-status'), '');
+    let backup, profiles; try { const a = await loadAccount(id); backup = a.backup; profiles = a.profiles; } catch (e) { ed.classList.remove('open'); $('pf-empty').style.display = ''; $('pf-empty').textContent = "Couldn't read account: " + e.message; return; }
     const meta = profiles.find(p => p.index === idx) || { index: idx, name: 'Profile ' + idx };
     const slice = sliceProfile(backup, idx);
     const live = { tv: null, mobile: null }, upd = { tv: null, mobile: null };
@@ -358,7 +365,7 @@
   const dirty = k => { pfDirty[k] = true; };
   function renderPfEditor() {
     if (!pfEdit) return;
-    $('pf-name-input').value = pfEdit.meta.name || ''; $('pf-editor-title').textContent = pfEdit.meta.name || 'Profile';
+    $('pf-name-input').value = pfEdit.meta.name || '';
     renderPfList('addons'); renderPfList('plugins'); renderPfCollections(); renderSettingsEditor();
     renderPfWatched(); renderPfWatchProgress();
     switchPfEditorTab(pfEditorTab);
@@ -567,7 +574,7 @@
       const next = live.map(p => { const r = normRow(p); if (p.profile_index === pfI) r.name = name.slice(0, 60); return r; });
       if (live.map(p => p.profile_index).sort().join() !== next.map(p => p.profile_index).sort().join()) throw new Error('Profile list changed — reload.');
       await c.rpc('sync_push_profiles', { p_profiles: next, p_client_max_profiles: 6 });
-      pfEdit.meta.name = name; inval(pfA); status($('pf-save-status'), 'Saved.', 'ok'); logAct('Renamed profile to ' + name, 'ok'); $('pf-editor-title').textContent = name; renderPfPicker(pfA);
+      pfEdit.meta.name = name; inval(pfA); status($('pf-save-status'), 'Saved.', 'ok'); logAct('Renamed profile to ' + name, 'ok'); renderPfPicker(pfA);
     } catch (e) { status($('pf-save-status'), "Couldn't rename: " + e.message, 'err'); }
   }
   async function savePfList(kind) {
@@ -612,7 +619,9 @@
     else if (kind === 'plugins') payload.plugins = pfEdit.plugins;
     else if (kind === 'collections') payload.collections = pfEdit.collections;
     else if (kind === 'settings') payload.settings = pfSettingsForTemplate();
-    else if (kind === 'profile') { payload.addons = pfEdit.addons; payload.plugins = pfEdit.plugins; payload.collections = pfEdit.collections; payload.settings = pfSettingsForTemplate(); }
+    else if (kind === 'watchprogress') payload.watchProgress = pfEdit.watchProgress || [];
+    else if (kind === 'watched') payload.watched = pfEdit.watched || [];
+    else if (kind === 'profile') { payload.addons = pfEdit.addons; payload.plugins = pfEdit.plugins; payload.collections = pfEdit.collections; payload.settings = pfSettingsForTemplate(); payload.watched = pfEdit.watched || []; payload.watchProgress = pfEdit.watchProgress || []; }
     status($('pf-save-status'), 'Saving template…');
     try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind: kind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Templates tab.', 'ok'); logAct('Saved template "' + name + '" (' + kind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
     catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); logAct('Template save failed: ' + e.message, 'err'); }
@@ -648,6 +657,20 @@
     btn.onclick = async () => {
       const tid = tsel.value; if (!tid) { status(st, 'Pick a target.', 'err'); return; } const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10);
       const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
+      // watchprogress / watched templates use a direct upsert (no plan/preview needed)
+      if (doc.watched || doc.watchProgress) {
+        const items = doc.watched ? { rpc: 'sync_push_watched_items', payload: doc.watched, label: 'watched items', paramKey: 'p_watched_items' }
+                                  : { rpc: 'sync_push_watch_progress', payload: doc.watchProgress, label: 'watch progress', paramKey: 'p_watch_progress' };
+        if (!Array.isArray(items.payload) || !items.payload.length) { status(st, 'Template has no ' + items.label + '.', 'err'); return; }
+        clr(res); res.appendChild(el('div', 'report'));
+        res.firstChild.innerHTML = `<div class="rhead">${items.payload.length} ${items.label} → target</div><div class="rline muted">Applied as an upsert — existing entries stay in place.</div>`;
+        const ap = el('button', 'btn btn-solid', 'Apply');
+        ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…');
+          try { await A.client(store, aid).rpc(items.rpc, { [items.paramKey]: items.payload, p_profile_id: idx, p_origin_client_id: 'numax-web' }); inval(aid); status(st, 'Template applied.', 'ok'); logAct('Applied ' + items.label + ' template to profile ' + idx, 'ok'); }
+          catch (e) { status(st, 'Failed: ' + e.message, 'err'); } };
+        res.appendChild(ap);
+        return;
+      }
       status(st, 'Reading target…');
       try {
         const master = { addons: doc.addons || [], plugins: doc.plugins || [], collections: doc.collections || [], settings: doc.settings || {} };
@@ -655,35 +678,52 @@
         if (doc.settings && Object.keys(doc.settings).length) { state.settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
         const cats = { addons: !!(doc.addons), plugins: !!(doc.plugins), collections: !!(doc.collections), settings: !!(doc.settings && Object.keys(doc.settings).length) };
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        renderApplyPlan(res, st, plan, aid, 'Template applied');
+        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx });
       } catch (e) { status(st, e.message, 'err'); }
     };
   }
 
   // shared apply-plan renderer (templates + restore)
   function tagHtml(cls, sign, arr) { return (arr && arr.length) ? `<span class="tag ${cls}">${sign}${arr.length}</span>` : ''; }
-  function renderApplyPlan(res, st, plan, accountId, okMsg) {
+  function renderApplyPlan(res, st, plan, accountId, okMsg, extras) {
     clr(res); const r = plan.report; const d = el('div', 'report');
     const line = (label, o) => { if (!o) return; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed)].filter(Boolean); if (bits.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' '); d.appendChild(x); } };
     line('Add-ons', r.addons); line('Plugins', r.plugins); line('Collections', r.collections);
     if (r.settings) { let ch = 0; for (const p of Object.keys(r.settings)) ch += r.settings[p].changed.length; if (ch) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Settings</span><span class="tag upd">${ch} fields</span>`; d.appendChild(x); } }
-    if (!plan.hasChanges) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
+    if (extras && Array.isArray(extras.watched) && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Watched</span><span class="tag add">+${extras.watched.length}</span>`; d.appendChild(x); }
+    if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Progress</span><span class="tag add">+${extras.watchProgress.length}</span>`; d.appendChild(x); }
+    const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length));
+    if (!plan.hasChanges && !hasExtras) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
     if (plan.hasRemovals) { const w = el('label', 'confirm'); const cb = el('input'); cb.type = 'checkbox'; cb.onchange = () => { confirmed = cb.checked; ap.disabled = !confirmed; }; w.appendChild(cb); w.appendChild(el('span', '', 'This removes items the target has that this doesn\'t. I understand.')); res.appendChild(w); }
-    const ap = el('button', 'btn btn-solid', 'Apply'); ap.disabled = !plan.hasChanges || !confirmed;
-    ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…'); try { const rr = await A.client(store, accountId).applyPlan(plan, { dryRun: false }); const fails = (rr.results || []).filter(x => !x.ok); invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok'); } catch (e) { status(st, 'Failed: ' + e.message, 'err'); } };
+    const ap = el('button', 'btn btn-solid', 'Apply'); ap.disabled = (!plan.hasChanges && !hasExtras) || !confirmed;
+    ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…');
+      try {
+        const rr = await A.client(store, accountId).applyPlan(plan, { dryRun: false }); const fails = (rr.results || []).filter(x => !x.ok);
+        // extras: push watched/progress in addition to plan
+        if (extras && extras.profileId != null) {
+          const c = A.client(store, accountId);
+          if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched, p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
+          if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress, p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
+        }
+        invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
+      } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
+    };
     res.appendChild(ap);
   }
 
   // ======================================================================
-  // SYNC DESK
+  // SYNC DESK  (two-column workspace, live preview on every change,
+  // watched/watchprogress as upsert-only categories, review grid + metrics)
   // ======================================================================
+  const sySnapExt = { watched: [], watchProgress: [] }; // filled per source select
+
   function refreshSyncTab() {
     const list = store.list(); const sel = $('sy-account'); const prev = sel.value;
     sel.innerHTML = list.map(r => `<option value="${esc(r.accountId)}">${esc(accountName(r.accountId))}</option>`).join('');
-    if (!list.length) { $('sy-body').style.display = 'none'; $('sy-empty').style.display = ''; return; }
-    $('sy-empty').style.display = 'none'; $('sy-body').style.display = '';
+    if (!list.length) { $('sy-body').classList.remove('open'); $('sy-empty').style.display = ''; return; }
+    $('sy-empty').style.display = 'none'; $('sy-body').classList.add('open');
     sel.value = (prev && list.some(r => r.accountId === prev)) ? prev : (syA && list.some(r => r.accountId === syA) ? syA : list[0].accountId);
     renderSySource(sel.value);
   }
@@ -692,21 +732,34 @@
     let profiles; try { profiles = (await loadAccount(id)).profiles; } catch (e) { clr(box); box.appendChild(el('span', 'muted sm err-text', e.message)); return; }
     clr(box); if (!profiles.length) { box.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
     const keep = (id === syA && profiles.some(p => p.index === syI)) ? syI : profiles[0].index;
-    profiles.forEach(p => { const c = el('button', 'pchip' + (p.index === keep ? ' on' : '')); c.type = 'button'; c.appendChild(avatar(p, 40)); c.appendChild(el('span', 'pcn', p.name)); c.onclick = () => selectSource(id, p.index); box.appendChild(c); });
+    profiles.forEach(p => {
+      const c = el('button', 'pchip' + (p.index === keep ? ' on' : ''));
+      c.type = 'button'; c.appendChild(avatar(p, 26)); c.appendChild(el('span', 'pcn', p.name));
+      c.onclick = () => selectSource(id, p.index);
+      box.appendChild(c);
+    });
     selectSource(id, keep);
   }
   async function selectSource(id, idx) {
-    syA = id; syI = idx; document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
+    syA = id; syI = idx;
+    document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
     try {
       const { backup } = await loadAccount(id); const slice = sliceProfile(backup, idx); const c = A.client(store, id); const settings = {};
-      for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); }
+      for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); } catch (e) { logAct("Couldn't read " + pl + " settings: " + e.message, 'err'); } }
       sySnap = { addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings };
+      sySnapExt.watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
+      sySnapExt.watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
       resetSel(); renderSyItems(); renderSyTree(); await renderSyTargets(); updateSyCounts(); status($('sy-status'), '');
+      renderReviewEmpty();
     } catch (e) { sySnap = null; status($('sy-status'), "Couldn't read source: " + e.message, 'err'); }
   }
   function resetSel() {
-    const s = sySnap || {}; sySel.addons = new Set((s.addons || []).map(a => a.url)); sySel.plugins = new Set((s.plugins || []).map(p => p.url)); sySel.collections = new Set((s.collections || []).map(collKey)); sySel.settings = defTokens(s.settings || {});
+    const s = sySnap || {};
+    sySel.addons = new Set((s.addons || []).map(a => a.url));
+    sySel.plugins = new Set((s.plugins || []).map(p => p.url));
+    sySel.collections = new Set((s.collections || []).map(collKey));
+    sySel.settings = defTokens(s.settings || {});
   }
   function defTokens(settings) {
     const t = new Set();
@@ -719,18 +772,18 @@
   function renderSyItem(kind) {
     const box = $('sy-items-' + kind); clr(box); const list = syList(kind);
     if (!list.length) { box.appendChild(el('p', 'empty sm', 'None on the source.')); return; }
-    const bar = el('div', 'chooser-bar'); const all = el('button', 'link', 'Select all'), none = el('button', 'link', 'Select none');
-    all.onclick = () => { list.forEach(x => sySel[kind].add(syKey(kind, x))); renderSyItem(kind); updateSyCounts(); }; none.onclick = () => { sySel[kind].clear(); renderSyItem(kind); updateSyCounts(); };
-    bar.appendChild(all); bar.appendChild(none); box.appendChild(bar);
-    list.forEach(x => { const key = syKey(kind, x); const row = el('label', 'pick'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel[kind].has(key); cb.onchange = () => { cb.checked ? sySel[kind].add(key) : sySel[kind].delete(key); updateSyCounts(); }; row.appendChild(cb); const b = el('div', 'pb'); if (kind === 'collections') { b.appendChild(el('div', 'pn', collLabel(x))); } else { b.appendChild(el('div', 'pn', x.name || host(x.url))); b.appendChild(el('div', 'ps', host(x.url))); } row.appendChild(b); box.appendChild(row); });
+    const bar = el('div', 'sy-carry-chooser-bar');
+    const all = el('button', 'sy-linkbtn', 'Select all'), none = el('button', 'sy-linkbtn muted', 'Select none');
+    all.onclick = () => { list.forEach(x => sySel[kind].add(syKey(kind, x))); renderSyItem(kind); updateSyCounts(); scheduleLivePreview(); };
+    none.onclick = () => { sySel[kind].clear(); renderSyItem(kind); updateSyCounts(); scheduleLivePreview(); };
+    bar.appendChild(all); bar.appendChild(el('span', 'sy-sep', '|')); bar.appendChild(none); box.appendChild(bar);
+    list.forEach(x => { const key = syKey(kind, x); const row = el('label', 'pick'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel[kind].has(key); cb.onchange = () => { cb.checked ? sySel[kind].add(key) : sySel[kind].delete(key); updateSyCounts(); scheduleLivePreview(); }; row.appendChild(cb); const b = el('div', 'pb'); if (kind === 'collections') { b.appendChild(el('div', 'pn', collLabel(x))); } else { b.appendChild(el('div', 'pn', x.name || host(x.url))); b.appendChild(el('div', 'ps', host(x.url))); } row.appendChild(b); box.appendChild(row); });
   }
-  // all copyable tokens actually present in the source for a platform
   function availTokens(pl) {
     const t = new Set(); const feat = ((sySnap.settings[pl]) || {}).features || {};
     for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (!SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
     return t;
   }
-  // tokens a schema tab would carry (payload groups as whole-group tokens)
   function schemaTabTokens(pl, tab) {
     const toks = new Set();
     (tab.groups || []).forEach(g => g.fields.forEach(f => {
@@ -745,7 +798,7 @@
     const groupRow = (title, sub, eff, extraCls) => {
       const row = el('label', 'pick' + (extraCls ? ' ' + extraCls : '')); const cb = el('input'); cb.type = 'checkbox';
       const selN = eff.filter(t => sySel.settings.has(t)).length; cb.checked = eff.length > 0 && selN === eff.length; cb.indeterminate = selN > 0 && selN < eff.length;
-      cb.onchange = () => { eff.forEach(t => cb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); };
+      cb.onchange = () => { eff.forEach(t => cb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
       row.appendChild(cb); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', title)); if (sub) b.appendChild(el('div', 'ps', sub)); row.appendChild(b); return row;
     };
     plats.forEach(pl => {
@@ -763,69 +816,135 @@
       if (Object.keys(feat).some(g => ACCOUNT_GROUP.test(g))) { const row = el('label', 'pick'); row.style.opacity = '.55'; row.appendChild(el('span', 'cb-spacer', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', 'Account-linked (Trakt)')); b.appendChild(el('div', 'ps', 'never copied')); row.appendChild(b); tree.appendChild(row); }
     });
   }
-  const humanize = k => (k || '').replace(/_settings$/, '').replace(/_payload$/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   function updateSyCounts() {
-    const s = sySnap || {}; const set = (id, sel, tot) => { const e = $(id); if (e) e.textContent = tot ? sel + ' / ' + tot : '0'; };
-    set('sy-cnt-addons', sySel.addons.size, (s.addons || []).length); set('sy-cnt-plugins', sySel.plugins.size, (s.plugins || []).length); set('sy-cnt-collections', sySel.collections.size, (s.collections || []).length);
+    const s = sySnap || {};
+    const set = (id, sel, tot) => { const e = $(id); if (e) e.textContent = tot ? sel + ' / ' + tot : '0 / 0'; };
+    set('sy-cnt-addons', sySel.addons.size, (s.addons || []).length);
+    set('sy-cnt-plugins', sySel.plugins.size, (s.plugins || []).length);
+    set('sy-cnt-collections', sySel.collections.size, (s.collections || []).length);
     if ($('sy-cnt-settings')) $('sy-cnt-settings').textContent = sySel.settings.size + ' selected';
+    if ($('sy-cnt-watchprogress')) $('sy-cnt-watchprogress').textContent = (sySnapExt.watchProgress || []).length + ' items';
+    if ($('sy-cnt-watched')) $('sy-cnt-watched').textContent = (sySnapExt.watched || []).length + ' items';
   }
-  let allSyTids = []; // track all available target tids for select-all
+
+  // ---- targets: grouped by account, chip-style, with per-account select all ----
+  let allSyTids = [];
   async function renderSyTargets() {
-    const box = $('sy-targets'); clr(box); syTargets.clear(); allSyTids = []; const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account.')); return; }
+    const box = $('sy-targets'); clr(box); syTargets.clear(); allSyTids = [];
+    const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account.')); return; }
     let any = false;
-    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue;
-      const acctTids = []; const acctRow = el('div', 'tgt-acct-row'); acctRow.appendChild(el('div', 'tgt-acct', accountName(rec.accountId)));
-      const acctSelAll = el('button', 'tgt-selall', 'select all'); acctRow.appendChild(acctSelAll); box.appendChild(acctRow);
-      const grid = el('div', 'tgt-grid'); tgt.forEach(p => { const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); acctTids.push(tid); const c = el('button', 'pchip multi'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => { const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid); c.classList.toggle('on', !on); livePreviewTarget(tid, !on); }; grid.appendChild(c); }); box.appendChild(grid);
-      acctSelAll.onclick = () => { const allOn = acctTids.every(t => syTargets.has(t)); acctTids.forEach(t => allOn ? syTargets.delete(t) : syTargets.add(t)); grid.querySelectorAll('.pchip.multi').forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'select all' : 'deselect all'; if (!allOn) livePreviewAllTargets(); else if (syTargets.size === 0) clearPreview(); else livePreviewAllTargets(); };
-      any = true; }
+    for (const rec of list) {
+      let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
+      const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue;
+      const group = el('div', 'sy-ct-group');
+      group.appendChild(el('div', 'sy-ct-group-lbl', (accountName(rec.accountId) || '').toUpperCase()));
+      const chips = el('div', 'sy-ct-chips');
+      const acctTids = [];
+      tgt.forEach(p => {
+        const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); acctTids.push(tid);
+        const c = el('button', 'sy-chip'); c.type = 'button'; c.dataset.tid = tid;
+        c.appendChild(avatar(p, 22)); c.appendChild(el('span', 'pcn', p.name));
+        const chk = el('span', 'chk'); chk.textContent = '✓'; c.appendChild(chk);
+        c.onclick = () => {
+          const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid);
+          c.classList.toggle('on', !on); updateApplyBtnLabel(); scheduleLivePreview();
+        };
+        chips.appendChild(c);
+      });
+      group.appendChild(chips); box.appendChild(group);
+      // per-account select-all is available via the header "Select all" — no per-account button in this design
+      group._acctTids = acctTids;
+      any = true;
+    }
     if (!any) box.appendChild(el('p', 'empty sm', 'No other profiles to sync into.'));
   }
   function sySelectAll() {
-    const chips = document.querySelectorAll('#sy-targets .pchip.multi');
-    const allOn = allSyTids.length > 0 && allSyTids.every(t => syTargets.has(t));
-    allSyTids.forEach(t => allOn ? syTargets.delete(t) : syTargets.add(t));
-    chips.forEach(c => c.classList.toggle('on', !allOn));
-    const btn = $('sy-select-all'); if (btn) btn.textContent = allOn ? 'Select all' : 'Deselect all';
-    // preview all targets
-    if (!allOn && allSyTids.length) livePreviewAllTargets(); else clearPreview();
+    allSyTids.forEach(t => syTargets.add(t));
+    document.querySelectorAll('#sy-targets .sy-chip').forEach(c => c.classList.add('on'));
+    updateApplyBtnLabel(); scheduleLivePreview();
+  }
+  function syDeselectAll() {
+    syTargets.clear();
+    document.querySelectorAll('#sy-targets .sy-chip').forEach(c => c.classList.remove('on'));
+    updateApplyBtnLabel(); renderReviewEmpty();
   }
 
-  // live preview: run preview for selected targets without requiring "Preview all" button
+  // ---- live preview ----
   let livePreviewTimer = null;
-  function livePreviewTarget(tid, selected) {
-    // debounce rapid clicks
+  function scheduleLivePreview() {
+    updateApplyBtnLabel();
     clearTimeout(livePreviewTimer);
     livePreviewTimer = setTimeout(() => {
-      if (syTargets.size === 0) { clearPreview(); return; }
+      if (syTargets.size === 0 || !sySnap) { renderReviewEmpty(); return; }
       livePreviewAllTargets();
-    }, 200);
+    }, 220);
   }
-  function clearPreview() {
-    const box = $('sy-results'); if (box) box.innerHTML = '<p class="empty">Select a target profile to see a live preview of changes.</p>';
+  function updateApplyBtnLabel() {
+    const n = syTargets.size;
+    const btn = $('sy-apply'); if (!btn) return;
+    btn.textContent = 'Apply to ' + n + ' profile' + (n === 1 ? '' : 's');
+  }
+  function renderReviewEmpty() {
+    $('sy-review-empty').style.display = ''; $('sy-review-full').style.display = 'none';
+    const sub = $('sy-review-sub'); if (sub) sub.textContent = '';
     status($('sy-pv-status'), '');
     $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; $('sy-apply').disabled = true; syPlans = null;
   }
   async function livePreviewAllTargets() {
-    if (!sySnap) { clearPreview(); return; }
-    const targets = [...syTargets]; if (!targets.length) { clearPreview(); return; }
+    if (!sySnap) { renderReviewEmpty(); return; }
+    const targets = [...syTargets]; if (!targets.length) { renderReviewEmpty(); return; }
+    $('sy-review-empty').style.display = 'none'; $('sy-review-full').style.display = '';
     status($('sy-pv-status'), 'Reading…');
     const mode = $('sy-mode').value === 'overwrite' ? 'mirror' : 'merge';
-    const cats = { addons: $('sy-cat-addons').checked, plugins: $('sy-cat-plugins').checked, collections: $('sy-cat-collections').checked, settings: $('sy-cat-settings').checked };
+    const cats = {
+      addons: $('sy-cat-addons').checked, plugins: $('sy-cat-plugins').checked,
+      collections: $('sy-cat-collections').checked, settings: $('sy-cat-settings').checked,
+      watchprogress: $('sy-cat-watchprogress').checked, watched: $('sy-cat-watched').checked,
+    };
     const master = syMaster();
     try {
       const plans = []; let rem = false;
-      for (const tid of targets) { const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10); const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
+      for (const tid of targets) {
+        const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10);
+        const c = A.client(store, aid); const { backup } = await loadAccount(aid);
+        const state = sliceProfile(backup, idx); const upd = {};
         if (cats.settings) { state.settings = {}; for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } catch (e) { logAct('Settings read failed for ' + pl + ': ' + e.message, 'err'); } } }
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        if (plan.hasRemovals) rem = true; plans.push({ aid, tid, plan }); }
-      syPlans = plans; renderSyReports(plans); if (rem) $('sy-confirm-wrap').style.display = ''; $('sy-apply').disabled = rem;
-      status($('sy-pv-status'), plans.length + ' profile' + (plans.length === 1 ? '' : 's'), 'ok');
+        if (plan.hasRemovals) rem = true;
+        // watched / watchprogress: upsert-only, no removals possible
+        const extras = {};
+        if (cats.watchprogress && sySnapExt.watchProgress.length) extras.watchProgress = sySnapExt.watchProgress;
+        if (cats.watched && sySnapExt.watched.length) extras.watched = sySnapExt.watched;
+        plans.push({ aid, tid, plan, extras });
+      }
+      syPlans = plans; renderSyReports(plans); renderSyMetrics(plans);
+      if (rem) $('sy-confirm-wrap').style.display = ''; else { $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; }
+      $('sy-apply').disabled = rem && !$('sy-confirm').checked;
+      const sub = $('sy-review-sub'); if (sub) sub.textContent = plans.length + ' profile' + (plans.length === 1 ? '' : 's') + ' selected';
+      renderSyReviewFoot(plans, rem);
+      status($('sy-pv-status'), 'Live', 'ok');
     } catch (e) { status($('sy-pv-status'), e.message, 'err'); }
   }
   function syMaster() {
-    const s = sySnap; const out = { addons: (s.addons || []).filter(a => sySel.addons.has(a.url)), plugins: (s.plugins || []).filter(p => sySel.plugins.has(p.url)), collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))), settings: {} };
-    for (const pl of Object.keys(s.settings || {})) { const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {}; for (const g of Object.keys(feat)) { const gv = feat[g]; const gtok = pl + '::' + g; if (sySel.settings.has(gtok)) { of[g] = gv; continue; } if (gv && typeof gv === 'object' && typeof gv !== 'string') { const pick = {}; for (const lf of Object.keys(gv)) if (sySel.settings.has(pl + '::' + g + '.' + lf)) pick[lf] = gv[lf]; if (Object.keys(pick).length) of[g] = pick; } } if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of }; }
+    const s = sySnap;
+    const out = {
+      addons: (s.addons || []).filter(a => sySel.addons.has(a.url)),
+      plugins: (s.plugins || []).filter(p => sySel.plugins.has(p.url)),
+      collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))),
+      settings: {},
+    };
+    for (const pl of Object.keys(s.settings || {})) {
+      const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {};
+      for (const g of Object.keys(feat)) {
+        const gv = feat[g]; const gtok = pl + '::' + g;
+        if (sySel.settings.has(gtok)) { of[g] = gv; continue; }
+        if (gv && typeof gv === 'object' && typeof gv !== 'string') {
+          const pick = {}; for (const lf of Object.keys(gv)) if (sySel.settings.has(pl + '::' + g + '.' + lf)) pick[lf] = gv[lf];
+          if (Object.keys(pick).length) of[g] = pick;
+        }
+      }
+      if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of };
+    }
     return out;
   }
   async function syncPreview() {
@@ -835,24 +954,113 @@
     await livePreviewAllTargets();
     logAct('Previewed sync into ' + targets.length + ' profile(s)', 'info');
   }
-  function tidName(tid) { const [id, i] = tid.split(':'); const rec = cache[id]; const p = rec && rec.profiles.find(x => x.index === parseInt(i, 10)); return (p ? p.name : 'Profile ' + i) + ' · ' + accountName(id); }
+  function tidName(tid) { const [id, i] = tid.split(':'); const rec = cache[id]; const p = rec && rec.profiles.find(x => x.index === parseInt(i, 10)); return { name: p ? p.name : 'Profile ' + i, acct: accountName(id), profile: p || { name: 'Profile ' + i } }; }
+
+  // ---- metrics row ----
+  function renderSyMetrics(plans) {
+    const box = $('sy-metrics'); if (!box) return; clr(box);
+    let addN = 0, plgN = 0, colN = 0, setN = 0, wpN = 0, wdN = 0;
+    plans.forEach(({ plan, extras }) => {
+      const r = plan.report;
+      if (r.addons) addN += (r.addons.added || []).length + (r.addons.updated || []).length;
+      if (r.plugins) plgN += (r.plugins.added || []).length + (r.plugins.updated || []).length;
+      if (r.collections) colN += (r.collections.added || []).length + (r.collections.updated || []).length;
+      if (r.settings) for (const p of Object.keys(r.settings)) setN += (r.settings[p].changed || []).length;
+      if (extras.watchProgress) wpN += extras.watchProgress.length;
+      if (extras.watched) wdN += extras.watched.length;
+    });
+    const metric = (icon, n, label) => {
+      const m = el('div', 'sy-metric');
+      const ic = el('span', 'sy-metric-ic'); ic.innerHTML = icon; m.appendChild(ic);
+      const tx = el('div', 'sy-metric-tx'); tx.appendChild(el('div', 'n', String(n))); tx.appendChild(el('div', 'l', label)); m.appendChild(tx);
+      return m;
+    };
+    box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.2"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>', plans.length, 'Profiles'));
+    box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>', addN, 'Add-ons'));
+    if (plgN) box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 1 1-12 0V7z"/></svg>', plgN, 'Plugins'));
+    if (colN) box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7"/></svg>', colN, 'Collections'));
+    if (wpN) box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', wpN, 'Progress'));
+    if (wdN) box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>', wdN, 'Watched'));
+    box.appendChild(metric('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg>', setN, 'Settings'));
+  }
+
+  // ---- profile change cards grid ----
   function renderSyReports(plans) {
-    const box = $('sy-results'); box.innerHTML = '';
-    plans.forEach(({ tid, plan }) => {
-      const r = plan.report; const d = el('div', 'report');
-      let h = `<div class="rhead">${esc(tidName(tid))}${plan.hasChanges ? '<span class="rbadge chg">changes</span>' : '<span class="rbadge no">no change</span>'}</div>`;
-      const line = (label, o) => { if (!o) return ''; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed), (o.keptLocal && o.keptLocal.length ? `<span class="tag keep">keeps ${o.keptLocal.length}</span>` : '')].filter(Boolean); return bits.length ? `<div class="rline"><span class="rk">${label}</span>${bits.join(' ')}</div>` : ''; };
-      const addonsLine = line('Add-ons', r.addons), pluginsLine = line('Plugins', r.plugins), collectionsLine = line('Collections', r.collections);
-      h += addonsLine + pluginsLine + collectionsLine;
-      if (r.settings) { let ch = 0, held = 0; for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; held += r.settings[p].skippedSecrets.length; } if (ch || held) h += `<div class="rline"><span class="rk">Settings</span>${ch ? `<span class="tag upd">${ch} fields</span>` : ''}${held ? `<span class="tag held">${held} keys held</span>` : ''}</div>`; }
-      if (!plan.hasChanges) h += '<div class="no-change">Already matches — nothing to do.</div>';
-      d.innerHTML = h; box.appendChild(d);
+    const box = $('sy-results'); clr(box);
+    plans.forEach(({ tid, plan, extras }) => {
+      const nm = tidName(tid);
+      const r = plan.report; const d = el('div', 'sy-card-report');
+      const head = el('div', 'rhead');
+      head.appendChild(avatar(nm.profile, 26));
+      const nameSpan = el('span', 'rhead-name'); nameSpan.textContent = nm.name;
+      head.appendChild(nameSpan);
+      const acctBadge = el('span', 'rbadge no'); acctBadge.textContent = nm.acct;
+      acctBadge.style.background = 'var(--surface)'; acctBadge.style.border = '1px solid var(--line)';
+      head.appendChild(acctBadge);
+      const chgBadge = el('span', 'rbadge ' + (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) ? 'chg' : 'no'));
+      chgBadge.textContent = (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length)) ? 'changes' : 'no change';
+      head.appendChild(chgBadge);
+      d.appendChild(head);
+
+      const line = (label, o) => {
+        if (!o) return null;
+        const bits = [];
+        if (o.added && o.added.length) bits.push('<span class="tag add">+' + o.added.length + '</span>');
+        if (o.updated && o.updated.length) bits.push('<span class="tag upd">~' + o.updated.length + '</span>');
+        if (o.removed && o.removed.length) bits.push('<span class="tag rem">−' + o.removed.length + '</span>');
+        if (o.keptLocal && o.keptLocal.length) bits.push('<span class="tag keep">keeps ' + o.keptLocal.length + '</span>');
+        if (!bits.length) return null;
+        const x = el('div', 'rline'); x.innerHTML = '<span class="rk">' + label + '</span>' + bits.join(' '); return x;
+      };
+      const rows = [];
+      const a = line('Add-ons', r.addons); if (a) rows.push(a);
+      const p = line('Plugins', r.plugins); if (p) rows.push(p);
+      const c = line('Collections', r.collections); if (c) rows.push(c);
+      if (r.settings) { let ch = 0, held = 0; for (const pl of Object.keys(r.settings)) { ch += r.settings[pl].changed.length; held += r.settings[pl].skippedSecrets.length; } if (ch || held) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Settings</span>' + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '') + (held ? '<span class="tag held">' + held + ' held</span>' : ''); rows.push(x); } }
+      if (extras.watchProgress && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Progress</span><span class="tag add">+' + extras.watchProgress.length + '</span>'; rows.push(x); }
+      if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span><span class="tag add">+' + extras.watched.length + '</span>'; rows.push(x); }
+      // removals line — explicit
+      const remRow = el('div', 'rline');
+      const totalRem = ((r.addons && (r.addons.removed || []).length) || 0) + ((r.plugins && (r.plugins.removed || []).length) || 0) + ((r.collections && (r.collections.removed || []).length) || 0);
+      remRow.innerHTML = '<span class="rk">Removals</span>' + (totalRem ? '<span class="tag rem">−' + totalRem + '</span>' : '<span style="font-size:12px;color:var(--t45)">None</span>');
+      if (rows.length) rows.forEach(rw => d.appendChild(rw));
+      d.appendChild(remRow);
+      if (!rows.length && !totalRem) d.appendChild(el('div', 'no-change', 'Already matches — nothing to do.'));
+      box.appendChild(d);
     });
   }
+
+  // ---- review footer (final confirmation area) ----
+  function renderSyReviewFoot(plans, hasRem) {
+    const foot = $('sy-review-foot'); if (!foot) return; clr(foot); foot.style.display = '';
+    const note = el('div', 'foot-note' + (hasRem ? ' warn' : ''));
+    note.innerHTML = hasRem
+      ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg><span>Removals detected — review and confirm on the left before applying.</span>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg><span>No removals in ' + ($('sy-mode').value === 'overwrite' ? 'Overwrite' : 'Merge') + ' mode — safe to apply.</span>';
+    foot.appendChild(note);
+  }
+
   async function syncApply() {
     if (!syPlans) return; $('sy-apply').disabled = true; status($('sy-status'), 'Applying…'); let ok = 0, fail = 0;
-    for (const { aid, plan } of syPlans) { if (!plan.hasChanges) continue; try { const r = await A.client(store, aid).applyPlan(plan, { dryRun: false }); (r.results || []).forEach(x => { x.ok ? ok++ : fail++; if (!x.ok) logAct('Sync ' + x.surface + ' failed: ' + x.error, 'err'); }); } catch (e) { fail++; logAct('Apply failed: ' + e.message, 'err'); } }
-    invalAll(); status($('sy-status'), 'Done — ' + ok + ' change' + (ok === 1 ? '' : 's') + (fail ? ', ' + fail + ' failed.' : '.'), fail ? 'err' : 'ok'); logAct('Applied sync: ' + ok + ' ok' + (fail ? ', ' + fail + ' failed' : ''), fail ? 'err' : 'ok'); syPlans = null; selectSource(syA, syI);
+    for (const { aid, plan, extras } of syPlans) {
+      const hasExtras = (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length);
+      if (!plan.hasChanges && !hasExtras) continue;
+      try {
+        if (plan.hasChanges) {
+          const r = await A.client(store, aid).applyPlan(plan, { dryRun: false });
+          (r.results || []).forEach(x => { x.ok ? ok++ : fail++; if (!x.ok) logAct('Sync ' + x.surface + ' failed: ' + x.error, 'err'); });
+        }
+        if (hasExtras) {
+          const c = A.client(store, aid);
+          if (extras.watchProgress && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress, p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watch progress failed: ' + e.message, 'err'); } }
+          if (extras.watched && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched, p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watched failed: ' + e.message, 'err'); } }
+        }
+      } catch (e) { fail++; logAct('Apply failed: ' + e.message, 'err'); }
+    }
+    invalAll();
+    status($('sy-status'), 'Done — ' + ok + ' change' + (ok === 1 ? '' : 's') + (fail ? ', ' + fail + ' failed.' : '.'), fail ? 'err' : 'ok');
+    logAct('Applied sync: ' + ok + ' ok' + (fail ? ', ' + fail + ' failed' : ''), fail ? 'err' : 'ok');
+    syPlans = null; selectSource(syA, syI);
   }
 
   // ======================================================================
@@ -930,7 +1138,20 @@
     $('pf-tpl-profile').onclick = () => saveTemplate('profile');
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
     $('sy-select-all').onclick = sySelectAll;
-    document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = () => $(b.dataset.target).classList.toggle('open'));
+    $('sy-deselect-all').onclick = syDeselectAll;
+    document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = (e) => { e.preventDefault(); $(b.dataset.target).classList.toggle('open'); });
+    // live preview on carry-over category toggles
+    ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-settings', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
+      const cb = $(id); if (cb) cb.addEventListener('change', () => { updateSyCounts(); scheduleLivePreview(); });
+    });
+    // live preview on mode change
+    $('sy-mode').addEventListener('change', () => {
+      const desc = $('sy-mode-desc');
+      if (desc) desc.textContent = $('sy-mode').value === 'overwrite'
+        ? 'Overwrite mode makes the target match the source exactly. Anything the target has that the source doesn\'t will be removed.'
+        : 'Merge mode adds new items and updates existing ones, but keeps everything else as-is.';
+      scheduleLivePreview();
+    });
     $('sy-preview').onclick = syncPreview; $('sy-apply').onclick = syncApply; $('sy-confirm').onchange = () => { $('sy-apply').disabled = !$('sy-confirm').checked; };
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
