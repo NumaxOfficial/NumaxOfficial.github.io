@@ -29,7 +29,7 @@
   // state
   // ======================================================================
   const cache = {};                     // accountId -> {backup, profiles, keysLoaded}
-  let readKeys = false, idleFlight = true;
+  let readKeys = false;
   let gAuth = { token: null, client: null, user: null };
   let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0;
   const pfDirty = {};
@@ -116,63 +116,382 @@
   }
 
   // ======================================================================
-  // toucan bird flight
   // ======================================================================
+  // Toucan — dimensional bird flight system
+  // ======================================================================
+  // States: PERCHED | TAKEOFF | EXIT | ENTER | APPROACH | LANDING | IDLE_BOB
   const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let cur = { x: -120, y: -120, rot: 0 }, flying = false, mascotKey = 'accounts', idleTimer = null, animId = null;
-  function setMascot() { const m = $('mascot'); if (m) m.style.transform = `translate(${cur.x}px,${cur.y}px) rotate(${cur.rot}deg)`; }
+
+  // tunable constants
+  const T = {
+    TAKEOFF_DUR:   300,    // ms to lift off tab
+    EXIT_DUR:      600,    // ms to fly off-screen
+    ENTER_DUR:     700,    // ms to re-enter from edge
+    APPROACH_DUR:  500,    // ms to glide to target tab
+    LANDING_DUR:   250,    // ms bounce/settle on landing
+    WING_FAST:     40,     // ms per flap cycle during takeoff
+    WING_CRUISE:   70,     // ms per flap cycle in flight
+    WING_SLOW:     120,    // ms per flap cycle on approach
+    WING_AMP_MAX:  28,     // deg — wing rotation at max flap
+    WING_AMP_MIN:  6,      // deg — wing rotation at cruise
+    BANK_LIMIT:    18,     // deg max body roll
+    PITCH_LIMIT:   12,     // deg max body pitch
+    BOB_AMP:       2.5,    // px — idle body bob amplitude
+    BOB_PERIOD:    2200,   // ms — idle bob period
+    HEAD_BOB_AMP:  1.5,    // deg — idle head tilt amplitude
+    TAIL_WAG_AMP:  3,      // deg — tail wag during perch
+    DEPTH_SCALE_MIN: .88,  // scale when "far" during exit
+    DEPTH_SCALE_MAX: 1.08, // scale when "near" during enter
+    LANDING_BOUNCE: 4,     // px bounce on landing
+    SHADOW_FLIGHT_Y: 30,   // px below bird for shadow during flight
+  };
+
+  let mascotKey = 'accounts', mascotEnabled = true;
+  let birdState = 'PERCHED'; // state machine
+  let cur = { x: -120, y: -120, rot: 0, pitch: 0, scale: 1 };
+  let animId = null, pendingTarget = null;
+
+  // DOM refs (cached on first use)
+  let _m, _body, _shadow, _wing, _wingFar, _head, _tail, _feet;
+  function birdEls() {
+    if (!_m) {
+      _m = $('mascot'); _body = $('mascot-body'); _shadow = $('mascot-shadow');
+      _wing = document.getElementById('m-wing'); _wingFar = document.getElementById('m-wing-far');
+      _head = document.getElementById('m-head'); _tail = document.getElementById('m-tail');
+      _feet = document.getElementById('m-feet');
+    }
+    return _m;
+  }
+
+  function applyBird() {
+    if (!birdEls()) return;
+    _m.style.transform = `translate(${cur.x}px,${cur.y}px) scale(${cur.scale || 1})`;
+    if (_body) _body.style.transform = `rotate(${cur.rot || 0}deg) skewY(${(cur.pitch || 0) * .3}deg)`;
+  }
+
+  function setWing(angle, farAngle) {
+    if (_wing) { _wing.style.transform = `rotate(${angle}deg)`; _wing.style.transformOrigin = '76% 26%'; }
+    if (_wingFar) { _wingFar.style.transform = `rotate(${(farAngle != null ? farAngle : angle * .7)}deg)`; _wingFar.style.transformOrigin = '82% 30%'; }
+  }
+
+  function setHead(angle) { if (_head) _head.style.transform = `rotate(${angle}deg)`; _head.style.transformOrigin = '55% 50%'; }
+  function setTail(angle) { if (_tail) _tail.style.transform = `rotate(${angle}deg)`; _tail.style.transformOrigin = '50% 30%'; }
+  function setFeet(vis) { if (_feet) _feet.style.opacity = vis ? '1' : '0'; }
+  function setShadow(show, spread, y) {
+    if (!_shadow) return;
+    _shadow.style.opacity = show ? '.3' : '0';
+    if (spread != null) _shadow.style.width = spread + 'px';
+    if (y != null) _shadow.style.bottom = (-y) + 'px';
+  }
+
   function perchPos(navKey) {
-    const btn = document.querySelector('.navbtn[data-nav="' + navKey + '"]'); const m = $('mascot');
-    if (!btn || !m) return null; const r = btn.getBoundingClientRect(); const mw = m.offsetWidth || 58, mh = m.offsetHeight || 52;
+    const btn = document.querySelector('.navbtn[data-nav="' + navKey + '"]');
+    if (!birdEls() || !btn) return null;
+    const r = btn.getBoundingClientRect();
+    const mw = _m.offsetWidth || 58, mh = _m.offsetHeight || 52;
     return { x: Math.round(r.right - mw * .45), y: Math.round(r.top + r.height / 2 - mh / 2) };
   }
-  function flapOn(v) { const w = document.getElementById('m-wing'); if (w) w.style.transformOrigin = '76% 26%'; const inner = $('mascot-inner'); if (inner) inner.style.setProperty('--flap', v ? '1' : '0'); }
-  function flyTo(x1, y1, dur, then) {
-    const m = $('mascot'); if (!m) { if (then) then(); return; }
-    if (reduce) { cur.x = x1; cur.y = y1; cur.rot = 0; setMascot(); if (then) then(); return; }
-    const x0 = cur.x, y0 = cur.y; const dist = Math.hypot(x1 - x0, y1 - y0);
-    const D = dur || Math.max(650, Math.min(1500, dist * 1.1));
-    // arc control point: perpendicular lift + upward bias (birds rise then settle)
-    const mx = (x0 + x1) / 2, my = (y0 + y1) / 2; const lift = Math.min(160, dist * .35) + 30;
-    const cx = mx, cy = my - lift;
-    const t0 = performance.now(); flying = true;
-    if (animId) cancelAnimationFrame(animId);
-    const wing = $('m-wing');
-    function frame(now) {
-      let t = (now - t0) / D; if (t > 1) t = 1;
-      const e = t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOut
-      const u = 1 - e;
-      const px = u * u * x0 + 2 * u * e * cx + e * e * x1;
-      const py = u * u * y0 + 2 * u * e * cy + e * e * y1 + Math.sin(e * Math.PI) * 6; // gentle bob
-      // velocity for banking
-      const vx = 2 * u * (cx - x0) + 2 * e * (x1 - cx);
-      const vy = 2 * u * (cy - y0) + 2 * e * (y1 - cy);
-      const rot = Math.max(-22, Math.min(22, Math.atan2(vy, vx) * 12));
-      cur.x = px; cur.y = py; cur.rot = (x1 < x0 ? -1 : 1) * 0 + rot * .5;
-      setMascot();
-      if (wing) { const flap = Math.sin(now / 55) * (10 + 14 * Math.sin(e * Math.PI)); wing.style.transform = `rotate(${flap}deg)`; wing.style.transformOrigin = '76% 26%'; }
-      if (t < 1) { animId = requestAnimationFrame(frame); }
-      else { flying = false; cur.rot = 0; setMascot(); if (wing) wing.style.transform = 'rotate(0deg)'; if (then) then(); }
-    }
-    animId = requestAnimationFrame(frame);
+
+  // cubic bezier evaluation: 4 control points
+  function bezierPt(t, p0, p1, p2, p3) {
+    const u = 1 - t;
+    return u*u*u*p0 + 3*u*u*t*p1 + 3*u*t*t*p2 + t*t*t*p3;
   }
-  function perch(navKey, animate) {
-    mascotKey = navKey; const p = perchPos(navKey); if (!p) return;
-    if (!animate) { cur.x = p.x; cur.y = p.y; cur.rot = 0; setMascot(); }
-    else flyTo(p.x, p.y);
-    scheduleIdle();
+  function bezierTangent(t, p0, p1, p2, p3) {
+    const u = 1 - t;
+    return 3*u*u*(p1-p0) + 6*u*t*(p2-p1) + 3*t*t*(p3-p2);
   }
-  function idleHop() {
-    if (!idleFlight || reduce || flying || document.hidden) { scheduleIdle(); return; }
-    if (!$('view-app').classList.contains('current')) { scheduleIdle(); return; }
+
+  // easeInOut cubic
+  function ease(t) { return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+  // easeOut
+  function easeOut(t) { return 1 - Math.pow(1-t,3); }
+  // easeIn
+  function easeIn(t) { return t*t*t; }
+
+  // pick a random off-screen exit point based on current position
+  function exitPoint(from) {
     const W = window.innerWidth, H = window.innerHeight;
-    const wp = [{ x: 120 + Math.random() * (W - 320), y: 80 + Math.random() * (H * .35) },
-                { x: 200 + Math.random() * (W - 380), y: 120 + Math.random() * (H * .5) }];
-    const home = perchPos(mascotKey) || cur;
-    flyTo(wp[0].x, wp[0].y, 900, () => flyTo(wp[1].x, wp[1].y, 850, () => flyTo(home.x, home.y, 1000, scheduleIdle)));
+    const side = Math.random();
+    if (side < .35) return { x: from.x + (Math.random() > .5 ? 1 : -1) * (W * .4 + 120), y: -100 }; // top exit
+    if (side < .65) return { x: -120, y: H * .15 + Math.random() * H * .3 }; // left exit
+    return { x: W + 120, y: H * .1 + Math.random() * H * .35 }; // right exit
   }
-  function scheduleIdle() { clearTimeout(idleTimer); if (!idleFlight || reduce) return; idleTimer = setTimeout(idleHop, 16000 + Math.random() * 22000); }
-  window.addEventListener('resize', () => { const p = perchPos(mascotKey); if (p && !flying) { cur.x = p.x; cur.y = p.y; setMascot(); } });
+
+  // pick a re-entry point (different edge than exit)
+  function entryPoint(exitPt) {
+    const W = window.innerWidth, H = window.innerHeight;
+    if (exitPt.y < 0) return { x: Math.random() * W * .6 + W * .15, y: -80 }; // re-enter from top (different x)
+    if (exitPt.x < 0) return { x: W + 100, y: Math.random() * H * .3 + 40 }; // re-enter from right
+    return { x: -100, y: Math.random() * H * .3 + 40 }; // re-enter from left
+  }
+
+  // full flight sequence: takeoff → exit → enter → approach → land
+  function flyToTab(navKey) {
+    if (!birdEls()) return;
+    pendingTarget = navKey;
+
+    // if already in flight, retarget smoothly — don't queue
+    if (birdState !== 'PERCHED' && birdState !== 'IDLE_BOB' && birdState !== 'LANDING') {
+      // pendingTarget will be read by the current animation
+      return;
+    }
+
+    if (reduce) {
+      // reduced motion: subtle slide
+      const p = perchPos(navKey); if (!p) return;
+      cur.x = p.x; cur.y = p.y; cur.rot = 0; cur.pitch = 0; cur.scale = 1;
+      applyBird(); setWing(0); setShadow(true, 36, 8); birdState = 'PERCHED';
+      return;
+    }
+
+    startFlight();
+  }
+
+  function startFlight() {
+    if (animId) cancelAnimationFrame(animId);
+    const startPos = { x: cur.x, y: cur.y };
+    const exitPt = exitPoint(startPos);
+    const t0 = performance.now();
+
+    birdState = 'TAKEOFF';
+    setFeet(false);
+    setShadow(false);
+
+    // phase 1: takeoff (small lift)
+    const liftY = -30, liftDur = T.TAKEOFF_DUR;
+    function takeoffFrame(now) {
+      if (pendingTarget !== mascotKey && birdState === 'TAKEOFF') {
+        // retarget check — we're committed to takeoff, continue
+      }
+      const t = Math.min(1, (now - t0) / liftDur);
+      const e = easeOut(t);
+      cur.y = startPos.y + liftY * e;
+      cur.pitch = -T.PITCH_LIMIT * e;
+      // fast flaps
+      const flapAngle = Math.sin(now / T.WING_FAST) * T.WING_AMP_MAX * (.5 + .5 * e);
+      setWing(flapAngle, flapAngle * .65);
+      setHead(-2 * e);
+      setTail(T.TAIL_WAG_AMP * Math.sin(now / 100));
+      applyBird();
+      if (t < 1) { animId = requestAnimationFrame(takeoffFrame); }
+      else { startExit(now, exitPt); }
+    }
+    animId = requestAnimationFrame(takeoffFrame);
+  }
+
+  function startExit(startTime, exitPt) {
+    birdState = 'EXIT';
+    const fromX = cur.x, fromY = cur.y;
+    // bezier control points for a curved exit
+    const cpx1 = fromX + (exitPt.x - fromX) * .3;
+    const cpy1 = fromY - 80; // lift arc
+    const cpx2 = fromX + (exitPt.x - fromX) * .7;
+    const cpy2 = exitPt.y + (exitPt.y < 0 ? 60 : -40);
+    const t0 = startTime || performance.now();
+    const dur = T.EXIT_DUR;
+    const goingLeft = exitPt.x < fromX;
+
+    function exitFrame(now) {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = ease(t);
+      cur.x = bezierPt(e, fromX, cpx1, cpx2, exitPt.x);
+      cur.y = bezierPt(e, fromY, cpy1, cpy2, exitPt.y);
+      // velocity-based rotation
+      const vx = bezierTangent(e, fromX, cpx1, cpx2, exitPt.x);
+      const vy = bezierTangent(e, fromY, cpy1, cpy2, exitPt.y);
+      const angle = Math.atan2(vy, vx) * (180 / Math.PI);
+      cur.rot = Math.max(-T.BANK_LIMIT, Math.min(T.BANK_LIMIT, angle * .35)) * (goingLeft ? -1 : 1);
+      cur.pitch = Math.max(-T.PITCH_LIMIT, Math.min(T.PITCH_LIMIT, vy * .04));
+      // depth: shrink as it goes away
+      cur.scale = 1 - (1 - T.DEPTH_SCALE_MIN) * e;
+      // cruise flaps
+      const flapAngle = Math.sin(now / T.WING_CRUISE) * (T.WING_AMP_MAX - (T.WING_AMP_MAX - T.WING_AMP_MIN) * e);
+      setWing(flapAngle, flapAngle * .6 + Math.sin(now / T.WING_CRUISE + .4) * 2);
+      setHead(Math.sin(now / 300) * 1.5);
+      setTail(T.TAIL_WAG_AMP * Math.sin(now / 140));
+      applyBird();
+      if (t < 1) { animId = requestAnimationFrame(exitFrame); }
+      else { startEnter(now, exitPt); }
+    }
+    animId = requestAnimationFrame(exitFrame);
+  }
+
+  function startEnter(startTime, exitPt) {
+    birdState = 'ENTER';
+    // re-read target in case user switched tabs during flight
+    mascotKey = pendingTarget || mascotKey;
+    const target = perchPos(mascotKey);
+    if (!target) { snapPerch(mascotKey); return; }
+
+    const entry = entryPoint(exitPt);
+    cur.x = entry.x; cur.y = entry.y;
+    // midpoint on the way to target
+    const midX = entry.x + (target.x - entry.x) * .5;
+    const midY = Math.min(entry.y, target.y) - 60 - Math.random() * 40;
+    const cpx1 = entry.x + (midX - entry.x) * .5;
+    const cpy1 = entry.y - 30;
+    const cpx2 = midX;
+    const cpy2 = midY;
+    const t0 = startTime || performance.now();
+    const dur = T.ENTER_DUR;
+
+    function enterFrame(now) {
+      // retarget check
+      if (pendingTarget !== mascotKey) {
+        mascotKey = pendingTarget;
+        // restart approach from current position
+        startApproach(now);
+        return;
+      }
+      const freshTarget = perchPos(mascotKey) || target;
+      const t = Math.min(1, (now - t0) / dur);
+      const e = ease(t);
+      cur.x = bezierPt(e, entry.x, cpx1, cpx2, freshTarget.x + (midX - freshTarget.x) * (1 - e));
+      cur.y = bezierPt(e, entry.y, cpy1, cpy2, freshTarget.y - 20);
+      const vx = bezierTangent(e, entry.x, cpx1, cpx2, freshTarget.x);
+      const vy = bezierTangent(e, entry.y, cpy1, cpy2, freshTarget.y);
+      cur.rot = Math.max(-T.BANK_LIMIT, Math.min(T.BANK_LIMIT, Math.atan2(vy, vx) * 8));
+      cur.pitch = Math.max(-T.PITCH_LIMIT, Math.min(T.PITCH_LIMIT, vy * .03));
+      // scale back up (approaching)
+      cur.scale = T.DEPTH_SCALE_MIN + (T.DEPTH_SCALE_MAX - T.DEPTH_SCALE_MIN) * e;
+      const flapAngle = Math.sin(now / T.WING_CRUISE) * (T.WING_AMP_MIN + (T.WING_AMP_MAX - T.WING_AMP_MIN) * (1 - e));
+      setWing(flapAngle, flapAngle * .65);
+      setHead(Math.sin(now / 250) * 1.2);
+      setTail(2 * Math.sin(now / 120));
+      applyBird();
+      if (t < 1) { animId = requestAnimationFrame(enterFrame); }
+      else { startApproach(now); }
+    }
+    animId = requestAnimationFrame(enterFrame);
+  }
+
+  function startApproach(startTime) {
+    birdState = 'APPROACH';
+    mascotKey = pendingTarget || mascotKey;
+    const target = perchPos(mascotKey);
+    if (!target) { snapPerch(mascotKey); return; }
+    const fromX = cur.x, fromY = cur.y;
+    const t0 = startTime || performance.now();
+    const dur = T.APPROACH_DUR;
+
+    function approachFrame(now) {
+      if (pendingTarget !== mascotKey) {
+        mascotKey = pendingTarget;
+        startApproach(now); return; // retarget
+      }
+      const freshTarget = perchPos(mascotKey) || target;
+      const t = Math.min(1, (now - t0) / dur);
+      const e = easeOut(t);
+      cur.x = fromX + (freshTarget.x - fromX) * e;
+      cur.y = fromY + (freshTarget.y - fromY) * e;
+      // deceleration — body tilts forward then levels
+      cur.rot = (1 - e) * cur.rot * .8;
+      cur.pitch = (1 - e) * T.PITCH_LIMIT * .5;
+      cur.scale = T.DEPTH_SCALE_MAX + (1 - T.DEPTH_SCALE_MAX) * e; // settle to 1
+      // slow controlled flaps
+      const flapAngle = Math.sin(now / T.WING_SLOW) * T.WING_AMP_MIN * (1 - e * .8);
+      setWing(flapAngle, flapAngle * .6);
+      setHead((1 - e) * Math.sin(now / 200));
+      setTail((1 - e) * 2 * Math.sin(now / 100));
+      applyBird();
+      if (t < 1) { animId = requestAnimationFrame(approachFrame); }
+      else { startLanding(now, freshTarget); }
+    }
+    animId = requestAnimationFrame(approachFrame);
+  }
+
+  function startLanding(startTime, target) {
+    birdState = 'LANDING';
+    setFeet(true);
+    const t0 = startTime || performance.now();
+    const dur = T.LANDING_DUR;
+    const bounce = T.LANDING_BOUNCE;
+
+    function landFrame(now) {
+      const t = Math.min(1, (now - t0) / dur);
+      // bounce: overshoot then settle via damped sine
+      const b = Math.sin(t * Math.PI * 2.5) * bounce * Math.pow(1 - t, 2.5);
+      cur.y = target.y + b;
+      cur.x = target.x;
+      cur.rot = b * .5; // tiny wobble
+      cur.pitch = 0;
+      cur.scale = 1 + Math.abs(b) * .003;
+      setWing(b * .8, b * .5);
+      setHead(b * .3);
+      setTail(-b * .4);
+      applyBird();
+      if (t < 1) { animId = requestAnimationFrame(landFrame); }
+      else {
+        cur.rot = 0; cur.pitch = 0; cur.scale = 1;
+        setWing(0); setHead(0); setTail(0);
+        setShadow(true, 36, 8);
+        applyBird();
+        birdState = 'PERCHED';
+        startIdleBob();
+        // if user switched again during landing, go
+        if (pendingTarget && pendingTarget !== mascotKey) {
+          mascotKey = pendingTarget;
+          setTimeout(() => flyToTab(pendingTarget), 100);
+        }
+      }
+    }
+    animId = requestAnimationFrame(landFrame);
+  }
+
+  // subtle idle breathing/bobbing while perched
+  let idleBobId = null;
+  function startIdleBob() {
+    if (idleBobId) cancelAnimationFrame(idleBobId);
+    if (birdState !== 'PERCHED') return;
+    const baseY = cur.y;
+    birdState = 'IDLE_BOB';
+    function bobFrame(now) {
+      if (birdState !== 'IDLE_BOB') return;
+      const bobY = Math.sin(now / T.BOB_PERIOD * Math.PI * 2) * T.BOB_AMP;
+      const headTilt = Math.sin(now / (T.BOB_PERIOD * 1.3) * Math.PI * 2) * T.HEAD_BOB_AMP;
+      const tailWag = Math.sin(now / (T.BOB_PERIOD * .8) * Math.PI * 2) * T.TAIL_WAG_AMP * .5;
+      cur.y = baseY + bobY;
+      applyBird();
+      setHead(headTilt);
+      setTail(tailWag);
+      idleBobId = requestAnimationFrame(bobFrame);
+    }
+    idleBobId = requestAnimationFrame(bobFrame);
+  }
+  function stopIdleBob() { if (idleBobId) { cancelAnimationFrame(idleBobId); idleBobId = null; } }
+
+  function snapPerch(navKey) {
+    if (animId) cancelAnimationFrame(animId);
+    stopIdleBob();
+    mascotKey = navKey;
+    const p = perchPos(navKey);
+    if (!p) return;
+    cur.x = p.x; cur.y = p.y; cur.rot = 0; cur.pitch = 0; cur.scale = 1;
+    setWing(0); setHead(0); setTail(0); setFeet(true);
+    setShadow(true, 36, 8);
+    applyBird();
+    birdState = 'PERCHED';
+    startIdleBob();
+  }
+
+  function perch(navKey, animate) {
+    pendingTarget = navKey;
+    if (!animate || !mascotEnabled) { snapPerch(navKey); return; }
+    if (mascotKey === navKey && (birdState === 'PERCHED' || birdState === 'IDLE_BOB')) return; // already there
+    stopIdleBob();
+    flyToTab(navKey);
+  }
+
+  // pause when hidden
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { if (animId) cancelAnimationFrame(animId); stopIdleBob(); }
+    else if (birdState === 'PERCHED' || birdState === 'IDLE_BOB') { snapPerch(mascotKey); }
+  });
+
+  window.addEventListener('resize', () => {
+    if (birdState === 'PERCHED' || birdState === 'IDLE_BOB') { snapPerch(mascotKey); }
+  });
 
   // ======================================================================
   // views + nav
@@ -180,8 +499,10 @@
   function showView(id) { document.querySelectorAll('.view').forEach(v => v.classList.toggle('current', v.id === id)); }
   const TITLES = { accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', activity: 'Activity', settings: 'Settings' };
   function enterApp() {
-    showView('view-app'); const m = $('mascot'); m.style.opacity = '1'; m.style.visibility = 'visible';
+    showView('view-app'); birdEls(); if (_m) { _m.style.opacity = '1'; _m.style.visibility = 'visible'; }
     nav('accounts'); requestAnimationFrame(() => perch('accounts', false));
+    // populate avatar catalog for built-in Nuvio avatars
+    A.fetchAvatarCatalog().then(map => { Object.assign(avatarCatalog, map); }).catch(() => {});
   }
   function nav(panel) {
     document.querySelectorAll('[data-panel]').forEach(p => p.style.display = p.dataset.panel === panel ? '' : 'none');
@@ -740,21 +1061,42 @@
     set('sy-cnt-addons', sySel.addons.size, (s.addons || []).length); set('sy-cnt-plugins', sySel.plugins.size, (s.plugins || []).length); set('sy-cnt-collections', sySel.collections.size, (s.collections || []).length);
     if ($('sy-cnt-settings')) $('sy-cnt-settings').textContent = sySel.settings.size + ' selected';
   }
+  let allSyTids = []; // track all available target tids for select-all
   async function renderSyTargets() {
-    const box = $('sy-targets'); clr(box); syTargets.clear(); const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account.')); return; }
+    const box = $('sy-targets'); clr(box); syTargets.clear(); allSyTids = []; const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account.')); return; }
     let any = false;
-    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue; box.appendChild(el('div', 'tgt-acct', accountName(rec.accountId))); const grid = el('div', 'tgt-grid'); tgt.forEach(p => { const tid = rec.accountId + ':' + p.index; const c = el('button', 'pchip multi'); c.type = 'button'; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => { const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid); c.classList.toggle('on', !on); }; grid.appendChild(c); }); box.appendChild(grid); any = true; }
+    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue; box.appendChild(el('div', 'tgt-acct', accountName(rec.accountId))); const grid = el('div', 'tgt-grid'); tgt.forEach(p => { const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); const c = el('button', 'pchip multi'); c.type = 'button'; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => { const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid); c.classList.toggle('on', !on); livePreviewTarget(tid, !on); }; grid.appendChild(c); }); box.appendChild(grid); any = true; }
     if (!any) box.appendChild(el('p', 'empty sm', 'No other profiles to sync into.'));
   }
-  function syMaster() {
-    const s = sySnap; const out = { addons: (s.addons || []).filter(a => sySel.addons.has(a.url)), plugins: (s.plugins || []).filter(p => sySel.plugins.has(p.url)), collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))), settings: {} };
-    for (const pl of Object.keys(s.settings || {})) { const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {}; for (const g of Object.keys(feat)) { const gv = feat[g]; const gtok = pl + '::' + g; if (sySel.settings.has(gtok)) { of[g] = gv; continue; } if (gv && typeof gv === 'object' && typeof gv !== 'string') { const pick = {}; for (const lf of Object.keys(gv)) if (sySel.settings.has(pl + '::' + g + '.' + lf)) pick[lf] = gv[lf]; if (Object.keys(pick).length) of[g] = pick; } } if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of }; }
-    return out;
+  function sySelectAll() {
+    const chips = document.querySelectorAll('#sy-targets .pchip.multi');
+    const allOn = allSyTids.length > 0 && allSyTids.every(t => syTargets.has(t));
+    allSyTids.forEach(t => allOn ? syTargets.delete(t) : syTargets.add(t));
+    chips.forEach(c => c.classList.toggle('on', !allOn));
+    const btn = $('sy-select-all'); if (btn) btn.textContent = allOn ? 'Select all' : 'Deselect all';
+    // preview all targets
+    if (!allOn && allSyTids.length) livePreviewAllTargets(); else clearPreview();
   }
-  async function syncPreview() {
-    status($('sy-status'), 'Reading targets…'); $('sy-results').innerHTML = ''; $('sy-apply').disabled = true; $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; syPlans = null;
-    if (!sySnap) { status($('sy-status'), 'Pick a source.', 'err'); return; }
-    const targets = [...syTargets]; if (!targets.length) { status($('sy-status'), 'Tick at least one target.', 'err'); return; }
+
+  // live preview: run preview for selected targets without requiring "Preview all" button
+  let livePreviewTimer = null;
+  function livePreviewTarget(tid, selected) {
+    // debounce rapid clicks
+    clearTimeout(livePreviewTimer);
+    livePreviewTimer = setTimeout(() => {
+      if (syTargets.size === 0) { clearPreview(); return; }
+      livePreviewAllTargets();
+    }, 200);
+  }
+  function clearPreview() {
+    const box = $('sy-results'); if (box) box.innerHTML = '<p class="empty">Select a target profile to see a live preview of changes.</p>';
+    status($('sy-pv-status'), '');
+    $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; $('sy-apply').disabled = true; syPlans = null;
+  }
+  async function livePreviewAllTargets() {
+    if (!sySnap) { clearPreview(); return; }
+    const targets = [...syTargets]; if (!targets.length) { clearPreview(); return; }
+    status($('sy-pv-status'), 'Reading…');
     const mode = $('sy-mode').value === 'overwrite' ? 'mirror' : 'merge';
     const cats = { addons: $('sy-cat-addons').checked, plugins: $('sy-cat-plugins').checked, collections: $('sy-cat-collections').checked, settings: $('sy-cat-settings').checked };
     const master = syMaster();
@@ -765,8 +1107,20 @@
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
         if (plan.hasRemovals) rem = true; plans.push({ aid, tid, plan }); }
       syPlans = plans; renderSyReports(plans); if (rem) $('sy-confirm-wrap').style.display = ''; $('sy-apply').disabled = rem;
-      status($('sy-status'), 'Preview ready — nothing written yet.', 'ok'); logAct('Previewed sync into ' + plans.length + ' profile(s)', 'info');
-    } catch (e) { status($('sy-status'), e.message, 'err'); }
+      status($('sy-pv-status'), plans.length + ' profile' + (plans.length === 1 ? '' : 's'), 'ok');
+    } catch (e) { status($('sy-pv-status'), e.message, 'err'); }
+  }
+  function syMaster() {
+    const s = sySnap; const out = { addons: (s.addons || []).filter(a => sySel.addons.has(a.url)), plugins: (s.plugins || []).filter(p => sySel.plugins.has(p.url)), collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))), settings: {} };
+    for (const pl of Object.keys(s.settings || {})) { const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {}; for (const g of Object.keys(feat)) { const gv = feat[g]; const gtok = pl + '::' + g; if (sySel.settings.has(gtok)) { of[g] = gv; continue; } if (gv && typeof gv === 'object' && typeof gv !== 'string') { const pick = {}; for (const lf of Object.keys(gv)) if (sySel.settings.has(pl + '::' + g + '.' + lf)) pick[lf] = gv[lf]; if (Object.keys(pick).length) of[g] = pick; } } if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of }; }
+    return out;
+  }
+  async function syncPreview() {
+    if (!sySnap) { status($('sy-status'), 'Pick a source.', 'err'); return; }
+    const targets = [...syTargets]; if (!targets.length) { status($('sy-status'), 'Tick at least one target.', 'err'); return; }
+    status($('sy-status'), '');
+    await livePreviewAllTargets();
+    logAct('Previewed sync into ' + targets.length + ' profile(s)', 'info');
   }
   function tidName(tid) { const [id, i] = tid.split(':'); const rec = cache[id]; const p = rec && rec.profiles.find(x => x.index === parseInt(i, 10)); return (p ? p.name : 'Profile ' + i) + ' · ' + accountName(id); }
   function renderSyReports(plans) {
@@ -846,11 +1200,12 @@
     $('pf-account').onchange = () => renderPfPicker($('pf-account').value); $('pf-save-identity').onclick = savePfIdentity;
     document.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => saveTemplate(b.dataset.tpl)); $('pf-tpl-profile').onclick = () => saveTemplate('profile');
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
+    $('sy-select-all').onclick = sySelectAll;
     document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = () => $(b.dataset.target).classList.toggle('open'));
     $('sy-preview').onclick = syncPreview; $('sy-apply').onclick = syncApply; $('sy-confirm').onchange = () => { $('sy-apply').disabled = !$('sy-confirm').checked; };
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
-    togWire('st-readkeys', setReadKeys); togWire('st-idle', on => { idleFlight = on; scheduleIdle(); });
+    togWire('st-readkeys', setReadKeys); togWire('st-idle', on => { mascotEnabled = on; if (!on) { if (animId) cancelAnimationFrame(animId); stopIdleBob(); birdEls(); if (_m) { _m.style.opacity = '0'; } } else { if (_m) { _m.style.opacity = '1'; _m.style.visibility = 'visible'; } snapPerch(mascotKey); } });
     $('st-signout').onclick = async () => { if (!(await uiConfirm('Sign out of Google on this device? Your accounts and templates stay in your Drive.', { danger: true, okLabel: 'Sign out' }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
