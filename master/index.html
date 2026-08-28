@@ -21,21 +21,7 @@
   :root{ color-scheme: dark; }
   option{ background:#151515; color:#fff; }
   body{ font-family:var(--f); background:var(--bg); color:var(--t); -webkit-font-smoothing:antialiased; }
-  .sync-top{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:stretch; }
-  .sync-top .card{ margin-bottom:0; display:flex; flex-direction:column; }
-  .sync-top .card .chip-grid,
-  .sync-top .card .sy-scroll{ flex:1; min-height:0; max-height:320px; overflow-y:auto; padding-right:4px; }
-  .sync-top .card .sy-scroll::-webkit-scrollbar{ width:5px; }
-  .sync-top .card .sy-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  @media (max-width:900px){ .sync-top{ grid-template-columns:1fr; gap:12px; } }
-  .sync-layout{ display:grid; grid-template-columns:1fr minmax(360px, 440px); gap:18px; align-items:start; }
-  .sync-main{ min-width:0; }
-  .sync-preview-pane{ position:sticky; top:72px; max-height:calc(100dvh - 90px); overflow-y:auto; }
-  .sync-preview-pane::-webkit-scrollbar{ width:5px; }
-  .sync-preview-pane::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  .sync-preview-pane .card{ margin-bottom:14px; }
-  .sync-preview-pane .empty{ text-align:center; padding:28px 10px; }
-  @media (max-width:1100px){ .sync-layout{ grid-template-columns:1fr; } .sync-preview-pane{ position:static; max-height:none; } }
+  @media (max-width:900px){ .sync-top, .sync-layout{ grid-template-columns:1fr; } }
   /* accounts tab: side-by-side, viewport-fit */
   .panel[data-panel="accounts"]{ display:flex; flex-direction:column; height:calc(100dvh - 52px); overflow:hidden; }
   .panel[data-panel="accounts"] .phead{ flex:none; }
@@ -47,41 +33,156 @@
   .api-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#7bd88f; background:rgba(67,160,71,.14); border:1px solid rgba(67,160,71,.25); border-radius:999px; padding:2px 8px; margin-left:8px; }
   @media (max-width:900px){ .accounts-layout{ grid-template-columns:1fr; } .panel[data-panel="accounts"]{ height:auto; overflow:auto; } }
 
-  /* profile tab: flat, sectioned layout, viewport-fit */
-  .panel[data-panel="profile"]{ display:flex; flex-direction:column; height:calc(100dvh - 52px); overflow:hidden; }
-  .panel[data-panel="profile"] > .pf-head-row{ flex:none; }
-  .panel[data-panel="profile"] > #pf-empty{ flex:none; }
-  .panel[data-panel="profile"] > #pf-editor{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
-  .panel[data-panel="profile"] > #pf-editor::-webkit-scrollbar{ width:5px; }
-  .panel[data-panel="profile"] > #pf-editor::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  .pf-head-row{ display:grid; grid-template-columns:1fr 300px; gap:22px; align-items:start; padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--line-2); }
-  .pf-head-row .phead{ margin:0; padding:0; border:none; }
-  .pf-picker-block{ border-left:1px solid var(--line-2); padding-left:22px; }
-  .pf-picker-block h3{ font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--accent); margin-bottom:12px; text-shadow:0 0 18px rgba(229,57,53,.45), 0 0 40px rgba(229,57,53,.2); }
-  .pf-picker-block .fld{ margin-bottom:12px; }
-  .pf-picker-block .chip-grid{ max-height:220px; overflow-y:auto; padding-right:4px; }
-  .pf-picker-block .pchip{ border-radius:4px; border-width:1px; }
-  @media (max-width:900px){ .pf-head-row{ grid-template-columns:1fr; } .pf-picker-block{ border-left:none; padding-left:0; border-top:1px solid var(--line-2); padding-top:18px; } .panel[data-panel="profile"]{ height:auto; overflow:auto; } .panel[data-panel="profile"] > #pf-editor{ overflow:visible; } }
+  /* ============ PROFILE TAB (card layout matching target design) ============ */
+  .panel[data-panel="profile"]{ display:flex; flex-direction:column; height:calc(100dvh - 52px); overflow:hidden; padding:clamp(16px,2vw,24px) clamp(18px,2.5vw,32px); max-width:none; gap:14px; }
+  .panel[data-panel="profile"] .pf-head-card,
+  .panel[data-panel="profile"] .pf-name-card{ flex:none; margin-bottom:0; }
+  .panel[data-panel="profile"] #pf-empty{ flex:none; }
+  .panel[data-panel="profile"] #pf-editor{ display:none; flex:1; min-height:0; flex-direction:column; gap:14px; }
+  .panel[data-panel="profile"] #pf-editor.open{ display:flex; }
+  .panel[data-panel="profile"] .pf-tabs-card{ flex:1; min-height:0; display:flex; flex-direction:column; margin-bottom:0; overflow:hidden; padding:0; }
+  .pf-head-card{ display:grid; grid-template-columns:1fr 1fr; gap:0; padding:22px 26px; align-items:stretch; }
+  .pf-head-l{ padding-right:24px; }
+  .pf-head-l .eyebrow{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:700; text-shadow:0 0 12px rgba(229,57,53,.35); }
+  .pf-head-l h1{ font-size:clamp(24px,2.6vw,32px); font-weight:800; letter-spacing:-.02em; margin-top:6px; }
+  .pf-head-l p{ color:var(--t55); font-size:14px; margin-top:8px; max-width:56ch; line-height:1.5; }
+  .pf-head-r{ border-left:1px solid var(--line-2); padding-left:26px; display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .pf-head-r .eyebrow{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:700; text-shadow:0 0 14px rgba(229,57,53,.5), 0 0 30px rgba(229,57,53,.25); }
+  .pf-head-r .pf-picker-scroll{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
+  .pf-head-r .pf-picker-scroll::-webkit-scrollbar{ width:5px; }
+  .pf-head-r .pf-picker-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+  .pf-head-r .chip-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .pf-head-r .pchip{ padding:10px 14px; min-width:88px; border-radius:12px; }
+  .pf-head-r .pchip .av{ width:38px; height:38px; font-size:15px; }
 
-  /* sync tab: viewport-fit */
-  .panel[data-panel="sync"]{ display:flex; flex-direction:column; height:calc(100dvh - 52px); overflow:hidden; }
-  .panel[data-panel="sync"] .phead{ flex:none; }
+  .pf-name-card{ display:flex; align-items:center; gap:16px; padding:16px 22px; }
+  .pf-name-card .fld{ flex:1; max-width:520px; }
+  .pf-name-card .fld > span{ font-size:10.5px; }
+  .pf-name-card .row{ gap:8px; }
+  .pf-name-card .spacer{ flex:1; }
+
+  .pf-tabs-bar{ display:flex; align-items:center; gap:2px; padding:0 22px; border-bottom:1px solid var(--line-2); flex:none; overflow-x:auto; scrollbar-width:none; }
+  .pf-tabs-bar::-webkit-scrollbar{ display:none; }
+  .pf-editor-tab{ flex:none; border:none; border-bottom:2px solid transparent; background:transparent; color:var(--t55); padding:14px 16px; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:0; white-space:nowrap; }
+  .pf-editor-tab:hover{ color:var(--t); }
+  .pf-editor-tab.on{ color:var(--t); border-bottom-color:var(--accent); }
+  .pf-tabs-header{ display:flex; align-items:center; padding:14px 22px 6px; gap:10px; flex:none; }
+  .pf-tabs-header h3{ font-size:16px; font-weight:700; }
+  .pf-tabs-header .spacer{ flex:1; }
+  .pf-panes-wrap{ flex:1; min-height:0; overflow-y:auto; padding:8px 22px 22px; }
+  .pf-panes-wrap::-webkit-scrollbar{ width:5px; }
+  .pf-panes-wrap::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  @media (max-width:900px){ .panel[data-panel="profile"]{ height:auto; overflow:auto; padding:16px; } .panel[data-panel="profile"] #pf-editor.open{ display:flex; } .pf-head-card{ grid-template-columns:1fr; } .pf-head-l{ padding:0; } .pf-head-r{ border-left:none; padding-left:0; border-top:1px solid var(--line-2); padding-top:18px; margin-top:18px; } .pf-panes-wrap{ overflow:visible; } }
+
+  /* ============ SYNC DESK (two-column workspace matching target design) ============ */
+  .panel[data-panel="sync"]{ display:flex; flex-direction:column; height:calc(100dvh - 52px); overflow:hidden; padding:clamp(16px,2vw,24px) clamp(18px,2.5vw,32px); max-width:none; gap:14px; }
+  .panel[data-panel="sync"] .phead{ flex:none; margin-bottom:0; }
   .panel[data-panel="sync"] #sy-empty{ flex:none; }
-  .panel[data-panel="sync"] #sy-body{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
-  .panel[data-panel="sync"] #sy-body::-webkit-scrollbar{ width:5px; }
-  .panel[data-panel="sync"] #sy-body::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  @media (max-width:900px){ .panel[data-panel="sync"]{ height:auto; overflow:auto; } .panel[data-panel="sync"] #sy-body{ overflow:visible; } }
-  .tgt-acct-row{ display:flex; align-items:center; gap:8px; margin:12px 0 8px; }
-  .tgt-acct-row .tgt-acct{ margin:0; }
-  .tgt-selall{ font-size:10px; font-weight:600; color:var(--t45); background:transparent; border:1px solid var(--line); border-radius:6px; padding:2px 7px; cursor:pointer; }
-  .tgt-selall:hover{ border-color:rgba(255,255,255,.3); color:var(--t70); }
+  .panel[data-panel="sync"] #sy-body{ flex:1; min-height:0; display:none; }
+  .panel[data-panel="sync"] #sy-body.open{ display:block; }
+  .sy-cols{ display:grid; grid-template-columns:minmax(0, 460px) minmax(0, 1fr); gap:16px; height:100%; }
+  .sy-left, .sy-right{ display:flex; flex-direction:column; gap:14px; min-width:0; min-height:0; }
+  .sy-left{ overflow-y:auto; padding-right:6px; }
+  .sy-left::-webkit-scrollbar{ width:5px; }
+  .sy-left::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  .sy-right .sy-review-card{ flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0; padding:0; }
+  .sy-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .sy-card-h{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+  .sy-card-h h3{ font-size:15px; font-weight:700; letter-spacing:-.005em; }
+  .sy-card-h .spacer{ flex:1; }
+  .sy-card-sub{ font-size:12px; color:var(--t45); font-weight:500; }
+  .sy-linkbtn{ font-size:12px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; padding:2px 4px; }
+  .sy-linkbtn:hover{ text-decoration:underline; color:#ff8a80; }
+  .sy-linkbtn.muted{ color:var(--t55); }
+  .sy-linkbtn.muted:hover{ color:var(--t); }
+  .sy-sep{ color:var(--t35); font-size:11px; margin:0 4px; }
 
-  /* improved preview reports */
-  .report{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:16px 18px; margin-bottom:12px; }
-  .rhead{ font-size:14px; font-weight:700; display:flex; align-items:center; gap:9px; margin-bottom:10px; padding-bottom:8px; border-bottom:1px solid var(--line-2); }
-  .rline{ display:flex; gap:8px; align-items:center; font-size:13px; color:var(--t55); padding:5px 0; flex-wrap:wrap; }
-  .rk{ font-weight:600; color:var(--t70); min-width:92px; }
-  .report .no-change{ text-align:center; padding:8px; color:var(--t45); font-size:13px; }
+  /* --- copy from --- */
+  .sy-source-row{ display:flex; gap:10px; align-items:center; }
+  .sy-source-row select.sel{ max-width:180px; flex:none; }
+  .sy-source-chips{ display:flex; gap:8px; overflow-x:auto; padding:2px; flex:1; min-width:0; scrollbar-width:none; }
+  .sy-source-chips::-webkit-scrollbar{ display:none; }
+  .sy-source-chips .pchip{ flex:none; padding:8px 12px; min-width:auto; flex-direction:row; border-radius:11px; }
+  .sy-source-chips .pchip .av{ width:26px; height:26px; font-size:11px; }
+  .sy-source-chips .pchip .pcn{ font-size:12.5px; }
+
+  /* --- copy into --- */
+  .sy-ct-groups{ display:flex; flex-direction:column; gap:10px; max-height:280px; overflow-y:auto; padding-right:4px; }
+  .sy-ct-groups::-webkit-scrollbar{ width:5px; }
+  .sy-ct-groups::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  .sy-ct-group{ display:grid; grid-template-columns:70px 1fr; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--line-2); }
+  .sy-ct-group:first-child{ border-top:none; padding-top:2px; }
+  .sy-ct-group-lbl{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--t45); font-weight:700; }
+  .sy-ct-chips{ display:flex; flex-wrap:wrap; gap:6px; }
+  .sy-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 10px 4px 4px; cursor:pointer; transition:.14s; }
+  .sy-chip:hover{ border-color:rgba(255,255,255,.28); }
+  .sy-chip.on{ border-color:var(--accent); background:rgba(229,57,53,.1); }
+  .sy-chip .av{ width:22px; height:22px; font-size:10px; }
+  .sy-chip .pcn{ font-size:12px; font-weight:500; }
+  .sy-chip .chk{ display:none; width:16px; height:16px; border-radius:50%; background:var(--accent); color:#fff; font-size:10px; place-items:center; }
+  .sy-chip.on .chk{ display:grid; }
+
+  /* --- what to carry over --- */
+  .sy-carry{ display:flex; flex-direction:column; gap:2px; }
+  .sy-carry-row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--line-2); }
+  .sy-carry-row:first-child{ border-top:none; }
+  .sy-carry-row input[type=checkbox]{ flex:none; }
+  .sy-carry-ic{ width:24px; height:24px; display:grid; place-items:center; color:var(--t70); flex:none; }
+  .sy-carry-ic svg{ width:18px; height:18px; }
+  .sy-carry-lbl{ font-size:13.5px; font-weight:600; flex:1; }
+  .sy-carry-cnt{ font-family:ui-monospace,monospace; font-size:11.5px; color:var(--t45); }
+  .sy-carry-choose{ font-size:12px; color:var(--t55); background:transparent; border:1px solid var(--line); border-radius:8px; padding:5px 10px; cursor:pointer; display:flex; align-items:center; gap:4px; }
+  .sy-carry-choose:hover{ border-color:rgba(255,255,255,.28); color:var(--t); }
+  .sy-carry-choose:disabled{ opacity:.35; cursor:not-allowed; }
+  .sy-carry-chooser{ display:none; grid-column:1/-1; margin:6px 0 4px 36px; padding:12px; background:var(--surface-2); border:1px solid var(--line); border-radius:10px; max-height:280px; overflow-y:auto; }
+  .sy-carry-chooser.open{ display:block; }
+  .sy-carry-chooser-bar{ display:flex; gap:10px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--line-2); }
+
+  /* --- apply card --- */
+  .sy-apply-card .sy-mode-row{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .sy-apply-card .sy-mode-row label{ font-size:13px; font-weight:600; flex:none; }
+  .sy-apply-card .sy-mode-row select.sel{ flex:1; }
+  .sy-apply-card .sy-mode-desc{ font-size:12px; color:var(--t45); margin-bottom:14px; line-height:1.4; }
+  .sy-apply-card .sy-btns{ display:flex; gap:10px; flex-wrap:wrap; }
+  .sy-apply-card .sy-btns .btn{ flex:1; justify-content:center; min-width:130px; }
+
+  /* --- review panel --- */
+  .sy-review-head{ display:flex; align-items:center; gap:10px; padding:18px 22px 14px; border-bottom:1px solid var(--line-2); flex:none; }
+  .sy-review-head h3{ font-size:16px; font-weight:700; }
+  .sy-review-head .spacer{ flex:1; }
+  .sy-review-body{ flex:1; min-height:0; overflow-y:auto; padding:18px 22px; }
+  .sy-review-body::-webkit-scrollbar{ width:5px; }
+  .sy-review-body::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+
+  .sy-empty-state{ height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px 20px; color:var(--t55); }
+  .sy-empty-state svg{ width:120px; height:120px; opacity:.32; margin-bottom:22px; }
+  .sy-empty-state h4{ font-size:16px; font-weight:700; color:var(--t70); margin-bottom:8px; }
+  .sy-empty-state p{ font-size:13px; color:var(--t45); max-width:32ch; line-height:1.5; }
+
+  .sy-metrics{ display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:18px; }
+  .sy-metric{ background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:12px 14px; display:flex; align-items:center; gap:12px; }
+  .sy-metric-ic{ width:38px; height:38px; border-radius:10px; background:rgba(229,57,53,.14); border:1px solid rgba(229,57,53,.24); display:grid; place-items:center; color:var(--accent); flex:none; }
+  .sy-metric-ic svg{ width:18px; height:18px; }
+  .sy-metric-tx{ min-width:0; }
+  .sy-metric-tx .n{ font-size:20px; font-weight:800; letter-spacing:-.02em; line-height:1.1; }
+  .sy-metric-tx .l{ font-size:11px; color:var(--t45); text-transform:uppercase; letter-spacing:.06em; font-weight:600; }
+
+  .sy-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+  .sy-card-report{ background:var(--surface-2); border:1px solid var(--line); border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  .sy-card-report .rhead{ display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:1px solid var(--line-2); margin-bottom:2px; }
+  .sy-card-report .rhead-name{ font-size:14px; font-weight:700; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sy-card-report .rline{ display:flex; align-items:center; gap:8px; font-size:12.5px; padding:2px 0; flex-wrap:wrap; }
+  .sy-card-report .rline .rk{ font-weight:500; color:var(--t55); min-width:82px; flex:none; }
+  .sy-card-report .no-change{ font-size:12.5px; color:var(--t45); font-style:italic; padding:4px 0; }
+
+  .sy-review-foot{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .sy-review-foot .spacer{ flex:1; }
+  .sy-review-foot .foot-note{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:#7bd88f; }
+  .sy-review-foot .foot-note svg{ width:16px; height:16px; }
+  .sy-review-foot .foot-note.warn{ color:#f0c060; }
+  .sy-review-foot .confirm{ margin:0; }
+
+  @media (max-width:1100px){ .sy-cols{ grid-template-columns:1fr; } .sy-left{ overflow-y:visible; } .panel[data-panel="sync"]{ height:auto; overflow:auto; } .panel[data-panel="sync"] #sy-body{ min-height:0; } .sy-right .sy-review-card{ min-height:400px; } }
 
   /* watched / watch progress tab */
   .watched-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-top:1px solid var(--line-2); }
@@ -430,27 +531,29 @@
 
     <!-- profile -->
     <section class="panel" data-panel="profile" style="display:none">
-      <div class="pf-head-row">
-        <div class="phead"><span class="eyebrow">Profile</span><h1>Open one profile and edit it.</h1>
-          <p>Everything a profile has — add-ons, plugins, collections, and the full Nuvio settings — editable in place. Reorder items, save changes, or save any part as a template.</p></div>
-        <div class="pf-picker-block">
-          <h3>Choose a profile</h3>
+      <div class="sy-card pf-head-card">
+        <div class="pf-head-l">
+          <span class="eyebrow">Profile</span>
+          <h1>Open one profile and edit it.</h1>
+          <p>Everything a profile has — add-ons, plugins, collections, and the full Nuvio settings — editable in place. Reorder items, save changes, or save any part as a template.</p>
+        </div>
+        <div class="pf-head-r">
+          <span class="eyebrow">Choose a profile</span>
           <label class="fld"><span>Account</span><select class="sel" id="pf-account"></select></label>
-          <div class="chip-grid" id="pf-profiles"></div>
+          <div class="pf-picker-scroll"><div class="chip-grid" id="pf-profiles"></div></div>
         </div>
       </div>
       <p class="empty" id="pf-empty">Link a Nuvio account, then pick a profile to edit.</p>
-      <div id="pf-editor" style="display:none">
-        <div class="pf-section">
-          <div class="pf-section-head"><h3 id="pf-editor-title">Profile</h3><span class="spacer"></span>
-            <button class="btn btn-ghost btn-xs" id="pf-tpl-profile">Save whole profile as template</button></div>
-          <div class="pf-editor-body">
-            <label class="fld" style="max-width:440px"><span>Profile name</span>
-              <div class="row"><input id="pf-name-input" type="text" maxlength="60"><button class="btn btn-solid btn-xs" id="pf-save-identity">Save</button></div></label>
-          </div>
+      <div id="pf-editor">
+        <div class="sy-card pf-name-card">
+          <label class="fld"><span>Profile name</span>
+            <div class="row"><input id="pf-name-input" type="text" maxlength="60"><button class="btn btn-solid btn-xs" id="pf-save-identity">Save</button></div>
+          </label>
+          <span class="spacer"></span>
+          <button class="btn btn-ghost btn-xs" id="pf-tpl-profile">Save whole profile as template</button>
         </div>
-        <div class="pf-section">
-          <div class="pf-editor-tabs" id="pf-editor-tabs">
+        <div class="sy-card pf-tabs-card">
+          <div class="pf-tabs-bar" id="pf-editor-tabs">
             <button class="pf-editor-tab on" data-pftab="addons">Add-ons</button>
             <button class="pf-editor-tab" data-pftab="plugins">Plugins</button>
             <button class="pf-editor-tab" data-pftab="collections">Collections</button>
@@ -458,11 +561,13 @@
             <button class="pf-editor-tab" data-pftab="watchprogress">Watch Progress</button>
             <button class="pf-editor-tab" data-pftab="watched">Watched</button>
           </div>
-          <div class="pf-editor-body">
-            <div class="pf-section-head" style="margin:-18px -18px 18px;padding:14px 18px" id="pf-editor-pane-head">
-              <h3 id="pf-editor-pane-title">Add-ons</h3><span class="spacer"></span>
-              <button class="btn btn-ghost btn-xs" data-tpl="addons" id="pf-editor-pane-tpl">Save as template</button>
-            </div>
+          <div class="pf-tabs-header" id="pf-editor-pane-head">
+            <h3 id="pf-editor-pane-title">Add-ons</h3>
+            <span class="spacer"></span>
+            <span class="inline-status" id="pf-save-status"></span>
+            <button class="btn btn-ghost btn-xs" data-tpl="addons" id="pf-editor-pane-tpl">Save as template</button>
+          </div>
+          <div class="pf-panes-wrap">
             <div id="pf-pane-addons" class="pf-pane"><div id="pf-addons"></div></div>
             <div id="pf-pane-plugins" class="pf-pane" style="display:none"><div id="pf-plugins"></div></div>
             <div id="pf-pane-collections" class="pf-pane" style="display:none"><div id="pf-collections"></div></div>
@@ -471,7 +576,6 @@
             <div id="pf-pane-watched" class="pf-pane" style="display:none"><div id="pf-watched"></div></div>
           </div>
         </div>
-        <div class="inline-status" id="pf-save-status" style="margin:0 0 20px 2px"></div>
       </div>
     </section>
 
@@ -480,37 +584,127 @@
       <div class="phead"><span class="eyebrow">Sync desk</span><h1>Copy one profile's setup to others.</h1>
         <p>Pick a source, choose exactly what to carry, pick which profiles receive it, then preview before anything is written.</p></div>
       <p class="empty" id="sy-empty">Link a Nuvio account to start syncing.</p>
-      <div id="sy-body" style="display:none">
-        <div class="sync-layout">
-        <div class="sync-main">
-        <div class="sync-top">
-        <div class="card"><div class="chead"><h3>Copy from</h3></div>
-          <label class="fld" style="max-width:320px;margin-bottom:14px"><span>Account</span><select class="sel" id="sy-account"></select></label>
-          <div class="chip-grid" id="sy-source"></div></div>
-        <div class="card"><div class="chead"><h3>Copy into</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="sy-select-all">Select all</button></div><div class="sy-scroll" id="sy-targets"></div></div>
-        </div>
-        <div class="card"><div class="chead"><h3>What to carry over</h3></div>
-          <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-addons" checked>Add-ons</span><span class="cat-cnt" id="sy-cnt-addons">0</span>
-            <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-items-addons">Choose add-ons</button><div class="chooser" id="sy-items-addons"></div></div></div>
-          <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-plugins" checked>Plugins</span><span class="cat-cnt" id="sy-cnt-plugins">0</span>
-            <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-items-plugins">Choose plugins</button><div class="chooser" id="sy-items-plugins"></div></div></div>
-          <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-collections" checked>Collections</span><span class="cat-cnt" id="sy-cnt-collections">0</span>
-            <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-items-collections">Choose collections</button><div class="chooser" id="sy-items-collections"></div></div></div>
-          <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-settings" checked>Settings</span><span class="cat-cnt" id="sy-cnt-settings">0 selected</span>
-            <div style="width:100%"><button class="btn btn-ghost btn-xs sy-tgl" data-target="sy-settings-tree">Choose settings</button><div class="chooser" id="sy-settings-tree"></div></div></div></div>
-        <div class="card"><div class="chead"><h3>How to apply</h3></div>
-          <div class="row" style="flex-wrap:wrap"><label style="font-size:13px;font-weight:600">Mode</label>
-            <select class="sel" id="sy-mode" style="max-width:380px"><option value="merge">Merge — add and update, keep the rest</option><option value="overwrite">Overwrite — make target match source exactly</option></select></div>
-          <p class="muted sm" style="margin-top:8px">Overwrite removes anything the target has that the source doesn't. Removals are listed and need a tick before applying.</p>
-          <div class="actbar"><button class="btn btn-primary" id="sy-preview">Preview all</button><div class="inline-status" id="sy-status"></div></div>
-          <div id="sy-confirm-wrap" style="display:none"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
-          <div class="actbar"><button class="btn btn-solid" id="sy-apply" disabled>Apply changes</button></div></div>
-        </div>
-        <div class="sync-preview-pane">
-          <div class="card"><div class="chead"><h3>Preview</h3><span class="spacer"></span><span class="inline-status" id="sy-pv-status"></span></div>
-            <div id="sy-results"><p class="empty">Select a target profile to see a live preview of changes.</p></div>
+      <div id="sy-body">
+        <div class="sy-cols">
+          <!-- ============ LEFT COLUMN ============ -->
+          <div class="sy-left">
+            <div class="sy-card">
+              <div class="sy-card-h"><h3>Sync setup</h3></div>
+              <label class="fld" style="margin-bottom:12px"><span>Copy from</span>
+                <div class="sy-source-row">
+                  <select class="sel" id="sy-account"></select>
+                  <div class="sy-source-chips" id="sy-source"></div>
+                </div>
+              </label>
+              <div class="sy-card-h" style="margin-top:16px;margin-bottom:10px">
+                <span style="font-size:13px;font-weight:700">Copy into</span>
+                <span class="spacer"></span>
+                <button class="sy-linkbtn" id="sy-select-all">Select all</button>
+                <span class="sy-sep">|</span>
+                <button class="sy-linkbtn muted" id="sy-deselect-all">Deselect all</button>
+              </div>
+              <div class="sy-ct-groups" id="sy-targets"></div>
+            </div>
+
+            <div class="sy-card">
+              <div class="sy-card-h"><h3>What to carry over</h3></div>
+              <div class="sy-carry">
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-addons" checked>
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+                  <span class="sy-carry-lbl">Add-ons</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-addons">0 / 0</span>
+                  <button class="sy-carry-choose sy-tgl" data-target="sy-items-addons">Choose <span>›</span></button>
+                </div>
+                <div class="sy-carry-chooser" id="sy-items-addons"></div>
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-plugins" checked>
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 1 1-12 0V7z"/><path d="M12 17v4"/></svg></span>
+                  <span class="sy-carry-lbl">Plugins</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-plugins">0 / 0</span>
+                  <button class="sy-carry-choose sy-tgl" data-target="sy-items-plugins">Choose <span>›</span></button>
+                </div>
+                <div class="sy-carry-chooser" id="sy-items-plugins"></div>
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-collections" checked>
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></span>
+                  <span class="sy-carry-lbl">Collections</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-collections">0 / 0</span>
+                  <button class="sy-carry-choose sy-tgl" data-target="sy-items-collections">Choose <span>›</span></button>
+                </div>
+                <div class="sy-carry-chooser" id="sy-items-collections"></div>
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-watchprogress">
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+                  <span class="sy-carry-lbl">Watch Progress</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-watchprogress">0 items</span>
+                  <button class="sy-carry-choose" disabled>All items</button>
+                </div>
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-watched">
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
+                  <span class="sy-carry-lbl">Watched History</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-watched">0 items</span>
+                  <button class="sy-carry-choose" disabled>All items</button>
+                </div>
+                <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-settings" checked>
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg></span>
+                  <span class="sy-carry-lbl">Settings</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-settings">0 selected</span>
+                  <button class="sy-carry-choose sy-tgl" data-target="sy-settings-tree">Choose <span>›</span></button>
+                </div>
+                <div class="sy-carry-chooser" id="sy-settings-tree"></div>
+              </div>
+            </div>
+
+            <div class="sy-card sy-apply-card">
+              <div class="sy-card-h"><h3>Apply settings</h3></div>
+              <div class="sy-mode-row">
+                <label>Mode</label>
+                <select class="sel" id="sy-mode">
+                  <option value="merge">Merge — add and update, keep the rest</option>
+                  <option value="overwrite">Overwrite — make target match source exactly</option>
+                </select>
+              </div>
+              <p class="sy-mode-desc" id="sy-mode-desc">Merge mode adds new items and updates existing ones, but keeps everything else as-is.</p>
+              <div id="sy-confirm-wrap" style="display:none;margin-bottom:12px"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
+              <div class="sy-btns">
+                <button class="btn btn-ghost" id="sy-preview">Preview changes</button>
+                <button class="btn btn-primary" id="sy-apply" disabled>Apply to 0 profiles</button>
+              </div>
+              <div class="inline-status" id="sy-status" style="margin-top:10px"></div>
+            </div>
           </div>
-        </div>
+
+          <!-- ============ RIGHT COLUMN ============ -->
+          <div class="sy-right">
+            <div class="sy-card sy-review-card">
+              <div class="sy-review-head">
+                <h3>Review changes</h3>
+                <span class="sy-card-sub" id="sy-review-sub"></span>
+                <span class="spacer"></span>
+                <span class="inline-status" id="sy-pv-status"></span>
+              </div>
+              <div class="sy-review-body">
+                <div class="sy-empty-state" id="sy-review-empty">
+                  <svg viewBox="0 0 200 180" fill="none" stroke="currentColor" stroke-width="1.4">
+                    <rect x="46" y="30" width="92" height="120" rx="6" fill="rgba(255,255,255,.02)"/>
+                    <path d="M60 62h56M60 78h48M60 94h56M60 110h32" stroke-linecap="round"/>
+                    <circle cx="150" cy="128" r="22" fill="rgba(229,57,53,.12)" stroke="rgba(229,57,53,.5)"/>
+                    <path d="M150 118v20M140 128h20" stroke="rgba(229,57,53,.9)" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                  <h4>Choose recipients to see a change summary</h4>
+                  <p>Select one or more profiles to preview what will be copied before applying any changes.</p>
+                </div>
+                <div id="sy-review-full" style="display:none">
+                  <div class="sy-metrics" id="sy-metrics"></div>
+                  <div class="sy-grid" id="sy-results"></div>
+                  <div class="sy-review-foot" id="sy-review-foot" style="display:none"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
