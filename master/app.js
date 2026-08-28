@@ -31,7 +31,15 @@
   const cache = {};                     // accountId -> {backup, profiles, keysLoaded}
   let readKeys = false;
   let gAuth = { token: null, client: null, user: null };
-  let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0;
+  let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
+  const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings' };
+  function switchPfEditorTab(kind) {
+    pfEditorTab = kind;
+    document.querySelectorAll('.pf-editor-tab').forEach(b => b.classList.toggle('on', b.dataset.pftab === kind));
+    document.querySelectorAll('.pf-pane').forEach(p => p.style.display = (p.id === 'pf-pane-' + kind) ? '' : 'none');
+    $('pf-editor-pane-title').textContent = PF_TAB_LABEL[kind] || kind;
+    $('pf-editor-pane-tpl').dataset.tpl = kind;
+  }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
   const sySel = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
@@ -345,6 +353,7 @@
     if (!pfEdit) return;
     $('pf-name-input').value = pfEdit.meta.name || ''; $('pf-editor-title').textContent = pfEdit.meta.name || 'Profile';
     renderPfList('addons'); renderPfList('plugins'); renderPfCollections(); renderSettingsEditor();
+    switchPfEditorTab(pfEditorTab);
   }
 
   function orderControls(kind, arr, i) {
@@ -823,7 +832,9 @@
     $('ac-reload').onclick = reloadAccounts;
     togWire('ac-readkeys', setReadKeys);
     $('pf-account').onchange = () => renderPfPicker($('pf-account').value); $('pf-save-identity').onclick = savePfIdentity;
-    document.querySelectorAll('[data-tpl]').forEach(b => b.onclick = () => saveTemplate(b.dataset.tpl)); $('pf-tpl-profile').onclick = () => saveTemplate('profile');
+    document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
+    $('pf-editor-pane-tpl').onclick = () => saveTemplate($('pf-editor-pane-tpl').dataset.tpl);
+    $('pf-tpl-profile').onclick = () => saveTemplate('profile');
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
     $('sy-select-all').onclick = sySelectAll;
     document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = () => $(b.dataset.target).classList.toggle('open'));
