@@ -280,7 +280,7 @@ function planTarget(master, target, options) {
     }
   }
 
-  return { operations: ops, report, hasChanges: ops.length > 0, hasRemovals };
+  return { operations: ops, report, hasChanges: ops.length > 0, hasRemovals, profileId: options.profileId };
 }
 
 // addons/plugins rows for push carry only the storable fields.
