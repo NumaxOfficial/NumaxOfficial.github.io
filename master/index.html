@@ -36,6 +36,29 @@
   .sync-preview-pane .card{ margin-bottom:14px; }
   .sync-preview-pane .empty{ text-align:center; padding:28px 10px; }
   @media (max-width:1100px){ .sync-layout{ grid-template-columns:1fr; } .sync-preview-pane{ position:static; max-height:none; } }
+  /* accounts tab: side-by-side equal cards */
+  .accounts-layout{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:stretch; }
+  .accounts-layout .card{ margin-bottom:0; display:flex; flex-direction:column; min-height:0; }
+  .accounts-layout .card #ac-list{ flex:1; min-height:0; max-height:420px; overflow-y:auto; padding-right:4px; }
+  .accounts-layout .card #ac-list::-webkit-scrollbar{ width:5px; }
+  .accounts-layout .card #ac-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  @media (max-width:900px){ .accounts-layout{ grid-template-columns:1fr; } }
+  /* profile tab: flat, sectioned layout (no bubbly cards) */
+  .pf-head-row{ display:grid; grid-template-columns:1fr 300px; gap:22px; align-items:start; padding-bottom:18px; margin-bottom:20px; border-bottom:1px solid var(--line-2); }
+  .pf-head-row .phead{ margin:0; padding:0; border:none; }
+  .pf-picker-block{ border-left:1px solid var(--line-2); padding-left:22px; }
+  .pf-picker-block h3{ font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--t55); margin-bottom:12px; }
+  .pf-picker-block .fld{ margin-bottom:12px; }
+  .pf-picker-block .chip-grid{ max-height:220px; overflow-y:auto; padding-right:4px; }
+  .pf-picker-block .pchip{ border-radius:4px; border-width:1px; }
+  @media (max-width:900px){ .pf-head-row{ grid-template-columns:1fr; } .pf-picker-block{ border-left:none; padding-left:0; border-top:1px solid var(--line-2); padding-top:18px; } }
+  .pf-section{ border:1px solid var(--line); border-radius:4px; padding:0; margin-bottom:18px; background:var(--surface); }
+  .pf-section-head{ display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line-2); }
+  .pf-editor-tabs{ display:flex; gap:2px; border-bottom:1px solid var(--line-2); padding:0 18px; overflow-x:auto; }
+  .pf-editor-tab{ flex:none; border:none; border-bottom:2px solid transparent; background:transparent; color:var(--t55); padding:12px 14px; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:0; }
+  .pf-editor-tab:hover{ color:var(--t); }
+  .pf-editor-tab.on{ color:var(--t); border-bottom-color:var(--accent); }
+  .pf-editor-body{ padding:18px; }
   .modal-root{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; }
   .modal-bg{ position:absolute; inset:0; background:rgba(0,0,0,.66); backdrop-filter:blur(2px); }
   .modal-card{ position:relative; background:#111; border:1px solid var(--line); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:0 24px 70px rgba(0,0,0,.6); }
@@ -351,6 +374,7 @@
     <section class="panel" data-panel="accounts">
       <div class="phead"><span class="eyebrow">Nuvio accounts</span><h1>Link the accounts you manage.</h1>
         <p>Sign in to each Nuvio account with its email and password. They're saved to your Google Drive, so they follow you to any device where you sign in with Google.</p></div>
+      <div class="accounts-layout">
       <div class="card">
         <div class="chead"><h3>Add an account</h3></div>
         <div class="field-col">
@@ -366,30 +390,48 @@
         <div class="chead"><h3>Linked accounts</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="ac-reload">Reload</button><span class="pill-count" id="ac-count">0</span></div>
         <div id="ac-list"></div>
       </div>
+      </div>
     </section>
 
     <!-- profile -->
     <section class="panel" data-panel="profile" style="display:none">
-      <div class="phead"><span class="eyebrow">Profile</span><h1>Open one profile and edit it.</h1>
-        <p>Everything a profile has — add-ons, plugins, collections, and the full Nuvio settings — editable in place. Reorder items, save changes, or save any part as a template.</p></div>
-      <div class="card">
-        <div class="chead"><h3>Choose a profile</h3></div>
-        <label class="fld" style="max-width:320px;margin-bottom:14px"><span>Account</span><select class="sel" id="pf-account"></select></label>
-        <div class="chip-grid" id="pf-profiles"></div>
+      <div class="pf-head-row">
+        <div class="phead"><span class="eyebrow">Profile</span><h1>Open one profile and edit it.</h1>
+          <p>Everything a profile has — add-ons, plugins, collections, and the full Nuvio settings — editable in place. Reorder items, save changes, or save any part as a template.</p></div>
+        <div class="pf-picker-block">
+          <h3>Choose a profile</h3>
+          <label class="fld"><span>Account</span><select class="sel" id="pf-account"></select></label>
+          <div class="chip-grid" id="pf-profiles"></div>
+        </div>
       </div>
       <p class="empty" id="pf-empty">Link a Nuvio account, then pick a profile to edit.</p>
       <div id="pf-editor" style="display:none">
-        <div class="card">
-          <div class="chead"><h3 id="pf-editor-title">Profile</h3><span class="spacer"></span>
+        <div class="pf-section">
+          <div class="pf-section-head"><h3 id="pf-editor-title">Profile</h3><span class="spacer"></span>
             <button class="btn btn-ghost btn-xs" id="pf-tpl-profile">Save whole profile as template</button></div>
-          <label class="fld" style="max-width:440px"><span>Profile name</span>
-            <div class="row"><input id="pf-name-input" type="text" maxlength="60"><button class="btn btn-solid btn-xs" id="pf-save-identity">Save</button></div></label>
+          <div class="pf-editor-body">
+            <label class="fld" style="max-width:440px"><span>Profile name</span>
+              <div class="row"><input id="pf-name-input" type="text" maxlength="60"><button class="btn btn-solid btn-xs" id="pf-save-identity">Save</button></div></label>
+          </div>
         </div>
-        <div class="card"><div class="chead"><h3>Add-ons</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" data-tpl="addons">Save as template</button></div><div id="pf-addons"></div></div>
-        <div class="card"><div class="chead"><h3>Plugins</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" data-tpl="plugins">Save as template</button></div><div id="pf-plugins"></div></div>
-        <div class="card"><div class="chead"><h3>Collections</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" data-tpl="collections">Save as template</button></div><div id="pf-collections"></div></div>
-        <div class="card"><div class="chead"><h3>Settings</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" data-tpl="settings">Save as template</button></div>
-          <div id="pf-settings"></div></div>
+        <div class="pf-section">
+          <div class="pf-editor-tabs" id="pf-editor-tabs">
+            <button class="pf-editor-tab on" data-pftab="addons">Add-ons</button>
+            <button class="pf-editor-tab" data-pftab="plugins">Plugins</button>
+            <button class="pf-editor-tab" data-pftab="collections">Collections</button>
+            <button class="pf-editor-tab" data-pftab="settings">Settings</button>
+          </div>
+          <div class="pf-editor-body">
+            <div class="pf-section-head" style="margin:-18px -18px 18px;padding:14px 18px" id="pf-editor-pane-head">
+              <h3 id="pf-editor-pane-title">Add-ons</h3><span class="spacer"></span>
+              <button class="btn btn-ghost btn-xs" data-tpl="addons" id="pf-editor-pane-tpl">Save as template</button>
+            </div>
+            <div id="pf-pane-addons" class="pf-pane"><div id="pf-addons"></div></div>
+            <div id="pf-pane-plugins" class="pf-pane" style="display:none"><div id="pf-plugins"></div></div>
+            <div id="pf-pane-collections" class="pf-pane" style="display:none"><div id="pf-collections"></div></div>
+            <div id="pf-pane-settings" class="pf-pane" style="display:none"><div id="pf-settings"></div></div>
+          </div>
+        </div>
         <div class="inline-status" id="pf-save-status" style="margin:0 0 20px 2px"></div>
       </div>
     </section>
