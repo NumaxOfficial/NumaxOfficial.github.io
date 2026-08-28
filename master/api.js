@@ -152,5 +152,24 @@
     return { rpc, exportBackup, pullProfiles, pullSettings, sliceProfile, applyPlan, get accountId() { return accountId; } };
   }
 
-  return { signIn, refresh, client, ANON, REST_BASE, AUTH_BASE, ConflictError, AuthError };
+  // Fetch the built-in avatar catalog (avatar_id -> image URL) from Nuvio.
+  // This is a server table readable with the anon key; no auth needed.
+  // Falls back to empty object on failure — never breaks the app.
+  let _avatarCache = null;
+  async function fetchAvatarCatalog() {
+    if (_avatarCache) return _avatarCache;
+    try {
+      const res = await fetch('https://api.nuvio.tv/rest/v1/avatar_catalog?select=id,image_url', {
+        headers: { apikey: ANON }
+      });
+      if (!res.ok) { _avatarCache = {}; return _avatarCache; }
+      const rows = await res.json();
+      const map = {};
+      if (Array.isArray(rows)) rows.forEach(r => { if (r.id && r.image_url) map[r.id] = r.image_url; });
+      _avatarCache = map;
+    } catch { _avatarCache = {}; }
+    return _avatarCache;
+  }
+
+  return { signIn, refresh, client, fetchAvatarCatalog, ANON, REST_BASE, AUTH_BASE, ConflictError, AuthError };
 });
