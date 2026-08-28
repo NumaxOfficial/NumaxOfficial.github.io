@@ -137,7 +137,6 @@
   .signin-card .eyebrow{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:700; }
   .signin-card h2{ font-size:26px; font-weight:700; letter-spacing:-.02em; margin:8px 0 10px; }
   .signin-card p{ color:var(--t55); font-size:13.5px; line-height:1.55; }
-  .toucan-slot{ display:flex; align-items:flex-end; justify-content:center; gap:16px; margin:22px 0; }
   .gwrap{ width:50px; height:50px; border-radius:50%; background:#fff; display:grid; place-items:center; }
   .gwrap svg{ width:26px; height:26px; }
   .btn-google{ width:100%; justify-content:center; background:#fff; color:#111; border:none; border-radius:13px; padding:14px; font-size:15px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:10px; }
@@ -286,51 +285,11 @@
     .navbtn{ width:auto; }
     .set-field{ grid-template-columns:1fr; }
     .set-field .sf-c{ justify-content:flex-start; }
-    #mascot{ display:none; }
   }
-  @media (prefers-reduced-motion:reduce){ #mascot{ transition:none !important; } }
 </style>
 </head>
 <body>
 <div class="land-glow" aria-hidden="true"></div>
-
-<!-- flying toucan (positioned by app.js — layered parts for dimensional animation) -->
-<div id="mascot" aria-hidden="true" style="position:fixed;top:0;left:0;width:58px;z-index:40;pointer-events:none;opacity:0;visibility:hidden;">
-  <!-- shadow (positioned separately during flight) -->
-  <div id="mascot-shadow" style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:36px;height:8px;background:radial-gradient(ellipse,rgba(0,0,0,.35),transparent 70%);border-radius:50%;opacity:0;transition:opacity .3s;"></div>
-  <div id="mascot-body" style="position:relative;">
-    <svg viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;overflow:visible;">
-      <defs>
-        <linearGradient id="m-beak" x1="0" y1="0" x2="1" y2=".25"><stop offset="0" stop-color="#ff6a00"/><stop offset=".4" stop-color="#ff9e12"/><stop offset=".7" stop-color="#ffb020"/><stop offset="1" stop-color="#ff6a00"/></linearGradient>
-        <linearGradient id="m-chest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f0e2"/><stop offset=".45" stop-color="#fbe27a"/><stop offset=".78" stop-color="#ffc42e"/><stop offset="1" stop-color="#f0a80e"/></linearGradient>
-        <linearGradient id="m-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#23252e"/><stop offset=".5" stop-color="#0d0e13"/><stop offset="1" stop-color="#050507"/></linearGradient>
-      </defs>
-      <!-- tail (separate for subtle wag) -->
-      <g id="m-tail"><path d="M96 88 Q70 130 74 182 Q86 170 104 144 Q112 116 108 92Z" fill="url(#m-body)"/></g>
-      <!-- feet -->
-      <g id="m-feet" stroke="#4a4d55" stroke-width="6" stroke-linecap="round" fill="none"><path d="M118 156l-6 18M118 156l4 20M118 156l12 16"/><path d="M150 156l-4 20M150 156l6 18M150 156l14 14"/></g>
-      <!-- far wing (behind body) -->
-      <g id="m-wing-far" style="transform-origin:82% 30%"><path d="M100 40 Q74 62 78 112 Q86 152 126 158 Q114 124 112 92 Q112 60 124 42Z" fill="#141620" opacity=".7"/></g>
-      <!-- body -->
-      <path d="M96 38 Q78 70 90 120 Q108 164 152 160 Q188 156 190 108 Q190 70 172 42Z" fill="url(#m-body)"/>
-      <!-- chest -->
-      <path d="M138 28 Q112 40 108 92 Q106 134 140 146 Q176 144 180 96 Q182 52 160 30 Q150 24 138 28Z" fill="url(#m-chest)"/>
-      <!-- near wing (in front of body) -->
-      <g id="m-wing" style="transform-origin:76% 26%"><path d="M104 36 Q80 58 84 106 Q92 146 130 152 Q120 120 118 88 Q118 58 128 38Z" fill="#1a1c22"/></g>
-      <!-- head group (moves slightly for head-bob) -->
-      <g id="m-head">
-        <path d="M118 -2 Q112 28 142 38 Q176 42 182 16 Q186 -8 168 -20 Q140 -30 124 -18 Q118 -12 118 -2Z" fill="url(#m-body)"/>
-        <circle cx="150" cy="0" r="8.5" fill="#0a0a0a"/><circle cx="150" cy="0" r="8.5" fill="none" stroke="#ff8a00" stroke-width="1.6"/><circle cx="153" cy="-3" r="2.6" fill="#fff"/>
-        <!-- beak -->
-        <g id="m-beak-g">
-          <path d="M166 -14 Q214 -20 250 12 Q244 24 224 28 Q210 16 178 16 Q168 4 166 -14Z" fill="url(#m-beak)"/>
-          <path d="M172 18 Q206 16 224 28 Q206 36 184 32 Q174 28 172 18Z" fill="#ff7a10"/>
-          <path d="M250 12 Q258 20 250 30 Q240 32 224 28 Q244 24 250 12Z" fill="#171412"/>
-        </g>
-      </g>
-    </svg>
-  </div>
-</div>
 
 <!-- ============ LANDING ============ -->
 <div class="view current" id="view-landing">
@@ -355,15 +314,8 @@
         <span class="eyebrow">Start here</span>
         <h2>Sign in with Google</h2>
         <p>Google is how Numax knows who you are and where to keep your linked accounts, templates, and backups — all in your own Drive.</p>
-        <div class="toucan-slot">
-          <div id="landing-toucan" style="width:76px" aria-hidden="true">
-            <svg viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;overflow:visible;">
-              <use href="#__nu_toucan"/>
-            </svg>
-          </div>
-          <div class="gwrap" aria-hidden="true">
-            <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
-          </div>
+        <div class="gwrap" aria-hidden="true" style="margin:22px auto;">
+          <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1Z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23Z"/><path fill="#FBBC05" d="M5.84 14.1a6.6 6.6 0 0 1 0-4.2V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84Z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.3 9.14 5.38 12 5.38Z"/></svg>
         </div>
         <button class="btn-google" id="btn-google"><span>Continue with Google</span><span style="font-weight:700">→</span></button>
         <div class="signin-note">
@@ -375,20 +327,6 @@
   </div>
   <div class="land-foot"><div class="land-wrap"><span>Numax · 2026</span><span>Not affiliated with Nuvio</span></div></div>
 </div>
-
-<!-- hidden toucan template for landing (reuses the mascot art) -->
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="__nu_toucan">
-  <path d="M96 88 Q70 130 74 182 Q86 170 104 144 Q112 116 108 92Z" fill="url(#m-body)"/>
-  <g stroke="#4a4d55" stroke-width="6" stroke-linecap="round" fill="none"><path d="M118 156l-6 18M118 156l4 20M118 156l12 16"/><path d="M150 156l-4 20M150 156l6 18M150 156l14 14"/></g>
-  <path d="M96 38 Q78 70 90 120 Q108 164 152 160 Q188 156 190 108 Q190 70 172 42Z" fill="url(#m-body)"/>
-  <path d="M138 28 Q112 40 108 92 Q106 134 140 146 Q176 144 180 96 Q182 52 160 30 Q150 24 138 28Z" fill="url(#m-chest)"/>
-  <path d="M104 36 Q80 58 84 106 Q92 146 130 152 Q120 120 118 88 Q118 58 128 38Z" fill="#1a1c22"/>
-  <path d="M118 -2 Q112 28 142 38 Q176 42 182 16 Q186 -8 168 -20 Q140 -30 124 -18 Q118 -12 118 -2Z" fill="url(#m-body)"/>
-  <circle cx="150" cy="0" r="8.5" fill="#0a0a0a"/><circle cx="150" cy="0" r="8.5" fill="none" stroke="#ff8a00" stroke-width="1.6"/><circle cx="153" cy="-3" r="2.6" fill="#fff"/>
-  <path d="M166 -14 Q214 -20 250 12 Q244 24 224 28 Q210 16 178 16 Q168 4 166 -14Z" fill="url(#m-beak)"/>
-  <path d="M172 18 Q206 16 224 28 Q206 36 184 32 Q174 28 172 18Z" fill="#ff7a10"/>
-  <path d="M250 12 Q258 20 250 30 Q240 32 224 28 Q244 24 250 12Z" fill="#171412"/>
-</g></defs></svg>
 
 <!-- ============ APP ============ -->
 <div class="view" id="view-app">
@@ -535,8 +473,6 @@
       <div class="phead"><span class="eyebrow">Settings</span><h1>Preferences.</h1><p>These apply to Numax on this device.</p></div>
       <div class="card"><div class="chead"><h3>Reading profiles</h3></div>
         <div class="switch-row"><div class="tx"><b>Read API keys</b><span>When on, provider keys are loaded so you can see them. Still never copied between profiles.</span></div><button class="tog" id="st-readkeys" role="switch"></button></div></div>
-      <div class="card"><div class="chead"><h3>Toucan</h3></div>
-        <div class="switch-row"><div class="tx"><b>Animated toucan</b><span>The toucan flies between tabs when you navigate. Turn off for a calmer screen.</span></div><button class="tog on" id="st-idle" role="switch"></button></div></div>
       <div class="card"><div class="chead"><h3>Sign out</h3></div>
         <p class="muted sm" style="margin-bottom:12px">Signs out of Google on this device. Your accounts and templates stay safe in your Drive.</p>
         <button class="btn btn-ghost danger" id="st-signout">Sign out</button></div>
