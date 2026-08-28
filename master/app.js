@@ -28,7 +28,7 @@
   // ======================================================================
   // state
   // ======================================================================
-  const cache = {};                     // accountId -> {backup, profiles, keysLoaded}
+  const cache = {};                     // accountId -> {backup, profiles}
   const membershipCache = {};           // accountId -> {isSupporter, tier, status} | null (fetch failed)
   let readKeys = false;
   let acGen = 0; // bumped on every refreshAccounts() call so a stale call's late-resolving loadAccount() can't paint over a newer render
@@ -204,7 +204,7 @@
       if (!files.length) { registryFileId = null; refreshAccounts(); return; }
       registryFileId = files[0].id;
       const doc = await driveDownload(registryFileId);
-      (doc.accounts || []).forEach(a => { try { if (a.session && a.session.access_token) store.add(a.session, { email: a.email, label: a.label }); } catch (e) {} });
+      (doc.accounts || []).forEach(a => { try { if (a.session && a.session.access_token) store.add(a.session, { email: a.email, label: a.label, keysIncluded: a.keysIncluded }); } catch (e) {} });
       logAct('Loaded ' + (doc.accounts || []).length + ' linked account(s) from Drive', 'info');
     } catch (e) { logAct('Could not load account registry: ' + e.message, 'err'); }
     refreshAccounts();
@@ -212,7 +212,7 @@
   async function saveRegistry() {
     if (!gAuth.token) return;
     try {
-      const accounts = store.list().map(r => ({ accountId: r.accountId, label: r.label, email: r.email, session: r.session }));
+      const accounts = store.list().map(r => ({ accountId: r.accountId, label: r.label, email: r.email, keysIncluded: r.keysIncluded, session: r.session }));
       const r = await driveUpload('numax-registry.json', { app: 'numax', kind: 'registry', savedAt: new Date().toISOString(), accounts }, { numax: 'registry' }, registryFileId);
       registryFileId = r.id;
     } catch (e) { logAct('Could not save account registry: ' + e.message, 'err'); }
@@ -221,11 +221,15 @@
   // ======================================================================
   // account loading
   // ======================================================================
+  // whether THIS account had API keys included, decided at link time and stored
+  // with it — not the live "Read API keys" switch, which only governs new links.
+  const accountKeysIncluded = id => { const rec = store.get(id); return !!(rec && rec.keysIncluded); };
   async function loadAccount(id, force) {
-    const c = cache[id]; if (c && c.keysLoaded === readKeys && !force) return c;
+    const c = cache[id]; if (c && !force) return c;
+    const keysIncluded = accountKeysIncluded(id);
     const cl = A.client(store, id); const backup = await cl.exportBackup();
-    if (!readKeys && Array.isArray(backup.profile_settings_blobs)) backup.profile_settings_blobs = backup.profile_settings_blobs.map(b => b && b.settings_json ? { ...b, settings_json: stripKeys(b.settings_json) } : b);
-    const rec = { backup, profiles: normProfiles(backup.profiles), keysLoaded: readKeys }; cache[id] = rec; return rec;
+    if (!keysIncluded && Array.isArray(backup.profile_settings_blobs)) backup.profile_settings_blobs = backup.profile_settings_blobs.map(b => b && b.settings_json ? { ...b, settings_json: stripKeys(b.settings_json) } : b);
+    const rec = { backup, profiles: normProfiles(backup.profiles) }; cache[id] = rec; return rec;
   }
   const inval = id => { delete cache[id]; delete membershipCache[id]; };
   const invalAll = () => Object.keys(cache).forEach(k => delete cache[k]) || Object.keys(membershipCache).forEach(k => delete membershipCache[k]);
@@ -254,7 +258,7 @@
     status(log, 'Signing in to Nuvio…');
     let session; try { session = await A.signIn(email, pass); } catch (e) { status(log, 'Sign-in failed: ' + e.message, 'err'); return; }
     const already = store.get(S.decodeSub(session.access_token));
-    try { store.add(session, { email, label }); } catch (e) { status(log, "Couldn't save: " + e.message, 'err'); return; }
+    try { store.add(session, { email, label, keysIncluded: readKeys }); } catch (e) { status(log, "Couldn't save: " + e.message, 'err'); return; }
     inval(S.decodeSub(session.access_token));
     $('ac-email').value = ''; $('ac-pass').value = ''; $('ac-label').value = '';
     await saveRegistry();
@@ -282,30 +286,30 @@
       const card = el('div', 'acct'); const head = el('div', 'acct-head');
       head.appendChild(avatar({ name: rec.label || rec.email }, 38));
       const who = el('div'); who.style.minWidth = '0';
-      const nmRow = el('div', 'acct-name'); nmRow.textContent = rec.label || rec.email || rec.accountId.slice(0, 10);
+      const nmRow = el('div', 'acct-name'); const nmText = el('span', 'acct-name-text', rec.label || rec.email || rec.accountId.slice(0, 10)); nmRow.appendChild(nmText);
+      // this account's own "keys included" state, fixed at link time — no fetch needed to know it
+      if (rec.keysIncluded) {
+        const badge = el('span', 'api-badge'); badge.textContent = 'API keys included';
+        const dot = el('span'); dot.textContent = '●'; dot.style.cssText = 'font-size:8px;color:#7bd88f'; badge.insertBefore(dot, badge.firstChild);
+        nmRow.appendChild(badge);
+      }
       who.appendChild(nmRow);
       if (rec.email && rec.label) who.appendChild(el('div', 'acct-mail', rec.email)); head.appendChild(who);
       head.appendChild(el('span', 'spacer'));
-      const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(who, nmRow, rec.accountId);
+      const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(nmText, rec.accountId);
       const rm = el('button', 'btn btn-ghost btn-xs danger', 'Unlink'); rm.onclick = () => unlink(rec.accountId, rec.label || rec.email);
       head.appendChild(ren); head.appendChild(rm); card.appendChild(head);
       const prof = el('div', 'acct-profiles'); prof.appendChild(el('span', 'muted sm', 'Loading profiles…')); card.appendChild(prof); box.appendChild(card);
-      loadAccount(rec.accountId).then(({ profiles, keysLoaded }) => {
+      loadAccount(rec.accountId).then(({ profiles }) => {
         if (gen !== acGen) return; // a newer refreshAccounts() already replaced this row — don't paint a detached one
-        // add API keys badge if this account was loaded WITH keys
-        if (keysLoaded && !nmRow.querySelector('.api-badge')) {
-          const badge = el('span', 'api-badge'); badge.textContent = 'API keys included';
-          const dot = el('span'); dot.textContent = '●'; dot.style.cssText = 'font-size:8px;color:#7bd88f'; badge.insertBefore(dot, badge.firstChild);
-          nmRow.appendChild(badge);
-        }
         clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
         profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); });
       })
         .catch(e => { if (gen !== acGen) return; clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
     }
   }
-  function startRename(who, nm, id) {
-    const i = el('input'); i.type = 'text'; i.value = nm.textContent; i.maxLength = 40; i.className = 'rename-input'; who.replaceChild(i, nm); i.focus(); i.select();
+  function startRename(nm, id) {
+    const i = el('input'); i.type = 'text'; i.value = nm.textContent; i.maxLength = 40; i.className = 'rename-input'; nm.parentNode.replaceChild(i, nm); i.focus(); i.select();
     const commit = async () => { store.setLabel(id, i.value.trim() || null); await saveRegistry(); logAct('Renamed an account', 'info'); refreshAccounts(); };
     i.addEventListener('keydown', e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') refreshAccounts(); });
     i.addEventListener('blur', commit);
@@ -315,10 +319,11 @@
     store.remove(id); inval(id); if (pfA === id) { pfA = pfI = pfEdit = null; } if (syA === id) { syA = syI = sySnap = null; }
     await saveRegistry(); logAct('Unlinked ' + name, 'info'); refreshAccounts();
   }
+  // sets the preference used the moment an account is next linked (or re-linked) —
+  // does not touch any account already linked, since that's decided per account.
   function setReadKeys(on) {
-    readKeys = on; $('ac-readkeys').classList.toggle('on', on); $('st-readkeys').classList.toggle('on', on); invalAll();
-    logAct('API keys ' + (on ? 'will load' : 'will stay hidden'), 'info'); refreshAccounts();
-    if (pfA != null) openProfile(pfA, pfI, true);
+    readKeys = on; $('ac-readkeys').classList.toggle('on', on); $('st-readkeys').classList.toggle('on', on);
+    logAct('Accounts you link from now on will ' + (on ? 'include' : 'exclude') + ' API keys', 'info');
   }
 
   // ======================================================================
@@ -367,7 +372,8 @@
     const meta = profiles.find(p => p.index === idx) || { index: idx, name: 'Profile ' + idx };
     const slice = sliceProfile(backup, idx);
     const live = { tv: null, mobile: null }, upd = { tv: null, mobile: null };
-    try { const c = A.client(store, id); for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
+    const keysIncluded = accountKeysIncluded(id);
+    try { const c = A.client(store, id); for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
     const watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
     const watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
     pfMembership = await getMembership(id);
@@ -557,7 +563,7 @@
     const v = curVal(f), ctl = f.control;
     if (SECRET_LEAF.test(f.key) || ctl === 'secret') {
       const w = el('div', 'sf-secret');
-      if (readKeys) { const i = el('input'); i.type = 'password'; i.value = (v == null ? '' : v); i.onchange = () => setVal(f, i.value); w.appendChild(i); }
+      if (accountKeysIncluded(pfA)) { const i = el('input'); i.type = 'password'; i.value = (v == null ? '' : v); i.onchange = () => setVal(f, i.value); w.appendChild(i); }
       else { const s = el('input'); s.type = 'text'; s.value = v ? '••••••••' : ''; s.disabled = true; w.appendChild(s); w.appendChild(el('span', 'lock', 'hidden')); }
       return w;
     }
@@ -758,8 +764,8 @@
     document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
     try {
-      const { backup } = await loadAccount(id); const slice = sliceProfile(backup, idx); const c = A.client(store, id); const settings = {};
-      for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); } catch (e) { logAct("Couldn't read " + pl + " settings: " + e.message, 'err'); } }
+      const { backup } = await loadAccount(id); const slice = sliceProfile(backup, idx); const c = A.client(store, id); const settings = {}; const keysIncluded = accountKeysIncluded(id);
+      for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); } catch (e) { logAct("Couldn't read " + pl + " settings: " + e.message, 'err'); } }
       sySnap = { addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings };
       sySnapExt.watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
       sySnapExt.watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];

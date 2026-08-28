@@ -30,7 +30,7 @@
   .accounts-layout .card #ac-list{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
   .accounts-layout .card #ac-list::-webkit-scrollbar{ width:5px; }
   .accounts-layout .card #ac-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  .api-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#7bd88f; background:rgba(67,160,71,.14); border:1px solid rgba(67,160,71,.25); border-radius:999px; padding:2px 8px; margin-left:8px; }
+  .api-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#7bd88f; background:rgba(67,160,71,.14); border:1px solid rgba(67,160,71,.25); border-radius:999px; padding:3px 8px; }
   @media (max-width:900px){ .accounts-layout{ grid-template-columns:1fr; } .panel[data-panel="accounts"]{ height:auto; overflow:auto; } }
 
   /* ============ PROFILE TAB (card layout matching target design) ============ */
@@ -359,8 +359,9 @@
   .av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
   .acct{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:14px 16px; margin-bottom:10px; }
   .acct-head{ display:flex; align-items:center; gap:12px; }
-  .acct-name{ font-size:14.5px; font-weight:600; }
-  .acct-mail{ font-size:12px; color:var(--t45); }
+  .acct-name{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:14.5px; font-weight:600; }
+  .acct-mail{ font-size:12px; color:var(--t45); margin-top:2px; }
+  .ac-hint{ margin:-4px 0 14px; line-height:1.5; }
   .acct-profiles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; padding-top:13px; border-top:1px solid var(--line-2); }
   .pmini{ display:inline-flex; align-items:center; gap:7px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 12px 4px 4px; font-size:12.5px; }
   .chip-grid{ display:flex; flex-wrap:wrap; gap:10px; }
@@ -522,11 +523,11 @@
           <button class="btn btn-primary" id="ac-link-btn" style="align-self:flex-start">Link account</button>
           <div class="inline-status" id="ac-log"></div>
         </div>
-        <div class="switch-row" style="margin-top:16px"><div class="tx"><b>Read API keys</b><span>Off keeps provider keys (MDBList, TMDB, debrid, AnimeSkip) out of the app. Keys are never copied between profiles either way.</span></div><button class="tog" id="ac-readkeys" role="switch"></button></div>
+        <div class="switch-row" style="margin-top:16px"><div class="tx"><b>Read API keys</b><span>Applies to the account you link below. Off keeps provider keys (MDBList, TMDB, debrid, AnimeSkip) out of Numax for it; already-linked accounts keep whatever was chosen when they were linked. Keys are never copied between profiles either way.</span></div><button class="tog" id="ac-readkeys" role="switch"></button></div>
       </div>
       <div class="card">
         <div class="chead"><h3>Linked accounts</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="ac-reload">Reload</button><span class="pill-count" id="ac-count">0</span></div>
-        <p class="muted sm" style="margin:-6px 0 12px">Accounts without the "API keys included" badge were linked or last loaded with Read API keys off, so their provider keys aren't in Numax. Either way, keys are never copied when you apply templates or copy settings between profiles — an account missing keys here won't gain them from another account, and one with keys won't pass them along.</p>
+        <p class="muted sm ac-hint">An account keeps its "API keys included" badge from when it was linked — re-link it to change that. Either way, keys are never copied between profiles: an account without the badge won't gain keys from one that has it, and one with keys won't pass them along.</p>
         <div id="ac-list"></div>
       </div>
       </div>
@@ -750,7 +751,7 @@
     <section class="panel" data-panel="settings" style="display:none">
       <div class="phead"><span class="eyebrow">Settings</span><h1>Preferences.</h1><p>These apply to Numax on this device.</p></div>
       <div class="card"><div class="chead"><h3>Reading profiles</h3></div>
-        <div class="switch-row"><div class="tx"><b>Read API keys</b><span>When on, provider keys are loaded so you can see them. Still never copied between profiles.</span></div><button class="tog" id="st-readkeys" role="switch"></button></div></div>
+        <div class="switch-row"><div class="tx"><b>Read API keys</b><span>Applies to the next account you link, from either tab — doesn't change accounts already linked. Still never copied between profiles.</span></div><button class="tog" id="st-readkeys" role="switch"></button></div></div>
       <div class="card"><div class="chead"><h3>Sign out</h3></div>
         <p class="muted sm" style="margin-bottom:12px">Signs out of Google on this device. Your accounts and templates stay safe in your Drive.</p>
         <button class="btn btn-ghost danger" id="st-signout">Sign out</button></div>

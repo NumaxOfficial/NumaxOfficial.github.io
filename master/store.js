@@ -60,6 +60,10 @@
             ? String(meta.label).trim().slice(0, 40)
             : (prev.label || null),
           email: meta.email || prev.email || null,
+          // whether provider API keys were pulled for this account, decided once
+          // at link (or re-link) time and kept until the account is re-linked —
+          // never flipped retroactively by a later change to the read-keys setting.
+          keysIncluded: meta.keysIncluded != null ? !!meta.keysIncluded : !!prev.keysIncluded,
           session: {
             access_token: session.access_token,
             refresh_token: session.refresh_token || (prev.session && prev.session.refresh_token) || null,
