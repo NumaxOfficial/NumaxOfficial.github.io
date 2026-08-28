@@ -32,13 +32,15 @@
   let readKeys = false;
   let gAuth = { token: null, client: null, user: null };
   let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
-  const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings' };
+  const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings', watchprogress: 'Watch Progress', watched: 'Watched' };
+  const PF_TAB_SAVEABLE = { addons: true, plugins: true, collections: true, settings: true };
   function switchPfEditorTab(kind) {
     pfEditorTab = kind;
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.classList.toggle('on', b.dataset.pftab === kind));
     document.querySelectorAll('.pf-pane').forEach(p => p.style.display = (p.id === 'pf-pane-' + kind) ? '' : 'none');
     $('pf-editor-pane-title').textContent = PF_TAB_LABEL[kind] || kind;
     $('pf-editor-pane-tpl').dataset.tpl = kind;
+    $('pf-editor-pane-tpl').style.display = PF_TAB_SAVEABLE[kind] ? '' : 'none';
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
@@ -268,7 +270,10 @@
     for (const rec of list) {
       const card = el('div', 'acct'); const head = el('div', 'acct-head');
       head.appendChild(avatar({ name: rec.label || rec.email }, 38));
-      const who = el('div'); who.style.minWidth = '0'; const nm = el('div', 'acct-name', rec.label || rec.email || rec.accountId.slice(0, 10)); who.appendChild(nm);
+      const who = el('div'); who.style.minWidth = '0';
+      const nmRow = el('div', 'acct-name'); nmRow.textContent = rec.label || rec.email || rec.accountId.slice(0, 10);
+      if (readKeys && cache[rec.accountId] && cache[rec.accountId].keysLoaded) { const badge = el('span', 'api-badge', 'API keys included'); nmRow.appendChild(badge); }
+      who.appendChild(nmRow);
       if (rec.email && rec.label) who.appendChild(el('div', 'acct-mail', rec.email)); head.appendChild(who);
       head.appendChild(el('span', 'spacer'));
       const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(who, nm, rec.accountId);
@@ -344,7 +349,9 @@
     const slice = sliceProfile(backup, idx);
     const live = { tv: null, mobile: null }, upd = { tv: null, mobile: null };
     try { const c = A.client(store, id); for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
-    pfEdit = { meta: { ...meta }, addons: JSON.parse(JSON.stringify(slice.addons)), plugins: JSON.parse(JSON.stringify(slice.plugins)), collections: JSON.parse(JSON.stringify(slice.collections)), settings: JSON.parse(JSON.stringify(live)), upd };
+    const watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
+    const watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
+    pfEdit = { meta: { ...meta }, addons: JSON.parse(JSON.stringify(slice.addons)), plugins: JSON.parse(JSON.stringify(slice.plugins)), collections: JSON.parse(JSON.stringify(slice.collections)), settings: JSON.parse(JSON.stringify(live)), upd, watched, watchProgress };
     pfPlat = live.tv ? 'tv' : (live.mobile ? 'mobile' : 'tv');
     renderPfEditor(); if (!silent) logAct('Opened ' + meta.name, 'info');
   }
@@ -353,6 +360,7 @@
     if (!pfEdit) return;
     $('pf-name-input').value = pfEdit.meta.name || ''; $('pf-editor-title').textContent = pfEdit.meta.name || 'Profile';
     renderPfList('addons'); renderPfList('plugins'); renderPfCollections(); renderSettingsEditor();
+    renderPfWatched(); renderPfWatchProgress();
     switchPfEditorTab(pfEditorTab);
   }
 
@@ -407,6 +415,72 @@
     const dn = el('button', 'iconbtn', '↓'); dn.style.cssText = 'width:22px;height:16px;font-size:10px'; dn.disabled = i === arr.length - 1;
     up.onclick = () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; after(); }; dn.onclick = () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; after(); };
     box.appendChild(up); box.appendChild(dn); return box;
+  }
+
+  // ---- watched / watch progress ----
+  function renderPfWatched() {
+    const box = $('pf-watched'); clr(box);
+    const list = (pfEdit && pfEdit.watched) || [];
+    if (!list.length) { box.appendChild(el('p', 'empty sm', 'No watched history for this profile.')); return; }
+    box.appendChild(el('p', 'muted sm', list.length + ' watched item' + (list.length === 1 ? '' : 's') + '.'));
+    const display = list.slice(0, 80);
+    const resolveQueue = [];
+    display.forEach(w => {
+      const row = el('div', 'watched-row');
+      const hasTitle = !!w.title;
+      const title = w.title || w.content_id || '(unknown)';
+      const type = w.content_type || '';
+      const season = w.season_number ? 'S' + w.season_number : '';
+      const episode = w.episode_number ? 'E' + w.episode_number : '';
+      const seInfo = [season, episode].filter(Boolean).join('');
+      const titleSpan = el('span', 'watched-title', title + (seInfo ? ' ' : ''));
+      if (seInfo) { const se = el('span', 'watched-se', seInfo); titleSpan.appendChild(se); }
+      row.appendChild(titleSpan);
+      if (type) row.appendChild(el('span', 'watched-meta', type));
+      box.appendChild(row);
+      if (!hasTitle && window.NumaxMeta && window.NumaxMeta.isImdbId(w.content_id)) {
+        resolveQueue.push({ id: w.content_id, type: (type || '').toLowerCase() === 'series' ? 'series' : undefined, titleSpan, seInfo });
+      }
+    });
+    if (list.length > 80) box.appendChild(el('p', 'muted sm', '… and ' + (list.length - 80) + ' more'));
+    if (resolveQueue.length && window.NumaxMeta) {
+      window.NumaxMeta.resolveBatch(
+        resolveQueue.map(({ id, type }) => ({ id, type })),
+        (id, result) => { if (!result) return; for (const e of resolveQueue) { if (e.id === id) { e.titleSpan.childNodes[0].textContent = result.name + (e.seInfo ? ' ' : ''); } } }
+      );
+    }
+  }
+  function renderPfWatchProgress() {
+    const box = $('pf-watchprogress'); clr(box);
+    const list = (pfEdit && pfEdit.watchProgress) || [];
+    if (!list.length) { box.appendChild(el('p', 'empty sm', 'No watch progress for this profile.')); return; }
+    box.appendChild(el('p', 'muted sm', list.length + ' item' + (list.length === 1 ? '' : 's') + ' in progress.'));
+    const display = list.slice(0, 80);
+    const resolveQueue = [];
+    display.forEach(w => {
+      const row = el('div', 'watched-row');
+      const label = w.content_id || w.progress_key || '(unknown)';
+      const posMin = Math.round((w.position || 0) / 60000);
+      const durMin = Math.round((w.duration || 0) / 60000);
+      const pct = durMin > 0 ? Math.round((posMin / durMin) * 100) : 0;
+      const titleSpan = el('span', 'watched-title', w.title || label);
+      row.appendChild(titleSpan);
+      const prog = el('div', 'row'); prog.style.gap = '8px';
+      const bar = el('div', 'wp-bar'); const fill = el('div', 'wp-bar-fill'); fill.style.width = Math.min(pct, 100) + '%'; bar.appendChild(fill); prog.appendChild(bar);
+      prog.appendChild(el('span', 'watched-meta', posMin + 'm / ' + durMin + 'm (' + pct + '%)'));
+      row.appendChild(prog);
+      box.appendChild(row);
+      if (!w.title && window.NumaxMeta && window.NumaxMeta.isImdbId(w.content_id)) {
+        resolveQueue.push({ id: w.content_id, type: (w.content_type || '').toLowerCase() === 'series' ? 'series' : undefined, titleSpan });
+      }
+    });
+    if (list.length > 80) box.appendChild(el('p', 'muted sm', '… and ' + (list.length - 80) + ' more'));
+    if (resolveQueue.length && window.NumaxMeta) {
+      window.NumaxMeta.resolveBatch(
+        resolveQueue.map(({ id, type }) => ({ id, type })),
+        (id, result) => { if (!result) return; for (const e of resolveQueue) { if (e.id === id) e.titleSpan.textContent = result.name; } }
+      );
+    }
   }
 
   // ---- settings editor (schema-driven) ----
@@ -699,7 +773,12 @@
   async function renderSyTargets() {
     const box = $('sy-targets'); clr(box); syTargets.clear(); allSyTids = []; const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account.')); return; }
     let any = false;
-    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue; box.appendChild(el('div', 'tgt-acct', accountName(rec.accountId))); const grid = el('div', 'tgt-grid'); tgt.forEach(p => { const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); const c = el('button', 'pchip multi'); c.type = 'button'; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => { const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid); c.classList.toggle('on', !on); livePreviewTarget(tid, !on); }; grid.appendChild(c); }); box.appendChild(grid); any = true; }
+    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue;
+      const acctTids = []; const acctRow = el('div', 'tgt-acct-row'); acctRow.appendChild(el('div', 'tgt-acct', accountName(rec.accountId)));
+      const acctSelAll = el('button', 'tgt-selall', 'select all'); acctRow.appendChild(acctSelAll); box.appendChild(acctRow);
+      const grid = el('div', 'tgt-grid'); tgt.forEach(p => { const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); acctTids.push(tid); const c = el('button', 'pchip multi'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => { const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid); c.classList.toggle('on', !on); livePreviewTarget(tid, !on); }; grid.appendChild(c); }); box.appendChild(grid);
+      acctSelAll.onclick = () => { const allOn = acctTids.every(t => syTargets.has(t)); acctTids.forEach(t => allOn ? syTargets.delete(t) : syTargets.add(t)); grid.querySelectorAll('.pchip.multi').forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'select all' : 'deselect all'; if (!allOn) livePreviewAllTargets(); else if (syTargets.size === 0) clearPreview(); else livePreviewAllTargets(); };
+      any = true; }
     if (!any) box.appendChild(el('p', 'empty sm', 'No other profiles to sync into.'));
   }
   function sySelectAll() {
@@ -737,7 +816,7 @@
     try {
       const plans = []; let rem = false;
       for (const tid of targets) { const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10); const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
-        if (cats.settings) { state.settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
+        if (cats.settings) { state.settings = {}; for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } catch (e) { logAct('Settings read failed for ' + pl + ': ' + e.message, 'err'); } } }
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
         if (plan.hasRemovals) rem = true; plans.push({ aid, tid, plan }); }
       syPlans = plans; renderSyReports(plans); if (rem) $('sy-confirm-wrap').style.display = ''; $('sy-apply').disabled = rem;
@@ -759,11 +838,16 @@
   function tidName(tid) { const [id, i] = tid.split(':'); const rec = cache[id]; const p = rec && rec.profiles.find(x => x.index === parseInt(i, 10)); return (p ? p.name : 'Profile ' + i) + ' · ' + accountName(id); }
   function renderSyReports(plans) {
     const box = $('sy-results'); box.innerHTML = '';
-    plans.forEach(({ tid, plan }) => { const r = plan.report; const d = el('div', 'report'); let h = `<div class="rhead">${esc(tidName(tid))}${plan.hasChanges ? '<span class="rbadge chg">changes</span>' : '<span class="rbadge no">no change</span>'}</div>`;
+    plans.forEach(({ tid, plan }) => {
+      const r = plan.report; const d = el('div', 'report');
+      let h = `<div class="rhead">${esc(tidName(tid))}${plan.hasChanges ? '<span class="rbadge chg">changes</span>' : '<span class="rbadge no">no change</span>'}</div>`;
       const line = (label, o) => { if (!o) return ''; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed), (o.keptLocal && o.keptLocal.length ? `<span class="tag keep">keeps ${o.keptLocal.length}</span>` : '')].filter(Boolean); return bits.length ? `<div class="rline"><span class="rk">${label}</span>${bits.join(' ')}</div>` : ''; };
-      h += line('Add-ons', r.addons) + line('Plugins', r.plugins) + line('Collections', r.collections);
-      if (r.settings) { let ch = 0, held = 0; for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; held += r.settings[p].skippedSecrets.length; } if (ch || held) h += `<div class="rline"><span class="rk">Settings</span>${ch ? `<span class="tag upd">${ch} fields</span>` : ''}${held ? `<span class="tag held">${held} keys kept back</span>` : ''}</div>`; }
-      if (!plan.hasChanges) h += '<div class="rline muted">Already matches.</div>'; d.innerHTML = h; box.appendChild(d); });
+      const addonsLine = line('Add-ons', r.addons), pluginsLine = line('Plugins', r.plugins), collectionsLine = line('Collections', r.collections);
+      h += addonsLine + pluginsLine + collectionsLine;
+      if (r.settings) { let ch = 0, held = 0; for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; held += r.settings[p].skippedSecrets.length; } if (ch || held) h += `<div class="rline"><span class="rk">Settings</span>${ch ? `<span class="tag upd">${ch} fields</span>` : ''}${held ? `<span class="tag held">${held} keys held</span>` : ''}</div>`; }
+      if (!plan.hasChanges) h += '<div class="no-change">Already matches — nothing to do.</div>';
+      d.innerHTML = h; box.appendChild(d);
+    });
   }
   async function syncApply() {
     if (!syPlans) return; $('sy-apply').disabled = true; status($('sy-status'), 'Applying…'); let ok = 0, fail = 0;
@@ -777,7 +861,16 @@
   async function refreshDrive() {
     status($('dr-status'), gAuth.token ? (gAuth.user && gAuth.user.email ? 'Connected as ' + gAuth.user.email : 'Connected.') : 'Not connected.', gAuth.token ? 'ok' : 'err');
     const box = $('dr-backup-picker'); clr(box); const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account to choose what to back up.')); return; }
-    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } box.appendChild(el('div', 'tgt-acct', accountName(rec.accountId))); const grid = el('div', 'tgt-grid'); profiles.forEach(p => { const tid = rec.accountId + ':' + p.index; const c = el('button', 'pchip multi on'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => c.classList.toggle('on'); grid.appendChild(c); }); box.appendChild(grid); }
+    const allBtn = el('button', 'btn btn-ghost btn-xs', 'Select all'); allBtn.style.marginBottom = '12px';
+    allBtn.onclick = () => { const chips = box.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); allBtn.textContent = allOn ? 'Select all' : 'Deselect all'; };
+    box.appendChild(allBtn);
+    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
+      const acctRow = el('div', 'tgt-acct-row'); acctRow.appendChild(el('div', 'tgt-acct', accountName(rec.accountId)));
+      const acctSelAll = el('button', 'tgt-selall', 'select all');
+      acctRow.appendChild(acctSelAll); box.appendChild(acctRow);
+      const grid = el('div', 'tgt-grid'); profiles.forEach(p => { const tid = rec.accountId + ':' + p.index; const c = el('button', 'pchip multi'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => c.classList.toggle('on'); grid.appendChild(c); }); box.appendChild(grid);
+      acctSelAll.onclick = () => { const chips = grid.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'select all' : 'deselect all'; };
+    }
     refreshRestore();
   }
   async function backupNow() {
