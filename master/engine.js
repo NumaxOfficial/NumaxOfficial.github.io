@@ -10,7 +10,8 @@
 //   - addons/plugins push = FULL REPLACE (send the complete desired list)
 //   - collections push     = FULL REPLACE (whole blob)
 //   - settings push        = FULL REPLACE per (profile, platform); use guarded
-//   - settings blob embeds LIVE API KEYS -> strip at the leaf level
+//   - settings blob embeds LIVE API KEYS -> strip at the leaf level unless the
+//     caller explicitly opts in via settings.includeSecrets (off by default)
 //   - settings blob shape  = { version, features: { group: { leaf:{type,value} } } }
 //   - mobile has JSON-string "*_payload" groups
 //   - version differs by platform -> never copy master's version onto a target
@@ -126,7 +127,7 @@ function reconcileCollections(masterArr, targetArr, mode) {
 
 /** Should this (group, leaf) be shared? */
 function leafIsShareable(group, leaf, opts) {
-  if (SECRET_LEAF.test(leaf)) return false;              // secrets: never
+  if (SECRET_LEAF.test(leaf) && !opts.includeSecrets) return false;  // secrets: opt-in only
   if (matchesAny(group, ACCOUNT_GROUPS)) return false;   // account-linked group: never
   if (matchesAny(group, PERSONAL_OPTIN_GROUPS)) return !!opts.includePersonal; // opt-in only
   return true;                                           // everything else: share
@@ -137,8 +138,10 @@ function sanitizePayloadString(group, str, opts) {
   if (matchesAny(group, ACCOUNT_GROUPS)) return { skip: 'account-linked' };
   let parsed;
   try { parsed = JSON.parse(str); } catch { return { skip: 'unparseable' }; }
-  const secretHit = findSecretKey(parsed);
-  if (secretHit) return { skip: 'contains secret: ' + secretHit };
+  if (!opts.includeSecrets) {
+    const secretHit = findSecretKey(parsed);
+    if (secretHit) return { skip: 'contains secret: ' + secretHit };
+  }
   return { value: str }; // clean -> copy verbatim
 }
 
@@ -180,7 +183,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}) {
     if (!mGroup || typeof mGroup !== 'object') continue;
 
     for (const leaf of Object.keys(mGroup)) {
-      if (SECRET_LEAF.test(leaf)) { skippedSecrets.push(group + '.' + leaf); continue; }
+      if (SECRET_LEAF.test(leaf) && !opts.includeSecrets) { skippedSecrets.push(group + '.' + leaf); continue; }
       if (matchesAny(group, ACCOUNT_GROUPS)) { skippedPersonal.push(group + '.' + leaf); continue; }
       if (matchesAny(group, PERSONAL_OPTIN_GROUPS) && !opts.includePersonal) { skippedPersonal.push(group + '.' + leaf); continue; }
 

@@ -24,6 +24,14 @@
     const o = {}; for (const [k, v] of Object.entries(node)) { if (API_KEY_STRIP.test(k)) continue; o[k] = (v && typeof v === 'object') ? stripKeys(v) : v; } return o;
   }
   const ACCOUNT_GROUP = /^trakt_/i, PERSONAL_GROUP = /^track_preference$/i;
+  // watched_items / watch_progress rows come straight off the SOURCE profile and carry its own
+  // profile_id (plus row PK/timestamps) — strip that identity before pushing so the push is scoped
+  // only by the top-level p_profile_id param, the same convention stripListForPush uses for addons/plugins.
+  function stripWatchRow(row) {
+    if (!row || typeof row !== 'object') return row;
+    const { profile_id, id, created_at, updated_at, inserted_at, ...rest } = row;
+    return rest;
+  }
 
   // ======================================================================
   // state
@@ -35,17 +43,15 @@
   let gAuth = { token: null, client: null, user: null };
   let pfA = null, pfI = null, pfEdit = null, pfMembership = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
   const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings', watchprogress: 'Watch Progress', watched: 'Watched' };
-  const PF_TAB_SAVEABLE = { addons: true, plugins: true, collections: true, settings: true, watchprogress: true, watched: true };
   function switchPfEditorTab(kind) {
     pfEditorTab = kind;
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.classList.toggle('on', b.dataset.pftab === kind));
     document.querySelectorAll('.pf-pane').forEach(p => p.style.display = (p.id === 'pf-pane-' + kind) ? '' : 'none');
     $('pf-editor-pane-title').textContent = PF_TAB_LABEL[kind] || kind;
-    $('pf-editor-pane-tpl').dataset.tpl = kind;
-    $('pf-editor-pane-tpl').style.display = PF_TAB_SAVEABLE[kind] ? '' : 'none';
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
+  let sySettingsIncludeKeys = false; // opt-in per source selection, set via the "include API keys" popup
   const sySel = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
   const syTargets = new Set(); let syPlans = null;
 
@@ -624,25 +630,66 @@
   // ======================================================================
   // TEMPLATES (on Drive)
   // ======================================================================
-  function pfSettingsForTemplate() {
+  function pfSettingsForTemplate(includeKeys) {
     const out = {};
-    for (const pl of ['tv', 'mobile']) { const b = pfEdit.settings[pl]; if (b && b.features) out[pl] = stripKeys(JSON.parse(JSON.stringify(b))); }
+    for (const pl of ['tv', 'mobile']) { const b = pfEdit.settings[pl]; if (b && b.features) out[pl] = includeKeys ? JSON.parse(JSON.stringify(b)) : stripKeys(JSON.parse(JSON.stringify(b))); }
     return out;
   }
-  async function saveTemplate(kind) {
+  // one combined template save, driven by the "Save as template" picker modal
+  const TPL_PARTS = [
+    { key: 'addons', label: 'Add-ons', count: () => (pfEdit.addons || []).length },
+    { key: 'plugins', label: 'Plugins', count: () => (pfEdit.plugins || []).length },
+    { key: 'collections', label: 'Collections', count: () => (pfEdit.collections || []).length },
+    { key: 'settings', label: 'Settings', count: () => ((pfEdit.settings.tv || pfEdit.settings.mobile) ? 1 : 0) },
+    { key: 'watchprogress', label: 'Watch Progress', count: () => (pfEdit.watchProgress || []).length },
+    { key: 'watched', label: 'Watched', count: () => (pfEdit.watched || []).length },
+  ];
+  async function openSaveTemplateModal() {
     if (!gAuth.token) { await uiAlert('Sign in with Google first.'); return; }
     if (!pfEdit) { await uiAlert('Open a profile first.'); return; }
-    const name = await uiPrompt('Name this template', pfEdit.meta.name + ' ' + kind); if (name == null || !name.trim()) return;
-    const payload = { app: 'numax', kind: 'template', tkind: kind, name, savedAt: new Date().toISOString(), from: pfEdit.meta.name };
-    if (kind === 'addons') payload.addons = pfEdit.addons;
-    else if (kind === 'plugins') payload.plugins = pfEdit.plugins;
-    else if (kind === 'collections') payload.collections = pfEdit.collections;
-    else if (kind === 'settings') payload.settings = pfSettingsForTemplate();
-    else if (kind === 'watchprogress') payload.watchProgress = pfEdit.watchProgress || [];
-    else if (kind === 'watched') payload.watched = pfEdit.watched || [];
-    else if (kind === 'profile') { payload.addons = pfEdit.addons; payload.plugins = pfEdit.plugins; payload.collections = pfEdit.collections; payload.settings = pfSettingsForTemplate(); payload.watched = pfEdit.watched || []; payload.watchProgress = pfEdit.watchProgress || []; }
+    const root = $('tpl-save-root'), list = $('tpl-save-list'), ok = $('tpl-save-ok'), cancel = $('tpl-save-cancel'), bg = $('tpl-save-bg');
+    clr(list);
+    const checks = {};
+    TPL_PARTS.forEach(part => {
+      const n = part.count(); const empty = !n;
+      const row = el('label', 'pick'); if (empty) row.style.opacity = '.5';
+      const cb = el('input'); cb.type = 'checkbox'; cb.disabled = empty; checks[part.key] = cb; row.appendChild(cb);
+      const b = el('div', 'pb'); b.appendChild(el('div', 'pn', part.label));
+      b.appendChild(el('div', 'ps', empty ? 'none on this profile' : (part.key === 'settings' ? 'available' : n + ' item' + (n === 1 ? '' : 's'))));
+      row.appendChild(b); list.appendChild(row);
+    });
+    root.style.display = '';
+    return new Promise(resolve => {
+      const done = async (proceed) => {
+        root.style.display = 'none'; ok.onclick = cancel.onclick = bg.onclick = null;
+        if (!proceed) { resolve(); return; }
+        const kinds = TPL_PARTS.map(p => p.key).filter(k => checks[k].checked && !checks[k].disabled);
+        if (!kinds.length) { await uiAlert('Pick at least one thing to save.'); resolve(); return; }
+        let includeKeys = false;
+        if (kinds.includes('settings')) {
+          if (accountKeysIncluded(pfA)) includeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this template?', { okLabel: 'Include keys' });
+          else await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values to include — settings will save without keys.');
+        }
+        await saveTemplateParts(kinds, includeKeys);
+        resolve();
+      };
+      ok.onclick = () => done(true); cancel.onclick = () => done(false); bg.onclick = () => done(false);
+    });
+  }
+  async function saveTemplateParts(kinds, includeKeys) {
+    const isWholeProfile = kinds.length === TPL_PARTS.length;
+    const label = isWholeProfile ? 'profile' : kinds.map(k => PF_TAB_LABEL[k] || k).join(', ');
+    const name = await uiPrompt('Name this template', pfEdit.meta.name + ' ' + label); if (name == null || !name.trim()) return;
+    const tkind = isWholeProfile ? 'profile' : kinds.join('+');
+    const payload = { app: 'numax', kind: 'template', tkind, name, savedAt: new Date().toISOString(), from: pfEdit.meta.name };
+    if (kinds.includes('addons')) payload.addons = pfEdit.addons;
+    if (kinds.includes('plugins')) payload.plugins = pfEdit.plugins;
+    if (kinds.includes('collections')) payload.collections = pfEdit.collections;
+    if (kinds.includes('settings')) payload.settings = pfSettingsForTemplate(includeKeys);
+    if (kinds.includes('watchprogress')) payload.watchProgress = pfEdit.watchProgress || [];
+    if (kinds.includes('watched')) payload.watched = pfEdit.watched || [];
     status($('pf-save-status'), 'Saving template…');
-    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind: kind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Templates tab.', 'ok'); logAct('Saved template "' + name + '" (' + kind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
+    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Templates tab.', 'ok'); logAct('Saved template "' + name + '" (' + tkind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
     catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); logAct('Template save failed: ' + e.message, 'err'); }
   }
   async function refreshTemplates() {
@@ -676,27 +723,14 @@
     btn.onclick = async () => {
       const tid = tsel.value; if (!tid) { status(st, 'Pick a target.', 'err'); return; } const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10);
       const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
-      // watchprogress / watched templates use a direct upsert (no plan/preview needed)
-      if (doc.watched || doc.watchProgress) {
-        const items = doc.watched ? { rpc: 'sync_push_watched_items', payload: doc.watched, label: 'watched items', paramKey: 'p_watched_items' }
-                                  : { rpc: 'sync_push_watch_progress', payload: doc.watchProgress, label: 'watch progress', paramKey: 'p_watch_progress' };
-        if (!Array.isArray(items.payload) || !items.payload.length) { status(st, 'Template has no ' + items.label + '.', 'err'); return; }
-        clr(res); res.appendChild(el('div', 'report'));
-        res.firstChild.innerHTML = `<div class="rhead">${items.payload.length} ${items.label} → target</div><div class="rline muted">Applied as an upsert — existing entries stay in place.</div>`;
-        const ap = el('button', 'btn btn-solid', 'Apply');
-        ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…');
-          try { await A.client(store, aid).rpc(items.rpc, { [items.paramKey]: items.payload, p_profile_id: idx, p_origin_client_id: 'numax-web' }); inval(aid); status(st, 'Template applied.', 'ok'); logAct('Applied ' + items.label + ' template to profile ' + idx, 'ok'); }
-          catch (e) { status(st, 'Failed: ' + e.message, 'err'); } };
-        res.appendChild(ap);
-        return;
-      }
       status(st, 'Reading target…');
       try {
         const master = { addons: doc.addons || [], plugins: doc.plugins || [], collections: doc.collections || [], settings: doc.settings || {} };
         const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
         if (doc.settings && Object.keys(doc.settings).length) { state.settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
         const cats = { addons: !!(doc.addons), plugins: !!(doc.plugins), collections: !!(doc.collections), settings: !!(doc.settings && Object.keys(doc.settings).length) };
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
+        // includeSecrets:true here is safe — a template only carries key values if the save-time "include API keys?" prompt was answered yes
+        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
         renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx });
       } catch (e) { status(st, e.message, 'err'); }
     };
@@ -723,8 +757,8 @@
         // extras: push watched/progress in addition to plan
         if (extras && extras.profileId != null) {
           const c = A.client(store, accountId);
-          if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched, p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
-          if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress, p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
+          if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
+          if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
         }
         invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
@@ -760,7 +794,7 @@
     selectSource(id, keep);
   }
   async function selectSource(id, idx) {
-    syA = id; syI = idx;
+    syA = id; syI = idx; sySettingsIncludeKeys = false; // fresh source selection — keys are opt-in again
     document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
     try {
@@ -782,7 +816,13 @@
   }
   function defTokens(settings) {
     const t = new Set();
-    for (const pl of Object.keys(settings)) { const feat = (settings[pl] && settings[pl].features) || {}; for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const lf of Object.keys(gv)) if (!SECRET_LEAF.test(lf)) t.add(pl + '::' + g + '.' + lf); } }
+    for (const pl of Object.keys(settings)) { const feat = (settings[pl] && settings[pl].features) || {}; for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const lf of Object.keys(gv)) if (sySettingsIncludeKeys || !SECRET_LEAF.test(lf)) t.add(pl + '::' + g + '.' + lf); } }
+    return t;
+  }
+  // secret-leaf tokens available on the source for a platform — only ever surfaced when the user opts in
+  function secretTokens(pl) {
+    const t = new Set(); if (!sySnap) return t; const feat = ((sySnap.settings[pl]) || {}).features || {};
+    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
     return t;
   }
   const syList = k => { const s = sySnap; return !s ? [] : (k === 'collections' ? (s.collections || []) : (s[k] || [])); };
@@ -800,16 +840,34 @@
   }
   function availTokens(pl) {
     const t = new Set(); const feat = ((sySnap.settings[pl]) || {}).features || {};
-    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (!SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
+    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (sySettingsIncludeKeys || !SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
     return t;
   }
   function schemaTabTokens(pl, tab) {
     const toks = new Set();
     (tab.groups || []).forEach(g => g.fields.forEach(f => {
-      if (!f.title || ACCOUNT_GROUP.test(f.feature) || SECRET_LEAF.test(f.key)) return;
+      if (!f.title || ACCOUNT_GROUP.test(f.feature) || (SECRET_LEAF.test(f.key) && !sySettingsIncludeKeys)) return;
       toks.add(isPayload(f.feature) ? pl + '::' + f.feature : pl + '::' + f.feature + '.' + f.key);
     }));
     return toks;
+  }
+  // Developer's choice: addons + plugins + collections, plus only the Playback settings tab
+  // (tv and mobile). Everything else — including watch progress/history and any other settings — off.
+  function syDevChoice() {
+    if (!sySnap) return;
+    sySel.addons = new Set((sySnap.addons || []).map(a => a.url));
+    sySel.plugins = new Set((sySnap.plugins || []).map(p => p.url));
+    sySel.collections = new Set((sySnap.collections || []).map(collKey));
+    sySel.settings = new Set();
+    for (const pl of ['tv', 'mobile']) {
+      const tab = (SCHEMA[pl] || []).find(t => t.title === 'Playback'); if (!tab) continue;
+      const avail = availTokens(pl);
+      schemaTabTokens(pl, tab).forEach(t => { if (avail.has(t)) sySel.settings.add(t); });
+    }
+    $('sy-cat-addons').checked = true; $('sy-cat-plugins').checked = true; $('sy-cat-collections').checked = true;
+    $('sy-cat-settings').checked = sySel.settings.size > 0;
+    $('sy-cat-watchprogress').checked = false; $('sy-cat-watched').checked = false;
+    renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
   }
   function renderSyTree() {
     const tree = $('sy-settings-tree'); clr(tree); const settings = (sySnap && sySnap.settings) || {}; const plats = Object.keys(settings).filter(p => settings[p] && settings[p].features);
@@ -928,7 +986,7 @@
         const c = A.client(store, aid); const { backup } = await loadAccount(aid);
         const state = sliceProfile(backup, idx); const upd = {};
         if (cats.settings) { state.settings = {}; for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } catch (e) { logAct('Settings read failed for ' + pl + ': ' + e.message, 'err'); } } }
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
+        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: sySettingsIncludeKeys }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
         if (plan.hasRemovals) rem = true;
         // watched / watchprogress: upsert-only, no removals possible
         const extras = {};
@@ -1071,8 +1129,8 @@
         }
         if (hasExtras) {
           const c = A.client(store, aid);
-          if (extras.watchProgress && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress, p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watch progress failed: ' + e.message, 'err'); } }
-          if (extras.watched && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched, p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watched failed: ' + e.message, 'err'); } }
+          if (extras.watchProgress && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watch progress failed: ' + e.message, 'err'); } }
+          if (extras.watched && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watched failed: ' + e.message, 'err'); } }
         }
       } catch (e) { fail++; logAct('Apply failed: ' + e.message, 'err'); }
     }
@@ -1153,15 +1211,32 @@
     togWire('ac-readkeys', setReadKeys);
     $('pf-account').onchange = () => renderPfPicker($('pf-account').value); $('pf-save-identity').onclick = savePfIdentity;
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
-    $('pf-editor-pane-tpl').onclick = () => saveTemplate($('pf-editor-pane-tpl').dataset.tpl);
-    $('pf-tpl-profile').onclick = () => saveTemplate('profile');
+    $('pf-tpl-profile').onclick = openSaveTemplateModal;
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
     $('sy-select-all').onclick = sySelectAll;
     $('sy-deselect-all').onclick = syDeselectAll;
+    $('sy-dev-choice').onclick = syDevChoice;
     document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = (e) => { e.preventDefault(); $(b.dataset.target).classList.toggle('open'); });
     // live preview on carry-over category toggles
-    ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-settings', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
+    ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
       const cb = $(id); if (cb) cb.addEventListener('change', () => { updateSyCounts(); scheduleLivePreview(); });
+    });
+    // settings toggle gets its own handler — turning it on asks whether to include API keys
+    $('sy-cat-settings').addEventListener('change', async () => {
+      const cb = $('sy-cat-settings');
+      if (cb.checked && sySnap) {
+        if (accountKeysIncluded(syA)) {
+          sySettingsIncludeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this sync?', { okLabel: 'Include keys' });
+        } else {
+          sySettingsIncludeKeys = false;
+          await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values available to copy — only non-key settings will sync.');
+        }
+        if (sySettingsIncludeKeys) for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.add(t));
+      } else {
+        for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.delete(t));
+        sySettingsIncludeKeys = false;
+      }
+      renderSyTree(); updateSyCounts(); scheduleLivePreview();
     });
     // live preview on mode change
     $('sy-mode').addEventListener('change', () => {

@@ -527,7 +527,7 @@
       </div>
       <div class="card">
         <div class="chead"><h3>Linked accounts</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="ac-reload">Reload</button><span class="pill-count" id="ac-count">0</span></div>
-        <p class="muted sm ac-hint">An account keeps its "API keys included" badge from when it was linked — re-link it to change that. Either way, keys are never copied between profiles: an account without the badge won't gain keys from one that has it, and one with keys won't pass them along.</p>
+        <p class="muted sm ac-hint">An account keeps its "API keys included" badge from when it was linked — re-link it to change that. Keys only ever move between profiles if you explicitly opt in (Sync Desk's "include API keys" prompt when Settings is checked, or the same prompt when saving a Settings template) — and only an account with the badge has key values available to offer in the first place.</p>
         <div id="ac-list"></div>
       </div>
       </div>
@@ -554,7 +554,7 @@
             <div class="row"><input id="pf-name-input" type="text" maxlength="60"><button class="btn btn-solid btn-xs" id="pf-save-identity">Save</button></div>
           </label>
           <span class="spacer"></span>
-          <button class="btn btn-ghost btn-xs" id="pf-tpl-profile">Save whole profile as template</button>
+          <button class="btn btn-ghost btn-xs" id="pf-tpl-profile">Save as template</button>
         </div>
         <div class="sy-card pf-tabs-card">
           <div class="pf-tabs-bar" id="pf-editor-tabs">
@@ -569,7 +569,6 @@
             <h3 id="pf-editor-pane-title">Add-ons</h3>
             <span class="spacer"></span>
             <span class="inline-status" id="pf-save-status"></span>
-            <button class="btn btn-ghost btn-xs" data-tpl="addons" id="pf-editor-pane-tpl">Save as template</button>
           </div>
           <div class="pf-panes-wrap">
             <div id="pf-pane-addons" class="pf-pane"><div id="pf-addons"></div></div>
@@ -611,10 +610,10 @@
             </div>
 
             <div class="sy-card">
-              <div class="sy-card-h"><h3>What to carry over</h3></div>
+              <div class="sy-card-h"><h3>What to carry over</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="sy-dev-choice">Developer's choice</button></div>
               <div class="sy-carry">
                 <div class="sy-carry-row">
-                  <input type="checkbox" id="sy-cat-addons" checked>
+                  <input type="checkbox" id="sy-cat-addons">
                   <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
                   <span class="sy-carry-lbl">Add-ons</span>
                   <span class="sy-carry-cnt" id="sy-cnt-addons">0 / 0</span>
@@ -622,7 +621,7 @@
                 </div>
                 <div class="sy-carry-chooser" id="sy-items-addons"></div>
                 <div class="sy-carry-row">
-                  <input type="checkbox" id="sy-cat-plugins" checked>
+                  <input type="checkbox" id="sy-cat-plugins">
                   <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 3v4M15 3v4M6 7h12v5a6 6 0 1 1-12 0V7z"/><path d="M12 17v4"/></svg></span>
                   <span class="sy-carry-lbl">Plugins</span>
                   <span class="sy-carry-cnt" id="sy-cnt-plugins">0 / 0</span>
@@ -630,7 +629,7 @@
                 </div>
                 <div class="sy-carry-chooser" id="sy-items-plugins"></div>
                 <div class="sy-carry-row">
-                  <input type="checkbox" id="sy-cat-collections" checked>
+                  <input type="checkbox" id="sy-cat-collections">
                   <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7h18M5 7v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V7M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></span>
                   <span class="sy-carry-lbl">Collections</span>
                   <span class="sy-carry-cnt" id="sy-cnt-collections">0 / 0</span>
@@ -652,7 +651,7 @@
                   <button class="sy-carry-choose" disabled>All items</button>
                 </div>
                 <div class="sy-carry-row">
-                  <input type="checkbox" id="sy-cat-settings" checked>
+                  <input type="checkbox" id="sy-cat-settings">
                   <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg></span>
                   <span class="sy-carry-lbl">Settings</span>
                   <span class="sy-carry-cnt" id="sy-cnt-settings">0 selected</span>
@@ -765,6 +764,16 @@
     <div class="modal-msg" id="modal-msg"></div>
     <input type="text" class="modal-input" id="modal-input" style="display:none">
     <div class="modal-actions"><button class="btn btn-ghost" id="modal-cancel">Cancel</button><button class="btn btn-primary" id="modal-ok">Confirm</button></div>
+  </div>
+</div>
+
+<div class="modal-root" id="tpl-save-root" style="display:none">
+  <div class="modal-bg" id="tpl-save-bg"></div>
+  <div class="modal-card" style="width:min(460px,92vw)">
+    <div class="modal-msg" style="font-weight:700;margin-bottom:8px">Save as template</div>
+    <p class="muted sm" style="margin:0 0 10px">Pick what this template should include.</p>
+    <div id="tpl-save-list"></div>
+    <div class="modal-actions"><button class="btn btn-ghost" id="tpl-save-cancel">Cancel</button><button class="btn btn-primary" id="tpl-save-ok">Save…</button></div>
   </div>
 </div>
 
