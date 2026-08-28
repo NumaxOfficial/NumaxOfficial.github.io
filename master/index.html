@@ -274,6 +274,8 @@
   .swatch .dot{ width:15px; height:15px; border-radius:50%; border:1px solid rgba(255,255,255,.25); }
   .swatch .sup{ font-size:9.5px; font-weight:700; letter-spacing:.06em; color:var(--warn); text-transform:uppercase; }
   .swatch.on .sup{ color:#a06a00; }
+  .swatch.locked{ opacity:.45; cursor:not-allowed; }
+  .swatch.locked:hover{ border-color:var(--line); color:var(--t70); }
 
   input[type=range]{ width:100%; accent-color:var(--accent); }
   input[type=color]{ width:44px; height:30px; padding:0; border:1px solid var(--line); border-radius:8px; background:none; cursor:pointer; }

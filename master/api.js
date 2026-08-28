@@ -126,6 +126,17 @@
       const rows = await rpc('sync_pull_profile_settings_blob', { p_profile_id: profileId, p_platform: platform });
       return Array.isArray(rows) && rows[0] ? rows[0] : null; // { settings_json, updated_at } or null
     }
+    // Whether this account currently has an active Nuvio Supporter / Supporter
+    // Plus membership — same RPC and gating rule (recognized tier + status
+    // "active") that Nuvio's own web client uses to unlock supporter-only
+    // theme colors, avatars, and profile backgrounds.
+    const SUPPORTER_TIERS = new Set(['SUPPORTER', 'SUPPORTER_PLUS']);
+    async function getMembership() {
+      const rows = await rpc('get_my_membership_overview', {});
+      const row = Array.isArray(rows) ? (rows[0] || null) : (rows || null);
+      const tier = row && SUPPORTER_TIERS.has(row.tier) ? row.tier : null;
+      return { isSupporter: !!tier && row.status === 'active', tier, status: (row && row.status) || 'inactive' };
+    }
 
     // slice one profile's addon/plugin/collection state out of a backup.data
     function sliceProfile(backup, profileId) {
@@ -149,7 +160,7 @@
       return { profileId: plan.profileId, executed: true, report: plan.report, results };
     }
 
-    return { rpc, exportBackup, pullProfiles, pullSettings, sliceProfile, applyPlan, get accountId() { return accountId; } };
+    return { rpc, exportBackup, pullProfiles, pullSettings, sliceProfile, applyPlan, getMembership, get accountId() { return accountId; } };
   }
 
   // Fetch the built-in avatar catalog (avatar_id -> image URL) from Nuvio.

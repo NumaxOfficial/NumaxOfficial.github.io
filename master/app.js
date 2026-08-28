@@ -29,9 +29,10 @@
   // state
   // ======================================================================
   const cache = {};                     // accountId -> {backup, profiles, keysLoaded}
+  const membershipCache = {};           // accountId -> {isSupporter, tier, status} | null (fetch failed)
   let readKeys = false;
   let gAuth = { token: null, client: null, user: null };
-  let pfA = null, pfI = null, pfEdit = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
+  let pfA = null, pfI = null, pfEdit = null, pfMembership = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
   const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings', watchprogress: 'Watch Progress', watched: 'Watched' };
   const PF_TAB_SAVEABLE = { addons: true, plugins: true, collections: true, settings: true, watchprogress: true, watched: true };
   function switchPfEditorTab(kind) {
@@ -225,8 +226,16 @@
     if (!readKeys && Array.isArray(backup.profile_settings_blobs)) backup.profile_settings_blobs = backup.profile_settings_blobs.map(b => b && b.settings_json ? { ...b, settings_json: stripKeys(b.settings_json) } : b);
     const rec = { backup, profiles: normProfiles(backup.profiles), keysLoaded: readKeys }; cache[id] = rec; return rec;
   }
-  const inval = id => { delete cache[id]; };
-  const invalAll = () => Object.keys(cache).forEach(k => delete cache[k]);
+  const inval = id => { delete cache[id]; delete membershipCache[id]; };
+  const invalAll = () => Object.keys(cache).forEach(k => delete cache[k]) || Object.keys(membershipCache).forEach(k => delete membershipCache[k]);
+  // whether an account has an active Nuvio Supporter / Supporter Plus membership —
+  // gates the supporter-only theme colors the same way Nuvio's own client does.
+  async function getMembership(id) {
+    if (id in membershipCache) return membershipCache[id];
+    try { membershipCache[id] = await A.client(store, id).getMembership(); }
+    catch (e) { membershipCache[id] = null; }
+    return membershipCache[id];
+  }
   function sliceProfile(backup, idx) {
     const pick = a => Array.isArray(a) ? a.filter(r => r.profile_id === idx) : [];
     const coll = pick(backup.collections)[0]; const sb = {};
@@ -358,6 +367,7 @@
     try { const c = A.client(store, id); for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = readKeys ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
     const watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
     const watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
+    pfMembership = await getMembership(id);
     pfEdit = { meta: { ...meta }, addons: JSON.parse(JSON.stringify(slice.addons)), plugins: JSON.parse(JSON.stringify(slice.plugins)), collections: JSON.parse(JSON.stringify(slice.collections)), settings: JSON.parse(JSON.stringify(live)), upd, watched, watchProgress };
     pfPlat = live.tv ? 'tv' : (live.mobile ? 'mobile' : 'tv');
     renderPfEditor(); if (!silent) logAct('Opened ' + meta.name, 'info');
@@ -549,7 +559,7 @@
       return w;
     }
     if (ctl === 'toggle') { const w = el('div', 'sf-toggle-wrap'); const st = el('span', 'st', v ? 'On' : 'Off'); const tg = el('button', 'tog' + (v ? ' on' : '')); tg.onclick = () => { const nv = !tg.classList.contains('on'); tg.classList.toggle('on', nv); st.textContent = nv ? 'On' : 'Off'; setVal(f, nv); }; w.appendChild(st); w.appendChild(tg); return w; }
-    if (ctl === 'swatches') { const w = el('div', 'swatches'); (f.options || []).forEach(o => { const b = el('button', 'swatch' + (String(v) === String(o.value) ? ' on' : '')); if (o.color) { const d = el('span', 'dot'); d.style.background = o.color; b.appendChild(d); } b.appendChild(el('span', '', o.label || o.value)); if (o.supporterOnly) b.appendChild(el('span', 'sup', 'Supporter')); b.onclick = () => { setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
+    if (ctl === 'swatches') { const w = el('div', 'swatches'); const isSupporter = !!(pfMembership && pfMembership.isSupporter); (f.options || []).forEach(o => { const locked = !!o.supporterOnly && !isSupporter; const b = el('button', 'swatch' + (String(v) === String(o.value) ? ' on' : '') + (locked ? ' locked' : '')); b.type = 'button'; if (locked) { b.disabled = true; b.title = 'Requires an active Nuvio Supporter membership on this account.'; } if (o.color) { const d = el('span', 'dot'); d.style.background = o.color; b.appendChild(d); } b.appendChild(el('span', '', o.label || o.value)); if (o.supporterOnly) b.appendChild(el('span', 'sup', 'Supporter')); b.onclick = () => { if (locked) return; setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
     if (ctl === 'segmented') { const w = el('div', 'seg' + ((f.options || []).some(o => o.desc) ? ' cards' : '')); (f.options || []).forEach(o => { const b = el('button', String(v) === String(o.value) ? 'on' : ''); b.appendChild(el('span', '', o.label || o.value)); if (o.desc) b.appendChild(el('span', 'osub', o.desc)); b.onclick = () => { setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
     if (ctl === 'select' || ctl === 'language') { const s = el('select', 'sel'); (f.options || []).forEach(o => { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label || o.value; if (String(v) === String(o.value)) op.selected = true; s.appendChild(op); }); s.onchange = () => setVal(f, s.value); return s; }
     if (ctl === 'slider') { const w = el('div', 'sf-range-wrap'); const r = el('input'); r.type = 'range'; if (f.min != null) r.min = f.min; if (f.max != null) r.max = f.max; if (f.step != null) r.step = f.step; r.value = v == null ? (f.min || 0) : v; const o = el('output', '', String(r.value) + (f.unit ? ' ' + f.unit : '')); r.oninput = () => { o.textContent = r.value + (f.unit ? ' ' + f.unit : ''); }; r.onchange = () => setVal(f, Number(r.value)); w.appendChild(r); w.appendChild(o); return w; }
