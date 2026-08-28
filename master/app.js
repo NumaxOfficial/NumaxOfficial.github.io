@@ -31,6 +31,7 @@
   const cache = {};                     // accountId -> {backup, profiles, keysLoaded}
   const membershipCache = {};           // accountId -> {isSupporter, tier, status} | null (fetch failed)
   let readKeys = false;
+  let acGen = 0; // bumped on every refreshAccounts() call so a stale call's late-resolving loadAccount() can't paint over a newer render
   let gAuth = { token: null, client: null, user: null };
   let pfA = null, pfI = null, pfEdit = null, pfMembership = null, pfPlat = 'tv', pfTab = 0, pfEditorTab = 'addons';
   const PF_TAB_LABEL = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', settings: 'Settings', watchprogress: 'Watch Progress', watched: 'Watched' };
@@ -270,6 +271,7 @@
     finally { btn.disabled = false; refreshAccounts(); }
   }
   async function refreshAccounts() {
+    const gen = ++acGen;
     const list = store.list();
     if ($('ac-count')) $('ac-count').textContent = list.length;
     if ($('nav-ac-cnt')) $('nav-ac-cnt').textContent = list.length || '';
@@ -289,6 +291,7 @@
       head.appendChild(ren); head.appendChild(rm); card.appendChild(head);
       const prof = el('div', 'acct-profiles'); prof.appendChild(el('span', 'muted sm', 'Loading profiles…')); card.appendChild(prof); box.appendChild(card);
       loadAccount(rec.accountId).then(({ profiles, keysLoaded }) => {
+        if (gen !== acGen) return; // a newer refreshAccounts() already replaced this row — don't paint a detached one
         // add API keys badge if this account was loaded WITH keys
         if (keysLoaded && !nmRow.querySelector('.api-badge')) {
           const badge = el('span', 'api-badge'); badge.textContent = 'API keys included';
@@ -298,7 +301,7 @@
         clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
         profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); });
       })
-        .catch(e => { clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
+        .catch(e => { if (gen !== acGen) return; clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
     }
   }
   function startRename(who, nm, id) {
