@@ -623,7 +623,7 @@
     status($('pf-save-status'), 'Saving settings…');
     try {
       const c = A.client(store, pfA);
-      await c.rpc('sync_push_profile_settings_blob_guarded', { p_profile_id: pfI, p_settings_json: blob, p_platform: plat, p_expected_updated_at: pfEdit.upd[plat] || null });
+      await c.rpc('sync_push_profile_settings_blob', { p_profile_id: pfI, p_settings_json: blob, p_platform: plat, p_origin_client_id: 'numax-web' });
       const row = await c.pullSettings(pfI, plat); if (row) pfEdit.upd[plat] = row.updated_at || null;
       inval(pfA); status($('pf-save-status'), 'Saved settings.', 'ok'); logAct('Saved ' + plat + ' settings to ' + pfEdit.meta.name, 'ok');
     } catch (e) { const conflict = (A.ConflictError && e instanceof A.ConflictError) || /40001|409|another device/i.test(e.message || ''); status($('pf-save-status'), conflict ? 'These settings changed elsewhere — reopen the profile and try again.' : "Couldn't save: " + e.message, 'err'); }

@@ -9,7 +9,8 @@
 // Everything here is derived from the verified Nuvio contract:
 //   - addons/plugins push = FULL REPLACE (send the complete desired list)
 //   - collections push     = FULL REPLACE (whole blob)
-//   - settings push        = FULL REPLACE per (profile, platform); use guarded
+//   - settings push        = FULL REPLACE per (profile, platform) via
+//     sync_push_profile_settings_blob (no "_guarded" variant/conflict param exists)
 //   - settings blob embeds LIVE API KEYS -> strip at the leaf level unless the
 //     caller explicitly opts in via settings.includeSecrets (off by default)
 //   - settings blob shape  = { version, features: { group: { leaf:{type,value} } } }
@@ -212,10 +213,11 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}) {
  * options: {
  *   categories: { addons?, plugins?, collections?, settings? } (booleans),
  *   modes: { addons:'merge'|'mirror', plugins:..., collections:... },
- *   settings: { includePersonal?: bool },
+ *   settings: { includePersonal?: bool, includeSecrets?: bool },
  *   profileId: number, originClientId: string,
- *   settingsUpdatedAt: { tv?: iso, mobile?: iso }  // for guarded writes
  * }
+ * (settingsUpdatedAt, if passed, is accepted but unused — sync_push_profile_settings_blob
+ * has no optimistic-concurrency guard; there's no server-side "_guarded" variant.)
  *
  * Returns { operations:[...], report:{...}, hasChanges:bool, hasRemovals:bool }.
  * Nothing is executed — the caller sends `operations` and shows `report`.
@@ -267,12 +269,12 @@ function planTarget(master, target, options) {
       const { result, report: r } = mergeSettingsBlob(mBlob, tBlob, options.settings || {});
       report.settings[platform] = r;
       if (r.changed.length) {
-        ops.push({ surface: 'settings:' + platform, rpc: 'sync_push_profile_settings_blob_guarded',
+        ops.push({ surface: 'settings:' + platform, rpc: 'sync_push_profile_settings_blob',
           params: {
             p_profile_id: options.profileId,
             p_settings_json: result,
             p_platform: platform,
-            p_expected_updated_at: (options.settingsUpdatedAt || {})[platform] || null,
+            p_origin_client_id: origin,
           } });
       }
     }
