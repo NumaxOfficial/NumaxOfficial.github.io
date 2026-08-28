@@ -21,9 +21,21 @@
   :root{ color-scheme: dark; }
   option{ background:#151515; color:#fff; }
   body{ font-family:var(--f); background:var(--bg); color:var(--t); -webkit-font-smoothing:antialiased; }
-  .sync-top{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
-  .sync-top .card{ margin-bottom:18px; }
-  @media (max-width:900px){ .sync-top{ grid-template-columns:1fr; gap:0; } }
+  .sync-top{ display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:stretch; }
+  .sync-top .card{ margin-bottom:0; display:flex; flex-direction:column; }
+  .sync-top .card .chip-grid,
+  .sync-top .card .sy-scroll{ flex:1; min-height:0; max-height:320px; overflow-y:auto; padding-right:4px; }
+  .sync-top .card .sy-scroll::-webkit-scrollbar{ width:5px; }
+  .sync-top .card .sy-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  @media (max-width:900px){ .sync-top{ grid-template-columns:1fr; gap:12px; } }
+  .sync-layout{ display:grid; grid-template-columns:1fr 360px; gap:18px; align-items:start; }
+  .sync-main{ min-width:0; }
+  .sync-preview-pane{ position:sticky; top:72px; max-height:calc(100dvh - 90px); overflow-y:auto; }
+  .sync-preview-pane::-webkit-scrollbar{ width:5px; }
+  .sync-preview-pane::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
+  .sync-preview-pane .card{ margin-bottom:14px; }
+  .sync-preview-pane .empty{ text-align:center; padding:28px 10px; }
+  @media (max-width:1100px){ .sync-layout{ grid-template-columns:1fr; } .sync-preview-pane{ position:static; max-height:none; } }
   .modal-root{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; }
   .modal-bg{ position:absolute; inset:0; background:rgba(0,0,0,.66); backdrop-filter:blur(2px); }
   .modal-card{ position:relative; background:#111; border:1px solid var(--line); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:0 24px 70px rgba(0,0,0,.6); }
@@ -282,25 +294,40 @@
 <body>
 <div class="land-glow" aria-hidden="true"></div>
 
-<!-- flying toucan (positioned by app.js) -->
+<!-- flying toucan (positioned by app.js — layered parts for dimensional animation) -->
 <div id="mascot" aria-hidden="true" style="position:fixed;top:0;left:0;width:58px;z-index:40;pointer-events:none;opacity:0;visibility:hidden;">
-  <div class="mascot-inner" id="mascot-inner">
+  <!-- shadow (positioned separately during flight) -->
+  <div id="mascot-shadow" style="position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);width:36px;height:8px;background:radial-gradient(ellipse,rgba(0,0,0,.35),transparent 70%);border-radius:50%;opacity:0;transition:opacity .3s;"></div>
+  <div id="mascot-body" style="position:relative;">
     <svg viewBox="0 0 260 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;overflow:visible;">
       <defs>
         <linearGradient id="m-beak" x1="0" y1="0" x2="1" y2=".25"><stop offset="0" stop-color="#ff6a00"/><stop offset=".4" stop-color="#ff9e12"/><stop offset=".7" stop-color="#ffb020"/><stop offset="1" stop-color="#ff6a00"/></linearGradient>
         <linearGradient id="m-chest" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6f0e2"/><stop offset=".45" stop-color="#fbe27a"/><stop offset=".78" stop-color="#ffc42e"/><stop offset="1" stop-color="#f0a80e"/></linearGradient>
         <linearGradient id="m-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#23252e"/><stop offset=".5" stop-color="#0d0e13"/><stop offset="1" stop-color="#050507"/></linearGradient>
       </defs>
-      <path d="M96 88 Q70 130 74 182 Q86 170 104 144 Q112 116 108 92Z" fill="url(#m-body)"/>
-      <g stroke="#4a4d55" stroke-width="6" stroke-linecap="round" fill="none"><path d="M118 156l-6 18M118 156l4 20M118 156l12 16"/><path d="M150 156l-4 20M150 156l6 18M150 156l14 14"/></g>
+      <!-- tail (separate for subtle wag) -->
+      <g id="m-tail"><path d="M96 88 Q70 130 74 182 Q86 170 104 144 Q112 116 108 92Z" fill="url(#m-body)"/></g>
+      <!-- feet -->
+      <g id="m-feet" stroke="#4a4d55" stroke-width="6" stroke-linecap="round" fill="none"><path d="M118 156l-6 18M118 156l4 20M118 156l12 16"/><path d="M150 156l-4 20M150 156l6 18M150 156l14 14"/></g>
+      <!-- far wing (behind body) -->
+      <g id="m-wing-far" style="transform-origin:82% 30%"><path d="M100 40 Q74 62 78 112 Q86 152 126 158 Q114 124 112 92 Q112 60 124 42Z" fill="#141620" opacity=".7"/></g>
+      <!-- body -->
       <path d="M96 38 Q78 70 90 120 Q108 164 152 160 Q188 156 190 108 Q190 70 172 42Z" fill="url(#m-body)"/>
+      <!-- chest -->
       <path d="M138 28 Q112 40 108 92 Q106 134 140 146 Q176 144 180 96 Q182 52 160 30 Q150 24 138 28Z" fill="url(#m-chest)"/>
-      <g id="m-wing"><path d="M104 36 Q80 58 84 106 Q92 146 130 152 Q120 120 118 88 Q118 58 128 38Z" fill="#1a1c22"/></g>
-      <path d="M118 -2 Q112 28 142 38 Q176 42 182 16 Q186 -8 168 -20 Q140 -30 124 -18 Q118 -12 118 -2Z" fill="url(#m-body)"/>
-      <circle cx="150" cy="0" r="8.5" fill="#0a0a0a"/><circle cx="150" cy="0" r="8.5" fill="none" stroke="#ff8a00" stroke-width="1.6"/><circle cx="153" cy="-3" r="2.6" fill="#fff"/>
-      <path d="M166 -14 Q214 -20 250 12 Q244 24 224 28 Q210 16 178 16 Q168 4 166 -14Z" fill="url(#m-beak)"/>
-      <path d="M172 18 Q206 16 224 28 Q206 36 184 32 Q174 28 172 18Z" fill="#ff7a10"/>
-      <path d="M250 12 Q258 20 250 30 Q240 32 224 28 Q244 24 250 12Z" fill="#171412"/>
+      <!-- near wing (in front of body) -->
+      <g id="m-wing" style="transform-origin:76% 26%"><path d="M104 36 Q80 58 84 106 Q92 146 130 152 Q120 120 118 88 Q118 58 128 38Z" fill="#1a1c22"/></g>
+      <!-- head group (moves slightly for head-bob) -->
+      <g id="m-head">
+        <path d="M118 -2 Q112 28 142 38 Q176 42 182 16 Q186 -8 168 -20 Q140 -30 124 -18 Q118 -12 118 -2Z" fill="url(#m-body)"/>
+        <circle cx="150" cy="0" r="8.5" fill="#0a0a0a"/><circle cx="150" cy="0" r="8.5" fill="none" stroke="#ff8a00" stroke-width="1.6"/><circle cx="153" cy="-3" r="2.6" fill="#fff"/>
+        <!-- beak -->
+        <g id="m-beak-g">
+          <path d="M166 -14 Q214 -20 250 12 Q244 24 224 28 Q210 16 178 16 Q168 4 166 -14Z" fill="url(#m-beak)"/>
+          <path d="M172 18 Q206 16 224 28 Q206 36 184 32 Q174 28 172 18Z" fill="#ff7a10"/>
+          <path d="M250 12 Q258 20 250 30 Q240 32 224 28 Q244 24 250 12Z" fill="#171412"/>
+        </g>
+      </g>
     </svg>
   </div>
 </div>
@@ -435,11 +462,13 @@
         <p>Pick a source, choose exactly what to carry, pick which profiles receive it, then preview before anything is written.</p></div>
       <p class="empty" id="sy-empty">Link a Nuvio account to start syncing.</p>
       <div id="sy-body" style="display:none">
+        <div class="sync-layout">
+        <div class="sync-main">
         <div class="sync-top">
         <div class="card"><div class="chead"><h3>Copy from</h3></div>
           <label class="fld" style="max-width:320px;margin-bottom:14px"><span>Account</span><select class="sel" id="sy-account"></select></label>
           <div class="chip-grid" id="sy-source"></div></div>
-        <div class="card"><div class="chead"><h3>Copy into</h3></div><div id="sy-targets"></div></div>
+        <div class="card"><div class="chead"><h3>Copy into</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="sy-select-all">Select all</button></div><div class="sy-scroll" id="sy-targets"></div></div>
         </div>
         <div class="card"><div class="chead"><h3>What to carry over</h3></div>
           <div class="cat-row"><span class="cat-lbl"><input type="checkbox" id="sy-cat-addons" checked>Add-ons</span><span class="cat-cnt" id="sy-cnt-addons">0</span>
@@ -454,10 +483,16 @@
           <div class="row" style="flex-wrap:wrap"><label style="font-size:13px;font-weight:600">Mode</label>
             <select class="sel" id="sy-mode" style="max-width:380px"><option value="merge">Merge — add and update, keep the rest</option><option value="overwrite">Overwrite — make target match source exactly</option></select></div>
           <p class="muted sm" style="margin-top:8px">Overwrite removes anything the target has that the source doesn't. Removals are listed and need a tick before applying.</p>
-          <div class="actbar"><button class="btn btn-primary" id="sy-preview">Preview changes</button><div class="inline-status" id="sy-status"></div></div>
-          <div id="sy-results" style="margin-top:14px"></div>
+          <div class="actbar"><button class="btn btn-primary" id="sy-preview">Preview all</button><div class="inline-status" id="sy-status"></div></div>
           <div id="sy-confirm-wrap" style="display:none"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
           <div class="actbar"><button class="btn btn-solid" id="sy-apply" disabled>Apply changes</button></div></div>
+        </div>
+        <div class="sync-preview-pane">
+          <div class="card"><div class="chead"><h3>Preview</h3><span class="spacer"></span><span class="inline-status" id="sy-pv-status"></span></div>
+            <div id="sy-results"><p class="empty">Select a target profile to see a live preview of changes.</p></div>
+          </div>
+        </div>
+        </div>
       </div>
     </section>
 
@@ -500,8 +535,8 @@
       <div class="phead"><span class="eyebrow">Settings</span><h1>Preferences.</h1><p>These apply to Numax on this device.</p></div>
       <div class="card"><div class="chead"><h3>Reading profiles</h3></div>
         <div class="switch-row"><div class="tx"><b>Read API keys</b><span>When on, provider keys are loaded so you can see them. Still never copied between profiles.</span></div><button class="tog" id="st-readkeys" role="switch"></button></div></div>
-      <div class="card"><div class="chead"><h3>Idle flight</h3></div>
-        <div class="switch-row"><div class="tx"><b>Let the toucan roam</b><span>Occasional idle flights across the page. Turn off for a calmer screen.</span></div><button class="tog on" id="st-idle" role="switch"></button></div></div>
+      <div class="card"><div class="chead"><h3>Toucan</h3></div>
+        <div class="switch-row"><div class="tx"><b>Animated toucan</b><span>The toucan flies between tabs when you navigate. Turn off for a calmer screen.</span></div><button class="tog on" id="st-idle" role="switch"></button></div></div>
       <div class="card"><div class="chead"><h3>Sign out</h3></div>
         <p class="muted sm" style="margin-bottom:12px">Signs out of Google on this device. Your accounts and templates stay safe in your Drive.</p>
         <button class="btn btn-ghost danger" id="st-signout">Sign out</button></div>
