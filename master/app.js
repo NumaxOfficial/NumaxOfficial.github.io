@@ -25,11 +25,13 @@
   }
   const ACCOUNT_GROUP = /^trakt_/i, PERSONAL_GROUP = /^track_preference$/i;
   // watched_items / watch_progress rows come straight off the SOURCE profile and carry its own
-  // profile_id (plus row PK/timestamps) — strip that identity before pushing so the push is scoped
-  // only by the top-level p_profile_id param, the same convention stripListForPush uses for addons/plugins.
+  // row id, user_id (the source ACCOUNT's auth user), and profile_id — strip that identity before
+  // pushing so the insert is scoped only by the top-level p_profile_id/auth session, the same
+  // convention stripListForPush uses for addons/plugins (verified table columns: api.nuvio.tv's
+  // PostgREST OpenAPI schema for watch_progress/watched_items).
   function stripWatchRow(row) {
     if (!row || typeof row !== 'object') return row;
-    const { profile_id, id, created_at, updated_at, inserted_at, ...rest } = row;
+    const { id, user_id, profile_id, created_at, updated_at, inserted_at, ...rest } = row;
     return rest;
   }
 
@@ -757,8 +759,8 @@
         // extras: push watched/progress in addition to plan
         if (extras && extras.profileId != null) {
           const c = A.client(store, accountId);
-          if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
-          if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
+          if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_items: extras.watched.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
+          if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_entries: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
         }
         invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
@@ -1129,8 +1131,8 @@
         }
         if (hasExtras) {
           const c = A.client(store, aid);
-          if (extras.watchProgress && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_watch_progress: extras.watchProgress.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watch progress failed: ' + e.message, 'err'); } }
-          if (extras.watched && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_watched_items: extras.watched.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watched failed: ' + e.message, 'err'); } }
+          if (extras.watchProgress && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_entries: extras.watchProgress.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watch progress failed: ' + e.message, 'err'); } }
+          if (extras.watched && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_items: extras.watched.map(stripWatchRow), p_profile_id: plan.profileId, p_origin_client_id: 'numax-web' }); ok++; } catch (e) { fail++; logAct('Sync watched failed: ' + e.message, 'err'); } }
         }
       } catch (e) { fail++; logAct('Apply failed: ' + e.message, 'err'); }
     }
