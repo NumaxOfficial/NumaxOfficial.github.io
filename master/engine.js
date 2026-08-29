@@ -509,15 +509,26 @@ function planTarget(master, target, options) {
         // 00000000000009_guard_profile_settings_writes, despite older notes saying otherwise.)
         const expected = Object.prototype.hasOwnProperty.call(upd, platform) ? (upd[platform] || null) : undefined;
         const guarded = expected !== undefined;
+        // The two RPCs take DIFFERENT parameter lists, and PostgREST resolves a function
+        // by name AND signature — passing p_origin_client_id to the guarded one is a
+        // 404/PGRST202, not an ignored extra. Verified against the live API: guarded
+        // accepts exactly (p_profile_id, p_settings_json, p_platform,
+        // p_expected_updated_at) and nothing else, which is also the shape Nuvio's own
+        // client sends. The trade-off is theirs: a guarded write carries no origin tag.
         ops.push({
           surface: 'settings:' + platform,
           rpc: guarded ? 'sync_push_profile_settings_blob_guarded' : 'sync_push_profile_settings_blob',
-          params: Object.assign({
+          params: guarded ? {
+            p_profile_id: options.profileId,
+            p_settings_json: result,
+            p_platform: platform,
+            p_expected_updated_at: expected,
+          } : {
             p_profile_id: options.profileId,
             p_settings_json: result,
             p_platform: platform,
             p_origin_client_id: origin,
-          }, guarded ? { p_expected_updated_at: expected } : {}),
+          },
         });
       }
     }
