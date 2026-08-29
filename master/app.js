@@ -23,7 +23,14 @@
     if (Array.isArray(node)) return node.map(stripKeys);
     const o = {}; for (const [k, v] of Object.entries(node)) { if (API_KEY_STRIP.test(k)) continue; o[k] = (v && typeof v === 'object') ? stripKeys(v) : v; } return o;
   }
-  const ACCOUNT_GROUP = /^trakt_/i, PERSONAL_GROUP = /^track_preference$/i;
+  const PERSONAL_GROUP = /^track_preference$/i;
+  // Single source of truth for "may this leaf be copied?" — the engine owns the rule
+  // (account identity & Trakt credentials never; API keys on opt-in; personal taste on
+  // opt-in). The UI must ask the same question the engine will, or the tree offers
+  // fields the engine then silently drops. Falls back to a key check if engine.js is absent.
+  const leafShareable = (group, leaf, includeKeys) => (E && E.leafIsShareable)
+    ? E.leafIsShareable(group, leaf, { includeSecrets: !!includeKeys, includePersonal: true })
+    : !(SECRET_LEAF.test(leaf) && !includeKeys);
   // watched_items / watch_progress rows come straight off the SOURCE profile and carry its own
   // row id, user_id (the source ACCOUNT's auth user), and profile_id — strip that identity before
   // pushing so the insert is scoped only by the top-level p_profile_id/auth session, the same
@@ -54,6 +61,7 @@
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
   let sySettingsIncludeKeys = false; // opt-in per source selection, set via the "include API keys" popup
+  let syKeysAnsweredFor = null;      // "accountId:profileIndex" the answer above was given for (see selectSource)
   const sySel = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
   const syTargets = new Set(); let syPlans = null;
 
@@ -738,6 +746,24 @@
     };
   }
 
+  // Every settings leaf the engine declined to copy, as one readable line each, so
+  // both preview surfaces can show exactly what was left behind instead of only
+  // counting what changed. Buckets come from engine.mergeSettingsBlob's report.
+  const SETTINGS_SKIP_WHY = [
+    ['skippedSecrets', 'API key — not included in this copy'],
+    ['skippedAccount', 'account/personal data — never copied'],
+    ['skippedPersonal', 'personal preference — not opted in'],
+    ['skippedUnreadable', ''],   // message already carries its own reason
+  ];
+  function settingsSkipLines(rep, platform) {
+    const out = [];
+    if (!rep) return out;
+    SETTINGS_SKIP_WHY.forEach(([bucket, why]) => {
+      (rep[bucket] || []).forEach(leaf => out.push(platform + ': ' + leaf + (why ? ' — ' + why : '')));
+    });
+    return out;
+  }
+
   // shared apply-plan renderer (templates + restore)
   function tagHtml(cls, sign, arr) { return (arr && arr.length) ? `<span class="tag ${cls}">${sign}${arr.length}</span>` : ''; }
   function renderApplyPlan(res, st, plan, accountId, okMsg, extras) {
@@ -745,11 +771,18 @@
     const line = (label, o) => { if (!o) return; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed)].filter(Boolean); if (bits.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' '); d.appendChild(x); } };
     line('Add-ons', r.addons); line('Plugins', r.plugins); line('Collections', r.collections);
     if (r.settings) {
-      let ch = 0; const gapDetail = [];
-      for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; (r.settings[p].wontApply || []).forEach(g => gapDetail.push(p + ': ' + g)); }
-      if (ch) {
+      let ch = 0; const gapDetail = [], skipDetail = [];
+      for (const p of Object.keys(r.settings)) {
+        ch += r.settings[p].changed.length;
+        settingsSkipLines(r.settings[p], p).forEach(s => skipDetail.push(s));
+        (r.settings[p].wontApply || []).forEach(g => gapDetail.push(p + ': ' + g));
+      }
+      if (ch || skipDetail.length || gapDetail.length) {
         const x = el('div', 'rline');
-        x.innerHTML = `<span class="rk">Settings</span><span class="tag upd">${ch} fields</span>` + (gapDetail.length ? `<span class="tag warn" title="${esc(gapDetail.join('\n'))}">${gapDetail.length} won't apply</span>` : '');
+        x.innerHTML = `<span class="rk">Settings</span>`
+          + (ch ? `<span class="tag upd">${ch} fields</span>` : '')
+          + (skipDetail.length ? `<span class="tag held" title="${esc(skipDetail.join('\n'))}">${skipDetail.length} skipped</span>` : '')
+          + (gapDetail.length ? `<span class="tag warn" title="${esc(gapDetail.join('\n'))}">${gapDetail.length} won't apply</span>` : '');
         d.appendChild(x);
       }
     }
@@ -804,7 +837,21 @@
     selectSource(id, keep);
   }
   async function selectSource(id, idx) {
-    syA = id; syI = idx; sySettingsIncludeKeys = false; // fresh source selection — keys are opt-in again
+    // The "include API keys" answer belongs to the exact source profile it was given
+    // for. This function runs again for the SAME source on every re-render — entering
+    // the Sync Desk tab, switching accounts in the dropdown, refreshing the profile
+    // chips — and it used to clear the answer unconditionally while leaving the
+    // Settings checkbox ticked, so a later Apply quietly copied everything except the
+    // keys with no prompt and no warning. Keep the answer when the source is unchanged;
+    // when it genuinely changes, clear it AND untick Settings so the choice gets made
+    // again rather than silently lost.
+    if (syKeysAnsweredFor !== id + ':' + idx) {
+      sySettingsIncludeKeys = false;
+      syKeysAnsweredFor = null;
+      const scb = $('sy-cat-settings');
+      if (scb && scb.checked) scb.checked = false;
+    }
+    syA = id; syI = idx;
     document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
     try {
@@ -826,13 +873,14 @@
   }
   function defTokens(settings) {
     const t = new Set();
-    for (const pl of Object.keys(settings)) { const feat = (settings[pl] && settings[pl].features) || {}; for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const lf of Object.keys(gv)) if (sySettingsIncludeKeys || !SECRET_LEAF.test(lf)) t.add(pl + '::' + g + '.' + lf); } }
+    for (const pl of Object.keys(settings)) { const feat = (settings[pl] && settings[pl].features) || {}; for (const g of Object.keys(feat)) { const gv = feat[g]; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const lf of Object.keys(gv)) if (leafShareable(g, lf, sySettingsIncludeKeys)) t.add(pl + '::' + g + '.' + lf); } }
     return t;
   }
-  // secret-leaf tokens available on the source for a platform — only ever surfaced when the user opts in
+  // secret-leaf tokens available on the source for a platform — only ever surfaced when the user opts in.
+  // Credentials the engine will never copy (Trakt OAuth) are excluded, so opting in can't select them.
   function secretTokens(pl) {
     const t = new Set(); if (!sySnap) return t; const feat = ((sySnap.settings[pl]) || {}).features || {};
-    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
+    for (const g of Object.keys(feat)) { const gv = feat[g]; if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (SECRET_LEAF.test(l) && leafShareable(g, l, true)) t.add(pl + '::' + g + '.' + l); }
     return t;
   }
   const syList = k => { const s = sySnap; return !s ? [] : (k === 'collections' ? (s.collections || []) : (s[k] || [])); };
@@ -850,14 +898,16 @@
   }
   function availTokens(pl) {
     const t = new Set(); const feat = ((sySnap.settings[pl]) || {}).features || {};
-    for (const g of Object.keys(feat)) { const gv = feat[g]; if (ACCOUNT_GROUP.test(g) || PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (sySettingsIncludeKeys || !SECRET_LEAF.test(l)) t.add(pl + '::' + g + '.' + l); }
+    for (const g of Object.keys(feat)) { const gv = feat[g]; if (PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (leafShareable(g, l, sySettingsIncludeKeys)) t.add(pl + '::' + g + '.' + l); }
     return t;
   }
   function schemaTabTokens(pl, tab) {
     const toks = new Set();
     (tab.groups || []).forEach(g => g.fields.forEach(f => {
-      if (!f.title || ACCOUNT_GROUP.test(f.feature) || (SECRET_LEAF.test(f.key) && !sySettingsIncludeKeys)) return;
-      toks.add(isPayload(f.feature) ? pl + '::' + f.feature : pl + '::' + f.feature + '.' + f.key);
+      if (!f.title) return;
+      if (isPayload(f.feature)) { toks.add(pl + '::' + f.feature); return; }
+      if (!leafShareable(f.feature, f.key, sySettingsIncludeKeys)) return;
+      toks.add(pl + '::' + f.feature + '.' + f.key);
     }));
     return toks;
   }
@@ -900,7 +950,11 @@
       if (other.length) tree.appendChild(groupRow('Other settings', other.length + ' more', other));
       const feat = settings[pl].features;
       Object.keys(feat).forEach(g => { if (PERSONAL_GROUP.test(g)) tree.appendChild(groupRow('Personal watch preferences', 'off by default', [pl + '::' + g])); });
-      if (Object.keys(feat).some(g => ACCOUNT_GROUP.test(g))) { const row = el('label', 'pick'); row.style.opacity = '.55'; row.appendChild(el('span', 'cb-spacer', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', 'Account-linked (Trakt)')); b.appendChild(el('div', 'ps', 'never copied')); row.appendChild(b); tree.appendChild(row); }
+      // Leaves the engine will never copy at any opt-in level — shown so the tree
+      // accounts for everything on the source, not just what's selectable.
+      const neverCopied = [];
+      Object.keys(feat).forEach(g => { const gv = feat[g]; if (gv && typeof gv === 'object') Object.keys(gv).forEach(l => { if (!leafShareable(g, l, true)) neverCopied.push(g + '.' + l); }); });
+      if (neverCopied.length) { const row = el('label', 'pick'); row.style.opacity = '.55'; row.title = neverCopied.join('\n'); row.appendChild(el('span', 'cb-spacer', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', 'Account & personal data')); b.appendChild(el('div', 'ps', neverCopied.length + ' field' + (neverCopied.length === 1 ? '' : 's') + ' — never copied')); row.appendChild(b); tree.appendChild(row); }
     });
   }
   function updateSyCounts() {
@@ -1104,11 +1158,18 @@
       const p = line('Plugins', r.plugins); if (p) rows.push(p);
       const c = line('Collections', r.collections); if (c) rows.push(c);
       if (r.settings) {
-        let ch = 0, held = 0; const gapDetail = [];
-        for (const pl of Object.keys(r.settings)) { ch += r.settings[pl].changed.length; held += r.settings[pl].skippedSecrets.length; (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g)); }
-        if (ch || held || gapDetail.length) {
+        let ch = 0; const gapDetail = [], skipDetail = [];
+        for (const pl of Object.keys(r.settings)) {
+          ch += r.settings[pl].changed.length;
+          settingsSkipLines(r.settings[pl], pl).forEach(s => skipDetail.push(s));
+          (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g));
+        }
+        if (ch || skipDetail.length || gapDetail.length) {
           const x = el('div', 'rline');
-          x.innerHTML = '<span class="rk">Settings</span>' + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '') + (held ? '<span class="tag held">' + held + ' held</span>' : '') + (gapDetail.length ? '<span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">' + gapDetail.length + ' won\'t apply</span>' : '');
+          x.innerHTML = '<span class="rk">Settings</span>'
+            + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '')
+            + (skipDetail.length ? '<span class="tag held" title="' + esc(skipDetail.join('\n')) + '">' + skipDetail.length + ' skipped</span>' : '')
+            + (gapDetail.length ? '<span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">' + gapDetail.length + ' won\'t apply</span>' : '');
           rows.push(x);
         }
       }
@@ -1249,10 +1310,13 @@
           sySettingsIncludeKeys = false;
           await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values available to copy — only non-key settings will sync.');
         }
+        // Tie the answer to this source so a re-render of the same source keeps it.
+        syKeysAnsweredFor = syA + ':' + syI;
         if (sySettingsIncludeKeys) for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.add(t));
       } else {
         for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.delete(t));
         sySettingsIncludeKeys = false;
+        syKeysAnsweredFor = null;
       }
       renderSyTree(); updateSyCounts(); scheduleLivePreview();
     });

@@ -23,9 +23,37 @@
 // key off the leaf name, not the group.
 const SECRET_LEAF = /(api_?key|client_id|token|secret|access_token|refresh|password)/i;
 
-// Whole settings groups that are account-linked / personal state. Never shared
-// regardless of leaf names (Trakt account + this profile's dismissed items).
-const ACCOUNT_GROUPS = [/^trakt_/i];
+// Leaves that name the ACCOUNT a profile is linked to, or hold that profile's
+// own personal watch state. Never shared, even with includeSecrets on.
+//
+// This replaces a previous blanket "any group whose name starts with trakt_"
+// rule. That rule did block these leaves, but it also swallowed ~14 pure
+// display preferences that carry no account identity whatsoever (day caps,
+// unaired-next-up visibility, comments on/off, more-like-this source, Simkl id
+// preference) — those could never be copied and nothing told the user why.
+// Worse, it only ever looked at TOP-LEVEL group names, so mobile's equivalent
+// personal state — dismissedNextUpKeys, which lives *inside* the
+// continue_watching_settings_payload JSON string, not in a trakt_* group —
+// sailed straight through and got copied onto every target profile. Matching on
+// the leaf name instead catches it in both places.
+//
+// Compared with underscores removed and case folded so the TV spelling
+// (dismissed_next_up_keys) and the mobile payload spelling (dismissedNextUpKeys)
+// both hit the same entry.
+const ACCOUNT_LEAF_NAMES = new Set([
+  'librarysourcemode',      // library_source_mode  / librarySourceMode
+  'watchprogresssource',    // watch_progress_source / watchProgressSource
+  'dismissednextupkeys',    // dismissed_next_up_keys / dismissedNextUpKeys
+]);
+const isAccountLeaf = (leaf) => ACCOUNT_LEAF_NAMES.has(String(leaf).replace(/_/g, '').toLowerCase());
+
+// Groups whose credentials ARE the account link. A token/secret leaf inside one
+// of these is never copyable at any opt-in level — copying a Trakt OAuth token
+// would bind the target profile to the source's Trakt account, which is exactly
+// what the old blanket trakt_* group block was really protecting against. Non-
+// credential leaves in these groups (day caps, visibility toggles) stay
+// shareable; only the credentials are pinned shut.
+const ACCOUNT_AUTH_GROUPS = [/^trakt_/i];
 
 // Groups that ARE shareable but represent personal taste (audio/subtitle
 // language prefs). Only applied when the user explicitly opts them in.
@@ -33,56 +61,30 @@ const PERSONAL_OPTIN_GROUPS = [/^track_preference$/i];
 
 const matchesAny = (name, patterns) => patterns.some((re) => re.test(name));
 
-// Fields Nuvio's own official apps do not currently apply when a synced settings
-// blob comes down to them — verified 2026-08-29 directly against NuvioMedia's
-// TV (NuvioTVSmart) and Mobile (NuvioMobile) source on GitHub, cross-referenced
-// field-by-field against nuvio-settings-schema.js. Two different reasons, kept
-// distinct in the message: "credential" fields are deliberately stripped by the
-// app before syncing (same intent as SECRET_LEAF, just app-side instead of ours);
-// the rest simply aren't wired into that platform's settings-sync code yet.
-// These are still written when the caller selects them — pulling them out would
-// throw away data that may start working once Nuvio ships support — but every
-// leaf here is reported separately so the UI never implies it took effect.
+// Fields a Nuvio app is CONFIRMED to ignore when a synced settings blob reaches
+// it. These are still written when the caller selects them — pulling them out
+// would throw away data that may start working later — but each is reported
+// separately so the UI never implies the field took effect.
+//
+// PROVENANCE RULE: only entries confirmed by direct observation on a real
+// account belong here. The previous version of this table was populated by
+// reading NuvioMedia's TV/Mobile source on GitHub and inferring which fields
+// their sync code touched. At least one of those inferences was flatly wrong —
+// mobile's MDBList key was listed as "never applies", and it demonstrably does
+// apply — which meant Numax was warning users off a field that works. A false
+// "won't apply" is worse than no warning: it tells someone not to bother with
+// something that would have worked. So every unverified entry has been removed
+// rather than left as a guess. Re-add one only after watching that specific
+// field fail to take effect on a real device, and say so in the message.
+//
+// Confirmed so far (observed 2026-08-29 on a live account):
+//   tv  mdblist_settings.mdblist_api_key — pushed successfully, TV app kept
+//       using its own key; the same push DID take effect on mobile.
 const PLATFORM_SYNC_GAPS = {
   tv: {
-    'mdblist_settings.mdblist_api_key': 'credential — Nuvio TV never applies this from a synced profile',
-    'debrid_settings.torbox_api_key': 'credential — Nuvio TV never applies this from a synced profile',
-    'debrid_settings.premiumize_api_key': 'credential — Nuvio TV never applies this from a synced profile',
-    'animeskip_settings.animeskip_client_id': 'credential — Nuvio TV never applies this from a synced profile',
-    'layout_settings.card_depth_edge_coverage': 'not wired into TV settings-sync yet',
-    'layout_settings.card_depth_edge_strength': 'not wired into TV settings-sync yet',
-    'layout_settings.card_depth_enabled': 'not wired into TV settings-sync yet',
-    'layout_settings.card_depth_sheen_strength': 'not wired into TV settings-sync yet',
-    'layout_settings.compose_highlighter_enabled': 'not wired into TV settings-sync yet',
-    'layout_settings.continue_watching_enabled': 'not wired into TV settings-sync yet',
-    'layout_settings.detail_imdb_ratings_visibility': 'not wired into TV settings-sync yet',
-    'layout_settings.follow_addons_order': 'not wired into TV settings-sync yet',
-    'layout_settings.prefer_external_meta_addon_detail': 'not wired into TV settings-sync yet',
-    'layout_settings.show_full_release_date': 'not wired into TV settings-sync yet',
-    'layout_settings.smooth_bring_into_view_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.enable_http2': 'not wired into TV settings-sync yet',
-    'player_settings.force_optical_passthrough': 'not wired into TV settings-sync yet',
-    'player_settings.loading_overlay_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.osd_clock_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.parental_guide_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.pause_overlay_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.playback_issue_reports_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.show_player_loading_status': 'not wired into TV settings-sync yet',
-    'player_settings.skip_silence': 'not wired into TV settings-sync yet',
-    'player_settings.stream_auto_play_next_episode_fallback_enabled': 'not wired into TV settings-sync yet',
-    'player_settings.subtitle_organization_mode': 'not wired into TV settings-sync yet',
-    'player_settings.subtitle_outline_width': 'not wired into TV settings-sync yet',
-    'player_settings.subtitle_strip_sdh': 'not wired into TV settings-sync yet',
+    'mdblist_settings.mdblist_api_key': 'the TV app kept its own key when this was last tested — set it in the TV app directly',
   },
-  mobile: {
-    'mdblist_settings.mdblist_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'debrid_settings.debrid_torbox_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'debrid_settings.debrid_premiumize_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'tmdb_settings.tmdb_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'player_settings.animeskip_client_id': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'player_settings.introdb_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
-    'player_settings.addon_subtitle_startup_mode': 'not wired into Mobile settings-sync yet',
-  },
+  mobile: {},
 };
 
 function platformSyncGapReason(platform, group, leaf) {
@@ -183,35 +185,70 @@ function reconcileCollections(masterArr, targetArr, mode) {
 
 // ---------- settings blob (leaf-level, secret-stripped) ----------
 
+/**
+ * Why this (group, leaf) may not be shared — null when it may.
+ * 'account'  never, at any opt-in level (account identity / personal watch state)
+ * 'secret'   credential, needs opts.includeSecrets
+ * 'personal' personal taste, needs opts.includePersonal
+ */
+function leafBlockReason(group, leaf, opts) {
+  if (isAccountLeaf(leaf)) return 'account';                                    // never
+  const isSecret = SECRET_LEAF.test(leaf);
+  if (isSecret && matchesAny(group, ACCOUNT_AUTH_GROUPS)) return 'account';     // Trakt OAuth etc: never
+  if (isSecret && !opts.includeSecrets) return 'secret';                        // opt-in only
+  if (matchesAny(group, PERSONAL_OPTIN_GROUPS) && !opts.includePersonal) return 'personal';
+  return null;
+}
+
 /** Should this (group, leaf) be shared? */
 function leafIsShareable(group, leaf, opts) {
-  if (SECRET_LEAF.test(leaf) && !opts.includeSecrets) return false;  // secrets: opt-in only
-  if (matchesAny(group, ACCOUNT_GROUPS)) return false;   // account-linked group: never
-  if (matchesAny(group, PERSONAL_OPTIN_GROUPS)) return !!opts.includePersonal; // opt-in only
-  return true;                                           // everything else: share
+  return !leafBlockReason(group, leaf, opts);
 }
 
-/** Try to parse a mobile "*_payload" JSON-string; return null if not shareable. */
-function sanitizePayloadString(group, str, opts) {
-  if (matchesAny(group, ACCOUNT_GROUPS)) return { skip: 'account-linked' };
+/**
+ * Sanitize a mobile "*_payload" JSON-string at the LEAF level.
+ *
+ * Previously this was all-or-nothing: a payload containing a single secret was
+ * dropped whole (losing every unrelated visual setting in it), and one holding
+ * personal state — continue_watching_settings_payload carries the profile's own
+ * dismissedNextUpKeys — was copied verbatim, overwriting each target's dismissed
+ * list with the source's. Now blocked leaves are removed individually and, when
+ * the target already had its own value for one, that value is put back, so a
+ * sync never rewrites someone else's personal state or credential.
+ *
+ * Returns { empty:true } (nothing set on the source), { skip:reason } (present
+ * but unreadable), or { value, stripped:[{leaf,why}] }.
+ */
+function sanitizePayloadString(group, str, opts, targetStr) {
+  if (typeof str !== 'string' || !str.trim()) return { empty: true };
   let parsed;
-  try { parsed = JSON.parse(str); } catch { return { skip: 'unparseable' }; }
-  if (!opts.includeSecrets) {
-    const secretHit = findSecretKey(parsed);
-    if (secretHit) return { skip: 'contains secret: ' + secretHit };
-  }
-  return { value: str }; // clean -> copy verbatim
+  try { parsed = JSON.parse(str); } catch { return { skip: 'unreadable on the source (not valid JSON)' }; }
+  let tgt = null;
+  if (typeof targetStr === 'string' && targetStr.trim()) { try { tgt = JSON.parse(targetStr); } catch { tgt = null; } }
+  const stripped = [];
+  const cleaned = scrubPayload(parsed, tgt, opts, group, '', stripped);
+  return { value: JSON.stringify(cleaned), stripped };
 }
 
-function findSecretKey(obj, path = '') {
-  if (obj && typeof obj === 'object') {
-    for (const k of Object.keys(obj)) {
-      if (SECRET_LEAF.test(k)) return path + k;
-      const deeper = findSecretKey(obj[k], path + k + '.');
-      if (deeper) return deeper;
+// Walk a parsed payload, dropping blocked leaves at any depth and restoring the
+// target's own value for each one it already had.
+function scrubPayload(node, tgtNode, opts, group, path, stripped) {
+  if (Array.isArray(node)) return node.map((v, i) => scrubPayload(v, null, opts, group, path + '[' + i + ']', stripped));
+  if (!node || typeof node !== 'object') return node;
+  const tgtObj = (tgtNode && typeof tgtNode === 'object' && !Array.isArray(tgtNode)) ? tgtNode : null;
+  const out = {};
+  for (const k of Object.keys(node)) {
+    const here = path ? path + '.' + k : k;
+    const why = leafBlockReason(group, k, { includeSecrets: opts.includeSecrets, includePersonal: true });
+    if (why) {
+      const keep = tgtObj ? tgtObj[k] : undefined;
+      if (keep !== undefined) out[k] = keep;   // hand the target its own value back
+      stripped.push({ leaf: group + '.' + here, why });
+      continue;
     }
+    out[k] = scrubPayload(node[k], tgtObj ? tgtObj[k] : null, opts, group, here, stripped);
   }
-  return null;
+  return out;
 }
 
 /**
@@ -219,15 +256,27 @@ function findSecretKey(obj, path = '') {
  * Target's version and every untouched leaf (incl. its secrets) are preserved.
  * `platform` ('tv'|'mobile'), when given, flags leaves against PLATFORM_SYNC_GAPS —
  * they are still written, just also listed in wontApply so the UI can say so.
- * Returns { result, report:{ changed:[...], skippedSecrets:[...], skippedPersonal:[...], wontApply:[...] } }.
+ *
+ * Every leaf that does NOT get written lands in exactly one report bucket, so a
+ * caller can always account for the difference between what the source had and
+ * what the target received — nothing is dropped without a trace:
+ *   skippedSecrets    credential, caller did not opt in
+ *   skippedAccount    account identity / personal watch state, never copied
+ *   skippedPersonal   personal-taste group, caller did not opt in
+ *   skippedUnreadable present on the source but not valid JSON (payload groups)
+ * Returns { result, report:{ changed, skippedSecrets, skippedAccount,
+ *           skippedPersonal, skippedUnreadable, wontApply } }.
  */
 function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
   const out = deepClone(targetBlob || { version: (masterBlob && masterBlob.version) || 1, features: {} });
   if (!out.features) out.features = {};
   const mFeat = (masterBlob && masterBlob.features) || {};
+  const tFeat = (targetBlob && targetBlob.features) || {};
   const changed = [];
   const skippedSecrets = [];
+  const skippedAccount = [];
   const skippedPersonal = [];
+  const skippedUnreadable = [];
   const wontApply = [];
 
   for (const group of Object.keys(mFeat)) {
@@ -235,8 +284,10 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
 
     // Mobile JSON-string payload group.
     if (typeof mGroup === 'string') {
-      const s = sanitizePayloadString(group, mGroup, opts);
-      if (s.skip) { if (/secret/.test(s.skip)) skippedSecrets.push(group + ' (' + s.skip + ')'); continue; }
+      const s = sanitizePayloadString(group, mGroup, opts, typeof tFeat[group] === 'string' ? tFeat[group] : null);
+      if (s.empty) continue;  // nothing configured on the source — nothing to carry
+      if (s.skip) { skippedUnreadable.push(group + ' — ' + s.skip); continue; }
+      (s.stripped || []).forEach((x) => (x.why === 'secret' ? skippedSecrets : skippedAccount).push(x.leaf));
       if (out.features[group] !== s.value) { out.features[group] = s.value; changed.push(group + ' (payload)'); }
       continue;
     }
@@ -244,9 +295,10 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
     if (!mGroup || typeof mGroup !== 'object') continue;
 
     for (const leaf of Object.keys(mGroup)) {
-      if (SECRET_LEAF.test(leaf) && !opts.includeSecrets) { skippedSecrets.push(group + '.' + leaf); continue; }
-      if (matchesAny(group, ACCOUNT_GROUPS)) { skippedPersonal.push(group + '.' + leaf); continue; }
-      if (matchesAny(group, PERSONAL_OPTIN_GROUPS) && !opts.includePersonal) { skippedPersonal.push(group + '.' + leaf); continue; }
+      const why = leafBlockReason(group, leaf, opts);
+      if (why === 'secret') { skippedSecrets.push(group + '.' + leaf); continue; }
+      if (why === 'account') { skippedAccount.push(group + '.' + leaf); continue; }
+      if (why === 'personal') { skippedPersonal.push(group + '.' + leaf); continue; }
 
       const mLeaf = mGroup[leaf];
       const existing = out.features[group];
@@ -262,7 +314,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
     }
   }
 
-  return { result: out, report: { changed, skippedSecrets, skippedPersonal, wontApply } };
+  return { result: out, report: { changed, skippedSecrets, skippedAccount, skippedPersonal, skippedUnreadable, wontApply } };
 }
 
 // ---------- top-level: plan one target ----------
@@ -364,7 +416,7 @@ function planAll(master, targets, baseOptions) {
 
 const __api = {
   planTarget, planAll, reconcileList, reconcileCollections, mergeSettingsBlob,
-  SECRET_LEAF, PLATFORM_SYNC_GAPS, // exported for tests
+  SECRET_LEAF, PLATFORM_SYNC_GAPS, isAccountLeaf, leafIsShareable, // exported for tests
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = __api;
 if (typeof window !== 'undefined') window.NumaxEngine = __api;
