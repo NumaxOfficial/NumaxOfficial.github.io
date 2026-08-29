@@ -61,6 +61,75 @@ const PERSONAL_OPTIN_GROUPS = [/^track_preference$/i];
 
 const matchesAny = (name, patterns) => patterns.some((re) => re.test(name));
 
+// The three platforms a profile can hold a settings blob for. 'desktop' is real:
+// Nuvio's own sync_copy_profile_setup takes a p_copy_desktop flag, and the
+// profile_settings_blobs.platform column is free text (<=80 chars, no enum), so
+// it stores whatever a client writes. There is no desktop entry in
+// nuvio-settings-schema.js, which is exactly why the copy UI is driven by the
+// blocks found in the live blob rather than by the schema — see listSettingsBlocks.
+const PLATFORMS = ['tv', 'mobile', 'desktop'];
+
+// Friendly names for the top-level feature groups a settings blob is built from.
+// These groups ARE the copy unit: a block is moved verbatim, so nothing has to be
+// mapped field-by-field and nothing can land in the wrong place. Unknown groups
+// (anything desktop-only, or added by a future Nuvio release) fall back to a
+// prettified version of their own name, so the UI never hides a block it cannot name.
+const GROUP_LABELS = {
+  theme_settings: 'Appearance & theme',
+  layout_settings: 'Layout',
+  player_settings: 'Playback',
+  debrid_settings: 'Debrid & stream selection',
+  stream_badge_settings: 'Stream badges',
+  tmdb_settings: 'TMDB',
+  mdblist_settings: 'MDBList ratings',
+  animeskip_settings: 'Anime Skip',
+  trakt_settings: 'Trakt',
+  trakt_comments_settings: 'Trakt comments',
+  notifications_settings: 'Notifications',
+  experience_settings: 'Experience mode',
+  trailer_settings: 'Trailers',
+  track_preference: 'Audio & subtitle track preferences',
+  trakt_settings_payload: 'Trakt',
+  meta_screen_settings_payload: 'Detail screen',
+  card_depth_style_settings_payload: 'Card depth style',
+  collection_mobile_settings_payload: 'Collections layout',
+  continue_watching_settings_payload: 'Continue watching',
+  poster_card_style_settings_payload: 'Poster card style',
+};
+function prettifyGroup(group) {
+  return String(group)
+    .replace(/_payload$/, '')
+    .replace(/_settings$/, '')
+    .replace(/_/g, ' ')
+    .replace(/^./, (c) => c.toUpperCase())
+    .trim() || String(group);
+}
+function groupLabel(group) { return GROUP_LABELS[group] || prettifyGroup(group); }
+
+/**
+ * The selectable blocks in one platform's blob, derived from live data rather
+ * than a schema so it works for desktop too. Blocks holding nothing copyable
+ * (a Trakt group that is only an OAuth token, say) are reported with count 0 so
+ * the UI can show them as unavailable instead of pretending they will copy.
+ */
+function listSettingsBlocks(blob, opts = {}) {
+  const feat = (blob && blob.features) || {};
+  return Object.keys(feat).map((group) => {
+    const gv = feat[group];
+    if (typeof gv === 'string') {
+      return { group, label: groupLabel(group), payload: true, total: gv.trim() ? 1 : 0, copyable: gv.trim() ? 1 : 0, secrets: 0 };
+    }
+    if (!gv || typeof gv !== 'object') return { group, label: groupLabel(group), payload: false, total: 0, copyable: 0, secrets: 0 };
+    const leaves = Object.keys(gv);
+    let copyable = 0, secrets = 0;
+    leaves.forEach((leaf) => {
+      if (SECRET_LEAF.test(leaf)) secrets++;
+      if (!leafBlockReason(group, leaf, opts)) copyable++;
+    });
+    return { group, label: groupLabel(group), payload: false, total: leaves.length, copyable, secrets };
+  }).sort((a, b) => a.label.localeCompare(b.label));
+}
+
 // Fields a Nuvio app is CONFIRMED to ignore when a synced settings blob reaches
 // it. These are still written when the caller selects them — pulling them out
 // would throw away data that may start working later — but each is reported
@@ -277,6 +346,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
   const skippedAccount = [];
   const skippedPersonal = [];
   const skippedUnreadable = [];
+  const removed = [];
   const wontApply = [];
 
   for (const group of Object.keys(mFeat)) {
@@ -293,6 +363,37 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
     }
 
     if (!mGroup || typeof mGroup !== 'object') continue;
+
+    // Overwrite mode: the block becomes exactly the source's block. Anything the
+    // target had in it that the source doesn't is dropped — a real removal, reported
+    // so the UI can demand confirmation before it runs. Blocked leaves are the one
+    // exception: the target keeps its own account identity and its own credentials,
+    // because a copy must never delete or leak those.
+    if (opts.blockMode === 'replace') {
+      const tGroup = (tFeat[group] && typeof tFeat[group] === 'object') ? tFeat[group] : {};
+      const built = {};
+      for (const leaf of Object.keys(mGroup)) {
+        const why = leafBlockReason(group, leaf, opts);
+        if (why) {
+          (why === 'secret' ? skippedSecrets : why === 'account' ? skippedAccount : skippedPersonal).push(group + '.' + leaf);
+          if (tGroup[leaf] !== undefined) built[leaf] = deepClone(tGroup[leaf]);
+          continue;
+        }
+        built[leaf] = deepClone(mGroup[leaf]);
+      }
+      for (const leaf of Object.keys(tGroup)) {
+        if (leaf in built) continue;
+        if (leafBlockReason(group, leaf, opts)) { built[leaf] = deepClone(tGroup[leaf]); continue; } // target's own, kept
+        removed.push(group + '.' + leaf);
+      }
+      if (JSON.stringify(out.features[group]) !== JSON.stringify(built)) {
+        out.features[group] = built;
+        changed.push(group + ' (block)');
+        const gapReason = platform && Object.keys(mGroup).map((l) => platformSyncGapReason(platform, group, l)).find(Boolean);
+        if (gapReason) wontApply.push(group + ' — ' + gapReason);
+      }
+      continue;
+    }
 
     for (const leaf of Object.keys(mGroup)) {
       const why = leafBlockReason(group, leaf, opts);
@@ -314,7 +415,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
     }
   }
 
-  return { result: out, report: { changed, skippedSecrets, skippedAccount, skippedPersonal, skippedUnreadable, wontApply } };
+  return { result: out, report: { changed, skippedSecrets, skippedAccount, skippedPersonal, skippedUnreadable, removed, wontApply } };
 }
 
 // ---------- top-level: plan one target ----------
@@ -330,8 +431,9 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
  *   settings: { includePersonal?: bool, includeSecrets?: bool },
  *   profileId: number, originClientId: string,
  * }
- * (settingsUpdatedAt, if passed, is accepted but unused — sync_push_profile_settings_blob
- * has no optimistic-concurrency guard; there's no server-side "_guarded" variant.)
+ * settingsUpdatedAt: { tv?, mobile?, desktop? } — the updated_at read alongside each
+ * target blob. When a platform's key is present the push uses the guarded RPC and
+ * fails with 40001 rather than clobbering a concurrent change.
  *
  * Returns { operations:[...], report:{...}, hasChanges:bool, hasRemovals:bool }.
  * Nothing is executed — the caller sends `operations` and shows `report`.
@@ -376,20 +478,32 @@ function planTarget(master, target, options) {
 
   if (cats.settings && master.settings) {
     report.settings = {};
-    for (const platform of ['tv', 'mobile']) {
+    const upd = options.settingsUpdatedAt || {};
+    for (const platform of PLATFORMS) {
       const mBlob = master.settings[platform];
       const tBlob = target.settings ? target.settings[platform] : null;
       if (!mBlob) continue;
       const { result, report: r } = mergeSettingsBlob(mBlob, tBlob, options.settings || {}, platform);
       report.settings[platform] = r;
+      if (r.removed.length) hasRemovals = true;   // overwrite mode dropped target-only settings
       if (r.changed.length) {
-        ops.push({ surface: 'settings:' + platform, rpc: 'sync_push_profile_settings_blob',
-          params: {
+        // Guarded write when we know what the target's blob looked like when we read
+        // it: sync_push_profile_settings_blob_guarded rejects with 40001 if anything
+        // saved in between, instead of silently overwriting another device's change.
+        // (This variant does exist on the live API and in the self-host migration
+        // 00000000000009_guard_profile_settings_writes, despite older notes saying otherwise.)
+        const expected = Object.prototype.hasOwnProperty.call(upd, platform) ? (upd[platform] || null) : undefined;
+        const guarded = expected !== undefined;
+        ops.push({
+          surface: 'settings:' + platform,
+          rpc: guarded ? 'sync_push_profile_settings_blob_guarded' : 'sync_push_profile_settings_blob',
+          params: Object.assign({
             p_profile_id: options.profileId,
             p_settings_json: result,
             p_platform: platform,
             p_origin_client_id: origin,
-          } });
+          }, guarded ? { p_expected_updated_at: expected } : {}),
+        });
       }
     }
   }
@@ -416,6 +530,7 @@ function planAll(master, targets, baseOptions) {
 
 const __api = {
   planTarget, planAll, reconcileList, reconcileCollections, mergeSettingsBlob,
+  listSettingsBlocks, groupLabel, PLATFORMS, GROUP_LABELS,
   SECRET_LEAF, PLATFORM_SYNC_GAPS, isAccountLeaf, leafIsShareable, // exported for tests
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = __api;

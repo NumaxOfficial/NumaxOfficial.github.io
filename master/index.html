@@ -389,6 +389,14 @@
   .pick .pb{ flex:1; min-width:0; }
   .pick .pn{ font-size:13px; }
   .pick .ps{ font-size:11px; color:var(--t45); font-family:ui-monospace,monospace; }
+  /* settings copy tree: platform header, then its blocks indented under it */
+  .pick.set-plat-head{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line-2); }
+  .pick.set-plat-head:first-child{ margin-top:0; padding-top:2px; border-top:0; }
+  .pick.set-plat-head .pn{ font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .set-plat-head-lbl{ font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--t45); font-weight:700; margin-top:16px; padding-top:10px; border-top:1px solid var(--line-2); }
+  .pick.set-block{ padding-left:22px; }
+  .pick.set-block.set-sub{ padding-left:44px; }
+  .cb-spacer{ display:inline-block; width:13px; flex:0 0 13px; }
   .chooser{ margin-top:10px; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:10px 12px; max-height:320px; overflow:auto; display:none; }
   .chooser.open{ display:block; }
   .chooser-bar{ display:flex; gap:8px; padding-bottom:6px; margin-bottom:6px; border-bottom:1px solid var(--line-2); }

@@ -138,6 +138,68 @@
       return { isSupporter: !!tier && row.status === 'active', tier, status: (row && row.status) || 'inactive' };
     }
 
+    // ---- Nuvio's own server-side settings copy ----
+    // sync_copy_profile_setup is a Postgres function on Nuvio's server; their web
+    // client passes nothing but flags, so all the field knowledge lives server-side
+    // and cannot be inspected or subdivided. Verified live: posting this exact
+    // signature unauthenticated returns 401 (signature matched, blocked at auth)
+    // while an invented name returns 404, so the function and its parameters are real.
+    // Both profiles resolve from the caller's own session, so this is SAME-ACCOUNT
+    // ONLY — cross-account copies must use the block path instead.
+    const COPY_STATUSES = ['not_selected', 'source_missing', 'invalid_source', 'copied', 'copied_partial', 'kept_existing', 'unchanged'];
+    const copyStatus = (v) => { const s = String(v || '').trim().toLowerCase(); return COPY_STATUSES.includes(s) ? s : 'unknown'; };
+    const posInt = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0; };
+    async function copyProfileSetup(opts = {}) {
+      const row = await rpc('sync_copy_profile_setup', {
+        p_source_profile_id: opts.sourceProfileId,
+        p_target_profile_id: opts.targetProfileId,
+        p_copy_tv: !!opts.copyTv,
+        p_copy_mobile: !!opts.copyMobile,
+        p_copy_desktop: !!opts.copyDesktop,
+        p_copy_provider_credentials: !!opts.copyProviderCredentials,
+        p_replace_provider_credentials: !!(opts.copyProviderCredentials && opts.replaceProviderCredentials),
+        p_origin_client_id: opts.originClientId || 'numax-web',
+      });
+      const r = Array.isArray(row) ? (row[0] || null) : row;
+      if (!r || typeof r !== 'object') throw new Error('Settings copy finished without a result.');
+      return {
+        sourceProfileId: r.source_profile_id ?? opts.sourceProfileId,
+        targetProfileId: r.target_profile_id ?? opts.targetProfileId,
+        tv: copyStatus(r.tv_status),
+        mobile: copyStatus(r.mobile_status),
+        desktop: copyStatus(r.desktop_status),
+        credentials: copyStatus(r.provider_credentials_status),
+        credentialsFound: posInt(r.provider_credentials_found),
+        credentialsWritten: posInt(r.provider_credentials_written),
+        credentialsPreserved: posInt(r.provider_credentials_preserved),
+      };
+    }
+
+    // ---- provider credentials (the OTHER home for API keys) ----
+    // Keys live here as well as inside settings_json, and Nuvio's own copy treats
+    // THIS table as "API keys and provider credentials". Allowed providers, from the
+    // self-host baseline: debrid:torbox, debrid:premiumize, debrid:realdebrid, tmdb,
+    // mdblist, introdb (field api_key) and animeskip (field client_id). Trakt and
+    // other OAuth connections live elsewhere and are deliberately not touched.
+    async function pullProviderCredentials(profileId) {
+      const rows = await rpc('sync_pull_provider_credentials', { p_profile_id: profileId });
+      return (Array.isArray(rows) ? rows : []).map((r) => ({
+        provider: String((r && r.provider) || '').trim().toLowerCase(),
+        credential_json: (r && r.credential_json && typeof r.credential_json === 'object') ? r.credential_json : {},
+      })).filter((r) => r.provider);
+    }
+    async function pushProviderCredentials(profileId, credentials, originClientId) {
+      const list = (Array.isArray(credentials) ? credentials : []).map((c) => ({
+        provider: String((c && c.provider) || '').trim().toLowerCase(),
+        credential_json: (c && c.credential_json && typeof c.credential_json === 'object') ? c.credential_json : {},
+      })).filter((c) => c.provider);
+      if (!list.length) return [];
+      await rpc('sync_push_provider_credentials', {
+        p_profile_id: profileId, p_credentials: list, p_origin_client_id: originClientId || 'numax-web',
+      });
+      return list;
+    }
+
     // slice one profile's addon/plugin/collection state out of a backup.data
     function sliceProfile(backup, profileId) {
       const pick = (arr) => (Array.isArray(arr) ? arr.filter((r) => r.profile_id === profileId) : []);
@@ -160,7 +222,11 @@
       return { profileId: plan.profileId, executed: true, report: plan.report, results };
     }
 
-    return { rpc, exportBackup, pullProfiles, pullSettings, sliceProfile, applyPlan, getMembership, get accountId() { return accountId; } };
+    return {
+      rpc, exportBackup, pullProfiles, pullSettings, sliceProfile, applyPlan, getMembership,
+      copyProfileSetup, pullProviderCredentials, pushProviderCredentials,
+      get accountId() { return accountId; },
+    };
   }
 
   // Fetch the built-in avatar catalog (avatar_id -> image URL) from Nuvio.

@@ -24,13 +24,6 @@
     const o = {}; for (const [k, v] of Object.entries(node)) { if (API_KEY_STRIP.test(k)) continue; o[k] = (v && typeof v === 'object') ? stripKeys(v) : v; } return o;
   }
   const PERSONAL_GROUP = /^track_preference$/i;
-  // Single source of truth for "may this leaf be copied?" — the engine owns the rule
-  // (account identity & Trakt credentials never; API keys on opt-in; personal taste on
-  // opt-in). The UI must ask the same question the engine will, or the tree offers
-  // fields the engine then silently drops. Falls back to a key check if engine.js is absent.
-  const leafShareable = (group, leaf, includeKeys) => (E && E.leafIsShareable)
-    ? E.leafIsShareable(group, leaf, { includeSecrets: !!includeKeys, includePersonal: true })
-    : !(SECRET_LEAF.test(leaf) && !includeKeys);
   // watched_items / watch_progress rows come straight off the SOURCE profile and carry its own
   // row id, user_id (the source ACCOUNT's auth user), and profile_id — strip that identity before
   // pushing so the insert is scoped only by the top-level p_profile_id/auth session, the same
@@ -60,8 +53,14 @@
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
-  let sySettingsIncludeKeys = false; // opt-in per source selection, set via the "include API keys" popup
+  let sySettingsIncludeKeys = false; // mirrors syCreds.copy — API keys are opt-in, as in Nuvio's dialog
   let syKeysAnsweredFor = null;      // "accountId:profileIndex" the answer above was given for (see selectSource)
+  // API keys / provider credentials, modelled on Nuvio's own copy dialog: one opt-in,
+  // plus "overwrite matching keys already in the target". Providers that exist only on
+  // the destination are always kept, which is why the default is add-but-don't-replace.
+  const syCreds = { copy: false, replace: false };
+  const PLATS = ['tv', 'mobile', 'desktop'];
+  const PLAT_LABEL = { tv: 'TV app', mobile: 'Mobile app', desktop: 'Desktop app' };
   const sySel = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
   const syTargets = new Set(); let syPlans = null;
 
@@ -813,7 +812,7 @@
   // SYNC DESK  (two-column workspace, live preview on every change,
   // watched/watchprogress as upsert-only categories, review grid + metrics)
   // ======================================================================
-  const sySnapExt = { watched: [], watchProgress: [] }; // filled per source select
+  const sySnapExt = { watched: [], watchProgress: [], credentials: [] }; // filled per source select
 
   function refreshSyncTab() {
     const list = store.list(); const sel = $('sy-account'); const prev = sel.value;
@@ -847,16 +846,21 @@
     // again rather than silently lost.
     if (syKeysAnsweredFor !== id + ':' + idx) {
       sySettingsIncludeKeys = false;
+      syCreds.copy = false; syCreds.replace = false;
       syKeysAnsweredFor = null;
-      const scb = $('sy-cat-settings');
-      if (scb && scb.checked) scb.checked = false;
     }
     syA = id; syI = idx;
     document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
     try {
       const { backup } = await loadAccount(id); const slice = sliceProfile(backup, idx); const c = A.client(store, id); const settings = {}; const keysIncluded = accountKeysIncluded(id);
-      for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); } catch (e) { logAct("Couldn't read " + pl + " settings: " + e.message, 'err'); } }
+      // Desktop is read alongside TV and mobile. A profile that has never run the
+      // desktop app simply returns nothing for it and the section is omitted.
+      for (const pl of PLATS) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); } catch (e) { logAct("Couldn't read " + pl + " settings: " + e.message, 'err'); } }
+      // The source's own API keys, from the separate credentials table Nuvio's copy uses.
+      // Only read when the account was linked with "Read API keys" on.
+      sySnapExt.credentials = [];
+      if (keysIncluded) { try { sySnapExt.credentials = await c.pullProviderCredentials(idx); } catch (e) { logAct("Couldn't read API keys: " + e.message, 'err'); } }
       sySnap = { addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings };
       sySnapExt.watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
       sySnapExt.watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
@@ -871,16 +875,25 @@
     sySel.collections = new Set((s.collections || []).map(collKey));
     sySel.settings = defTokens(s.settings || {});
   }
+  // ---- settings selection: one token per (platform, block) ----
+  // A "block" is a top-level feature group in the settings blob. Blocks are read from
+  // the LIVE blob, never from nuvio-settings-schema.js, which is what lets this cover
+  // the desktop platform at all — there is no desktop schema. Copying moves a block
+  // verbatim, so no field is ever remapped and nothing can land in the wrong place.
+  const blocksFor = (pl) => {
+    const blob = (sySnap && sySnap.settings && sySnap.settings[pl]) || null;
+    if (!blob || !E || !E.listSettingsBlocks) return [];
+    return E.listSettingsBlocks(blob, { includeSecrets: sySettingsIncludeKeys, includePersonal: true });
+  };
   function defTokens(settings) {
     const t = new Set();
-    for (const pl of Object.keys(settings)) { const feat = (settings[pl] && settings[pl].features) || {}; for (const g of Object.keys(feat)) { const gv = feat[g]; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const lf of Object.keys(gv)) if (leafShareable(g, lf, sySettingsIncludeKeys)) t.add(pl + '::' + g + '.' + lf); } }
-    return t;
-  }
-  // secret-leaf tokens available on the source for a platform — only ever surfaced when the user opts in.
-  // Credentials the engine will never copy (Trakt OAuth) are excluded, so opting in can't select them.
-  function secretTokens(pl) {
-    const t = new Set(); if (!sySnap) return t; const feat = ((sySnap.settings[pl]) || {}).features || {};
-    for (const g of Object.keys(feat)) { const gv = feat[g]; if (PERSONAL_GROUP.test(g)) continue; if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (SECRET_LEAF.test(l) && leafShareable(g, l, true)) t.add(pl + '::' + g + '.' + l); }
+    for (const pl of Object.keys(settings)) {
+      const blob = settings[pl]; if (!blob || !blob.features) continue;
+      const blocks = (E && E.listSettingsBlocks) ? E.listSettingsBlocks(blob, { includeSecrets: true, includePersonal: true }) : [];
+      // Default on, matching Nuvio's dialog (all platforms ticked) — except personal
+      // taste, which stays opt-in, and blocks with nothing copyable in them.
+      blocks.forEach(b => { if (b.copyable > 0 && !PERSONAL_GROUP.test(b.group)) t.add(pl + '::' + b.group); });
+    }
     return t;
   }
   const syList = k => { const s = sySnap; return !s ? [] : (k === 'collections' ? (s.collections || []) : (s[k] || [])); };
@@ -896,66 +909,124 @@
     bar.appendChild(all); bar.appendChild(el('span', 'sy-sep', '|')); bar.appendChild(none); box.appendChild(bar);
     list.forEach(x => { const key = syKey(kind, x); const row = el('label', 'pick'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel[kind].has(key); cb.onchange = () => { cb.checked ? sySel[kind].add(key) : sySel[kind].delete(key); updateSyCounts(); scheduleLivePreview(); }; row.appendChild(cb); const b = el('div', 'pb'); if (kind === 'collections') { b.appendChild(el('div', 'pn', collLabel(x))); } else { b.appendChild(el('div', 'pn', x.name || host(x.url))); b.appendChild(el('div', 'ps', host(x.url))); } row.appendChild(b); box.appendChild(row); });
   }
-  function availTokens(pl) {
-    const t = new Set(); const feat = ((sySnap.settings[pl]) || {}).features || {};
-    for (const g of Object.keys(feat)) { const gv = feat[g]; if (PERSONAL_GROUP.test(g)) continue; if (typeof gv === 'string') { t.add(pl + '::' + g); continue; } if (gv && typeof gv === 'object') for (const l of Object.keys(gv)) if (leafShareable(g, l, sySettingsIncludeKeys)) t.add(pl + '::' + g + '.' + l); }
-    return t;
-  }
-  function schemaTabTokens(pl, tab) {
-    const toks = new Set();
-    (tab.groups || []).forEach(g => g.fields.forEach(f => {
-      if (!f.title) return;
-      if (isPayload(f.feature)) { toks.add(pl + '::' + f.feature); return; }
-      if (!leafShareable(f.feature, f.key, sySettingsIncludeKeys)) return;
-      toks.add(pl + '::' + f.feature + '.' + f.key);
-    }));
-    return toks;
-  }
-  // Developer's choice: addons + plugins + collections, plus only the Playback settings tab
-  // (tv and mobile). Everything else — including watch progress/history and any other settings — off.
+  // Developer's choice: addons + plugins + collections, plus only the Playback block
+  // on every platform. Everything else — watch progress/history, other settings — off.
   function syDevChoice() {
     if (!sySnap) return;
     sySel.addons = new Set((sySnap.addons || []).map(a => a.url));
     sySel.plugins = new Set((sySnap.plugins || []).map(p => p.url));
     sySel.collections = new Set((sySnap.collections || []).map(collKey));
     sySel.settings = new Set();
-    for (const pl of ['tv', 'mobile']) {
-      const tab = (SCHEMA[pl] || []).find(t => t.title === 'Playback'); if (!tab) continue;
-      const avail = availTokens(pl);
-      schemaTabTokens(pl, tab).forEach(t => { if (avail.has(t)) sySel.settings.add(t); });
-    }
+    PLATS.forEach(pl => blocksFor(pl).forEach(b => { if (b.group === 'player_settings' && b.copyable > 0) sySel.settings.add(pl + '::' + b.group); }));
     $('sy-cat-addons').checked = true; $('sy-cat-plugins').checked = true; $('sy-cat-collections').checked = true;
     $('sy-cat-settings').checked = sySel.settings.size > 0;
     $('sy-cat-watchprogress').checked = false; $('sy-cat-watched').checked = false;
     renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
   }
   function renderSyTree() {
-    const tree = $('sy-settings-tree'); clr(tree); const settings = (sySnap && sySnap.settings) || {}; const plats = Object.keys(settings).filter(p => settings[p] && settings[p].features);
+    const tree = $('sy-settings-tree'); clr(tree);
+    const settings = (sySnap && sySnap.settings) || {};
+    const plats = PLATS.filter(p => settings[p] && settings[p].features && Object.keys(settings[p].features).length);
     if (!plats.length) { tree.appendChild(el('p', 'empty sm', 'No settings on source.')); return; }
-    const groupRow = (title, sub, eff, extraCls) => {
-      const row = el('label', 'pick' + (extraCls ? ' ' + extraCls : '')); const cb = el('input'); cb.type = 'checkbox';
-      const selN = eff.filter(t => sySel.settings.has(t)).length; cb.checked = eff.length > 0 && selN === eff.length; cb.indeterminate = selN > 0 && selN < eff.length;
-      cb.onchange = () => { eff.forEach(t => cb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
-      row.appendChild(cb); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', title)); if (sub) b.appendChild(el('div', 'ps', sub)); row.appendChild(b); return row;
-    };
+
     plats.forEach(pl => {
-      tree.appendChild(el('div', 'set-group-h', pl === 'tv' ? 'TV app' : 'Mobile app'));
-      const avail = availTokens(pl); const covered = new Set();
-      (SCHEMA[pl] || []).forEach(tab => {
-        const eff = [...schemaTabTokens(pl, tab)].filter(t => avail.has(t)); if (!eff.length) return;
-        eff.forEach(t => covered.add(t));
-        tree.appendChild(groupRow(tab.title, eff.length + ' setting' + (eff.length === 1 ? '' : 's'), eff));
+      const blocks = blocksFor(pl);
+      const usable = blocks.filter(b => b.copyable > 0);
+      const toks = usable.map(b => pl + '::' + b.group);
+      const selN = toks.filter(t => sySel.settings.has(t)).length;
+
+      // platform header doubles as select-all for that platform
+      const head = el('label', 'pick set-plat-head');
+      const hcb = el('input'); hcb.type = 'checkbox';
+      hcb.checked = toks.length > 0 && selN === toks.length;
+      hcb.indeterminate = selN > 0 && selN < toks.length;
+      hcb.onchange = () => { toks.forEach(t => hcb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
+      head.appendChild(hcb);
+      const hb = el('div', 'pb');
+      hb.appendChild(el('div', 'pn', PLAT_LABEL[pl] || pl));
+      hb.appendChild(el('div', 'ps', selN + ' of ' + toks.length + ' selected'));
+      head.appendChild(hb); tree.appendChild(head);
+
+      blocks.forEach(b => {
+        const tok = pl + '::' + b.group;
+        const row = el('label', 'pick set-block');
+        if (!b.copyable) {
+          row.style.opacity = '.5';
+          row.appendChild(el('span', 'cb-spacer', ''));
+          const nb = el('div', 'pb');
+          nb.appendChild(el('div', 'pn', b.label));
+          nb.appendChild(el('div', 'ps', b.total ? 'nothing copyable here' : 'not set on the source'));
+          row.appendChild(nb); tree.appendChild(row); return;
+        }
+        const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel.settings.has(tok);
+        cb.onchange = () => { cb.checked ? sySel.settings.add(tok) : sySel.settings.delete(tok); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
+        row.appendChild(cb);
+        const bb = el('div', 'pb');
+        bb.appendChild(el('div', 'pn', b.label));
+        const bits = [];
+        if (b.payload) bits.push('1 block');
+        else bits.push(b.copyable + ' setting' + (b.copyable === 1 ? '' : 's') + (b.copyable < b.total ? ' of ' + b.total : ''));
+        if (PERSONAL_GROUP.test(b.group)) bits.push('personal — off by default');
+        if (b.secrets) bits.push(b.secrets + ' key' + (b.secrets === 1 ? '' : 's'));
+        bb.appendChild(el('div', 'ps', bits.join(' · ')));
+        row.appendChild(bb); tree.appendChild(row);
       });
-      const other = [...avail].filter(t => !covered.has(t));
-      if (other.length) tree.appendChild(groupRow('Other settings', other.length + ' more', other));
-      const feat = settings[pl].features;
-      Object.keys(feat).forEach(g => { if (PERSONAL_GROUP.test(g)) tree.appendChild(groupRow('Personal watch preferences', 'off by default', [pl + '::' + g])); });
-      // Leaves the engine will never copy at any opt-in level — shown so the tree
-      // accounts for everything on the source, not just what's selectable.
-      const neverCopied = [];
-      Object.keys(feat).forEach(g => { const gv = feat[g]; if (gv && typeof gv === 'object') Object.keys(gv).forEach(l => { if (!leafShareable(g, l, true)) neverCopied.push(g + '.' + l); }); });
-      if (neverCopied.length) { const row = el('label', 'pick'); row.style.opacity = '.55'; row.title = neverCopied.join('\n'); row.appendChild(el('span', 'cb-spacer', '')); const b = el('div', 'pb'); b.appendChild(el('div', 'pn', 'Account & personal data')); b.appendChild(el('div', 'ps', neverCopied.length + ' field' + (neverCopied.length === 1 ? '' : 's') + ' — never copied')); row.appendChild(b); tree.appendChild(row); }
     });
+
+    // ---- API keys / provider credentials, as its own item (Nuvio's model) ----
+    tree.appendChild(el('div', 'set-plat-head-lbl', 'API keys'));
+    const linked = accountKeysIncluded(syA);
+    const found = (sySnapExt.credentials || []).length;
+    const crow = el('label', 'pick set-block');
+    const ccb = el('input'); ccb.type = 'checkbox'; ccb.checked = syCreds.copy && linked; ccb.disabled = !linked;
+    ccb.onchange = () => {
+      syCreds.copy = ccb.checked; if (!ccb.checked) syCreds.replace = false;
+      sySettingsIncludeKeys = ccb.checked;
+      syKeysAnsweredFor = syA + ':' + syI;   // remember this answer for this source
+      renderSyTree(); updateSyCounts(); scheduleLivePreview();
+    };
+    crow.appendChild(ccb);
+    const cb2 = el('div', 'pb');
+    cb2.appendChild(el('div', 'pn', 'API keys and provider credentials'));
+    cb2.appendChild(el('div', 'ps', !linked
+      ? 'this account wasn\'t linked with "Read API keys" on'
+      : 'Debrid, TMDB, MDBList, AnimeSkip and IntroDB keys' + (found ? ' — ' + found + ' on the source' : ' — none stored on the source') + '. Trakt and other OAuth connections are not included.'));
+    crow.appendChild(cb2); tree.appendChild(crow);
+    if (!linked) crow.style.opacity = '.5';
+
+    const rrow = el('label', 'pick set-block set-sub');
+    const rcb = el('input'); rcb.type = 'checkbox'; rcb.checked = syCreds.replace; rcb.disabled = !syCreds.copy || !linked;
+    rcb.onchange = () => { syCreds.replace = rcb.checked; scheduleLivePreview(); };
+    rrow.appendChild(rcb);
+    const rb = el('div', 'pb');
+    rb.appendChild(el('div', 'pn', 'Overwrite matching keys already in the target'));
+    rb.appendChild(el('div', 'ps', 'Keys for providers that exist only on the destination are always kept.'));
+    rrow.appendChild(rb);
+    if (!syCreds.copy || !linked) rrow.style.opacity = '.45';
+    tree.appendChild(rrow);
+  }
+
+  // Nuvio's own sync_copy_profile_setup is whole-platform and same-account only. Use it
+  // when the selection maps exactly onto what it can express — that is the "known to
+  // work" path, and the only one that reaches desktop settings and the credentials
+  // table server-side. Anything finer, or any cross-account copy, falls back to the
+  // block copy, which moves the chosen blocks verbatim.
+  function nuvioCopyEligibility(targetAccountId) {
+    if (targetAccountId !== syA) return { ok: false, why: 'different account' };
+    const settingsOn = $('sy-cat-settings') && $('sy-cat-settings').checked;
+    const flags = { copyTv: false, copyMobile: false, copyDesktop: false };
+    if (settingsOn) {
+      for (const pl of PLATS) {
+        const usable = blocksFor(pl).filter(b => b.copyable > 0);
+        if (!usable.length) continue;
+        const selN = usable.filter(b => sySel.settings.has(pl + '::' + b.group)).length;
+        if (selN === 0) continue;
+        if (selN !== usable.length) return { ok: false, why: 'only part of the ' + (PLAT_LABEL[pl] || pl) + ' settings selected' };
+        flags['copy' + pl.charAt(0).toUpperCase() + pl.slice(1)] = true;
+      }
+    }
+    if (!flags.copyTv && !flags.copyMobile && !flags.copyDesktop && !syCreds.copy) return { ok: false, why: 'nothing it can carry' };
+    return { ok: true, flags };
   }
   function updateSyCounts() {
     const s = sySnap || {};
@@ -1049,14 +1120,17 @@
         const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10);
         const c = A.client(store, aid); const { backup } = await loadAccount(aid);
         const state = sliceProfile(backup, idx); const upd = {};
-        if (cats.settings) { state.settings = {}; for (const pl of ['tv', 'mobile']) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } catch (e) { logAct('Settings read failed for ' + pl + ': ' + e.message, 'err'); } } }
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: sySettingsIncludeKeys }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
+        if (cats.settings) { state.settings = {}; for (const pl of PLATS) { try { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at || null; } } catch (e) { logAct('Settings read failed for ' + pl + ': ' + e.message, 'err'); } } }
+        // Settings honour the same Merge/Overwrite choice as everything else: merge
+        // overlays the chosen blocks, overwrite makes each chosen block match the
+        // source exactly (and reports what that drops).
+        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: sySettingsIncludeKeys, blockMode: mode === 'mirror' ? 'replace' : 'merge' }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
         if (plan.hasRemovals) rem = true;
         // watched / watchprogress: upsert-only, no removals possible
         const extras = {};
         if (cats.watchprogress && sySnapExt.watchProgress.length) extras.watchProgress = sySnapExt.watchProgress;
         if (cats.watched && sySnapExt.watched.length) extras.watched = sySnapExt.watched;
-        plans.push({ aid, tid, plan, extras });
+        plans.push({ aid, tid, plan, extras, nuvio: nuvioCopyEligibility(aid) });
       }
       syPlans = plans; renderSyReports(plans); renderSyMetrics(plans);
       if (rem) $('sy-confirm-wrap').style.display = ''; else { $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; }
@@ -1074,16 +1148,11 @@
       collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))),
       settings: {},
     };
+    // Selection is per block now: a chosen block is carried across whole and untouched,
+    // so the values that land on the target are byte-for-byte the source's own.
     for (const pl of Object.keys(s.settings || {})) {
       const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {};
-      for (const g of Object.keys(feat)) {
-        const gv = feat[g]; const gtok = pl + '::' + g;
-        if (sySel.settings.has(gtok)) { of[g] = gv; continue; }
-        if (gv && typeof gv === 'object' && typeof gv !== 'string') {
-          const pick = {}; for (const lf of Object.keys(gv)) if (sySel.settings.has(pl + '::' + g + '.' + lf)) pick[lf] = gv[lf];
-          if (Object.keys(pick).length) of[g] = pick;
-        }
-      }
+      for (const g of Object.keys(feat)) { if (sySel.settings.has(pl + '::' + g)) of[g] = feat[g]; }
       if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of };
     }
     return out;
@@ -1128,7 +1197,7 @@
   // ---- profile change cards grid ----
   function renderSyReports(plans) {
     const box = $('sy-results'); clr(box);
-    plans.forEach(({ tid, plan, extras }) => {
+    plans.forEach(({ tid, plan, extras, nuvio }) => {
       const nm = tidName(tid);
       const r = plan.report; const d = el('div', 'sy-card-report');
       const head = el('div', 'rhead');
@@ -1141,6 +1210,16 @@
       const chgBadge = el('span', 'rbadge ' + (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) ? 'chg' : 'no'));
       chgBadge.textContent = (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length)) ? 'changes' : 'no change';
       head.appendChild(chgBadge);
+      // Which copy path this target will take — Nuvio's own server-side copy, or
+      // Numax moving the chosen blocks verbatim. Cross-account always takes the latter.
+      if ($('sy-cat-settings') && $('sy-cat-settings').checked) {
+        const pathBadge = el('span', 'rbadge no');
+        pathBadge.textContent = (nuvio && nuvio.ok) ? 'Nuvio copy' : 'block copy';
+        pathBadge.title = (nuvio && nuvio.ok)
+          ? "Uses Nuvio's own sync_copy_profile_setup — whole platforms, same account."
+          : 'Numax copies the selected blocks verbatim' + (nuvio && nuvio.why ? ' (' + nuvio.why + ')' : '') + '.';
+        head.appendChild(pathBadge);
+      }
       d.appendChild(head);
 
       const line = (label, o) => {
@@ -1158,16 +1237,18 @@
       const p = line('Plugins', r.plugins); if (p) rows.push(p);
       const c = line('Collections', r.collections); if (c) rows.push(c);
       if (r.settings) {
-        let ch = 0; const gapDetail = [], skipDetail = [];
+        let ch = 0; const gapDetail = [], skipDetail = [], remDetail = [];
         for (const pl of Object.keys(r.settings)) {
           ch += r.settings[pl].changed.length;
           settingsSkipLines(r.settings[pl], pl).forEach(s => skipDetail.push(s));
+          (r.settings[pl].removed || []).forEach(g => remDetail.push(pl + ': ' + g));
           (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g));
         }
-        if (ch || skipDetail.length || gapDetail.length) {
+        if (ch || skipDetail.length || gapDetail.length || remDetail.length) {
           const x = el('div', 'rline');
           x.innerHTML = '<span class="rk">Settings</span>'
-            + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '')
+            + (ch ? '<span class="tag upd">' + ch + '</span>' : '')
+            + (remDetail.length ? '<span class="tag rem" title="' + esc(remDetail.join('\n')) + '">−' + remDetail.length + '</span>' : '')
             + (skipDetail.length ? '<span class="tag held" title="' + esc(skipDetail.join('\n')) + '">' + skipDetail.length + ' skipped</span>' : '')
             + (gapDetail.length ? '<span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">' + gapDetail.length + ' won\'t apply</span>' : '');
           rows.push(x);
@@ -1177,7 +1258,9 @@
       if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span><span class="tag add">+' + extras.watched.length + '</span>'; rows.push(x); }
       // removals line — explicit
       const remRow = el('div', 'rline');
-      const totalRem = ((r.addons && (r.addons.removed || []).length) || 0) + ((r.plugins && (r.plugins.removed || []).length) || 0) + ((r.collections && (r.collections.removed || []).length) || 0);
+      let settingsRem = 0;
+      if (r.settings) for (const pl of Object.keys(r.settings)) settingsRem += (r.settings[pl].removed || []).length;
+      const totalRem = ((r.addons && (r.addons.removed || []).length) || 0) + ((r.plugins && (r.plugins.removed || []).length) || 0) + ((r.collections && (r.collections.removed || []).length) || 0) + settingsRem;
       remRow.innerHTML = '<span class="rk">Removals</span>' + (totalRem ? '<span class="tag rem">−' + totalRem + '</span>' : '<span style="font-size:12px;color:var(--t45)">None</span>');
       if (rows.length) rows.forEach(rw => d.appendChild(rw));
       d.appendChild(remRow);
@@ -1196,14 +1279,53 @@
     foot.appendChild(note);
   }
 
+  // Copy API keys the way Nuvio's own copy does: additively by provider, with
+  // "overwrite matching keys" as an explicit opt-in. Providers that exist only on the
+  // destination are always kept, so this can never delete a key the target already had.
+  async function applyCredentials(aid, profileId) {
+    const src = sySnapExt.credentials || [];
+    if (!syCreds.copy || !src.length) return { written: 0, kept: 0 };
+    const c = A.client(store, aid);
+    let existing = [];
+    try { existing = await c.pullProviderCredentials(profileId); } catch (e) { logAct("Couldn't read target API keys: " + e.message, 'err'); }
+    const have = new Set(existing.map(x => x.provider));
+    const toWrite = src.filter(x => syCreds.replace || !have.has(x.provider));
+    const kept = src.length - toWrite.length;
+    if (toWrite.length) await c.pushProviderCredentials(profileId, toWrite, 'numax-web');
+    return { written: toWrite.length, kept };
+  }
+
   async function syncApply() {
     if (!syPlans) return; $('sy-apply').disabled = true; status($('sy-status'), 'Applying…'); let ok = 0, fail = 0;
-    for (const { aid, plan, extras } of syPlans) {
+    for (const { aid, plan, extras, nuvio } of syPlans) {
       const hasExtras = (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length);
-      if (!plan.hasChanges && !hasExtras) continue;
+      const doCreds = syCreds.copy && (sySnapExt.credentials || []).length;
+      if (!plan.hasChanges && !hasExtras && !nuvio && !doCreds) continue;
       try {
-        if (plan.hasChanges) {
-          const r = await A.client(store, aid).applyPlan(plan, { dryRun: false });
+        // Nuvio's own server-side copy, when the selection is something it can express.
+        if (nuvio && nuvio.ok) {
+          try {
+            const r = await A.client(store, aid).copyProfileSetup({
+              sourceProfileId: syI, targetProfileId: plan.profileId,
+              copyTv: nuvio.flags.copyTv, copyMobile: nuvio.flags.copyMobile, copyDesktop: nuvio.flags.copyDesktop,
+              copyProviderCredentials: syCreds.copy, replaceProviderCredentials: syCreds.replace,
+              originClientId: 'numax-web',
+            });
+            const done = PLATS.filter(p => r[p] === 'copied' || r[p] === 'copied_partial');
+            done.length ? ok += done.length : ok++;
+            logAct('Nuvio copy → profile ' + plan.profileId + ': ' + PLATS.map(p => p + '=' + r[p]).join(' ') + ', keys=' + r.credentials + ' (' + r.credentialsWritten + ' written, ' + r.credentialsPreserved + ' kept)', 'ok');
+          } catch (e) { fail++; logAct('Nuvio copy failed: ' + e.message, 'err'); }
+        } else if (doCreds) {
+          // block path: settings go through the plan, keys are pushed separately
+          try { const cr = await applyCredentials(aid, plan.profileId); if (cr.written) { ok++; logAct('Copied ' + cr.written + ' API key(s), kept ' + cr.kept, 'ok'); } }
+          catch (e) { fail++; logAct('API key copy failed: ' + e.message, 'err'); }
+        }
+        // Add-ons / plugins / collections are never part of Nuvio's copy, so the plan
+        // still runs — minus the settings pushes when the server-side copy did those.
+        const usedNuvio = !!(nuvio && nuvio.ok);
+        const ops = usedNuvio ? plan.operations.filter(o => !/^settings:/.test(o.surface)) : plan.operations;
+        if (ops.length) {
+          const r = await A.client(store, aid).applyPlan({ ...plan, operations: ops }, { dryRun: false });
           (r.results || []).forEach(x => { x.ok ? ok++ : fail++; if (!x.ok) logAct('Sync ' + x.surface + ' failed: ' + x.error, 'err'); });
         }
         if (hasExtras) {
@@ -1300,24 +1422,11 @@
     ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
       const cb = $(id); if (cb) cb.addEventListener('change', () => { updateSyCounts(); scheduleLivePreview(); });
     });
-    // settings toggle gets its own handler — turning it on asks whether to include API keys
-    $('sy-cat-settings').addEventListener('change', async () => {
-      const cb = $('sy-cat-settings');
-      if (cb.checked && sySnap) {
-        if (accountKeysIncluded(syA)) {
-          sySettingsIncludeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this sync?', { okLabel: 'Include keys' });
-        } else {
-          sySettingsIncludeKeys = false;
-          await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values available to copy — only non-key settings will sync.');
-        }
-        // Tie the answer to this source so a re-render of the same source keeps it.
-        syKeysAnsweredFor = syA + ':' + syI;
-        if (sySettingsIncludeKeys) for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.add(t));
-      } else {
-        for (const pl of ['tv', 'mobile']) secretTokens(pl).forEach(t => sySel.settings.delete(t));
-        sySettingsIncludeKeys = false;
-        syKeysAnsweredFor = null;
-      }
+    // API keys are no longer a modal prompt — they are the "API keys and provider
+    // credentials" row in the settings tree, matching Nuvio's own dialog. Turning
+    // Settings off clears that opt-in too, so keys can never ride along unnoticed.
+    $('sy-cat-settings').addEventListener('change', () => {
+      if (!$('sy-cat-settings').checked) { syCreds.copy = false; syCreds.replace = false; sySettingsIncludeKeys = false; }
       renderSyTree(); updateSyCounts(); scheduleLivePreview();
     });
     // live preview on mode change
