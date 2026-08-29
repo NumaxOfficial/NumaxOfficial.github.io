@@ -744,7 +744,15 @@
     clr(res); const r = plan.report; const d = el('div', 'report');
     const line = (label, o) => { if (!o) return; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed)].filter(Boolean); if (bits.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' '); d.appendChild(x); } };
     line('Add-ons', r.addons); line('Plugins', r.plugins); line('Collections', r.collections);
-    if (r.settings) { let ch = 0; for (const p of Object.keys(r.settings)) ch += r.settings[p].changed.length; if (ch) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Settings</span><span class="tag upd">${ch} fields</span>`; d.appendChild(x); } }
+    if (r.settings) {
+      let ch = 0; const gapDetail = [];
+      for (const p of Object.keys(r.settings)) { ch += r.settings[p].changed.length; (r.settings[p].wontApply || []).forEach(g => gapDetail.push(p + ': ' + g)); }
+      if (ch) {
+        const x = el('div', 'rline');
+        x.innerHTML = `<span class="rk">Settings</span><span class="tag upd">${ch} fields</span>` + (gapDetail.length ? `<span class="tag warn" title="${esc(gapDetail.join('\n'))}">${gapDetail.length} won't apply</span>` : '');
+        d.appendChild(x);
+      }
+    }
     if (extras && Array.isArray(extras.watched) && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Watched</span><span class="tag add">+${extras.watched.length}</span>`; d.appendChild(x); }
     if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Progress</span><span class="tag add">+${extras.watchProgress.length}</span>`; d.appendChild(x); }
     const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length));
@@ -1095,7 +1103,15 @@
       const a = line('Add-ons', r.addons); if (a) rows.push(a);
       const p = line('Plugins', r.plugins); if (p) rows.push(p);
       const c = line('Collections', r.collections); if (c) rows.push(c);
-      if (r.settings) { let ch = 0, held = 0; for (const pl of Object.keys(r.settings)) { ch += r.settings[pl].changed.length; held += r.settings[pl].skippedSecrets.length; } if (ch || held) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Settings</span>' + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '') + (held ? '<span class="tag held">' + held + ' held</span>' : ''); rows.push(x); } }
+      if (r.settings) {
+        let ch = 0, held = 0; const gapDetail = [];
+        for (const pl of Object.keys(r.settings)) { ch += r.settings[pl].changed.length; held += r.settings[pl].skippedSecrets.length; (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g)); }
+        if (ch || held || gapDetail.length) {
+          const x = el('div', 'rline');
+          x.innerHTML = '<span class="rk">Settings</span>' + (ch ? '<span class="tag upd">' + ch + ' fields</span>' : '') + (held ? '<span class="tag held">' + held + ' held</span>' : '') + (gapDetail.length ? '<span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">' + gapDetail.length + ' won\'t apply</span>' : '');
+          rows.push(x);
+        }
+      }
       if (extras.watchProgress && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Progress</span><span class="tag add">+' + extras.watchProgress.length + '</span>'; rows.push(x); }
       if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span><span class="tag add">+' + extras.watched.length + '</span>'; rows.push(x); }
       // removals line — explicit

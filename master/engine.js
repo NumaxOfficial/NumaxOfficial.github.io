@@ -33,6 +33,63 @@ const PERSONAL_OPTIN_GROUPS = [/^track_preference$/i];
 
 const matchesAny = (name, patterns) => patterns.some((re) => re.test(name));
 
+// Fields Nuvio's own official apps do not currently apply when a synced settings
+// blob comes down to them — verified 2026-08-29 directly against NuvioMedia's
+// TV (NuvioTVSmart) and Mobile (NuvioMobile) source on GitHub, cross-referenced
+// field-by-field against nuvio-settings-schema.js. Two different reasons, kept
+// distinct in the message: "credential" fields are deliberately stripped by the
+// app before syncing (same intent as SECRET_LEAF, just app-side instead of ours);
+// the rest simply aren't wired into that platform's settings-sync code yet.
+// These are still written when the caller selects them — pulling them out would
+// throw away data that may start working once Nuvio ships support — but every
+// leaf here is reported separately so the UI never implies it took effect.
+const PLATFORM_SYNC_GAPS = {
+  tv: {
+    'mdblist_settings.mdblist_api_key': 'credential — Nuvio TV never applies this from a synced profile',
+    'debrid_settings.torbox_api_key': 'credential — Nuvio TV never applies this from a synced profile',
+    'debrid_settings.premiumize_api_key': 'credential — Nuvio TV never applies this from a synced profile',
+    'animeskip_settings.animeskip_client_id': 'credential — Nuvio TV never applies this from a synced profile',
+    'layout_settings.card_depth_edge_coverage': 'not wired into TV settings-sync yet',
+    'layout_settings.card_depth_edge_strength': 'not wired into TV settings-sync yet',
+    'layout_settings.card_depth_enabled': 'not wired into TV settings-sync yet',
+    'layout_settings.card_depth_sheen_strength': 'not wired into TV settings-sync yet',
+    'layout_settings.compose_highlighter_enabled': 'not wired into TV settings-sync yet',
+    'layout_settings.continue_watching_enabled': 'not wired into TV settings-sync yet',
+    'layout_settings.detail_imdb_ratings_visibility': 'not wired into TV settings-sync yet',
+    'layout_settings.follow_addons_order': 'not wired into TV settings-sync yet',
+    'layout_settings.prefer_external_meta_addon_detail': 'not wired into TV settings-sync yet',
+    'layout_settings.show_full_release_date': 'not wired into TV settings-sync yet',
+    'layout_settings.smooth_bring_into_view_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.enable_http2': 'not wired into TV settings-sync yet',
+    'player_settings.force_optical_passthrough': 'not wired into TV settings-sync yet',
+    'player_settings.loading_overlay_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.osd_clock_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.parental_guide_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.pause_overlay_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.playback_issue_reports_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.show_player_loading_status': 'not wired into TV settings-sync yet',
+    'player_settings.skip_silence': 'not wired into TV settings-sync yet',
+    'player_settings.stream_auto_play_next_episode_fallback_enabled': 'not wired into TV settings-sync yet',
+    'player_settings.subtitle_organization_mode': 'not wired into TV settings-sync yet',
+    'player_settings.subtitle_outline_width': 'not wired into TV settings-sync yet',
+    'player_settings.subtitle_strip_sdh': 'not wired into TV settings-sync yet',
+  },
+  mobile: {
+    'mdblist_settings.mdblist_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'debrid_settings.debrid_torbox_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'debrid_settings.debrid_premiumize_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'tmdb_settings.tmdb_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'player_settings.animeskip_client_id': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'player_settings.introdb_api_key': 'credential — Nuvio Mobile never applies this from a synced profile',
+    'player_settings.addon_subtitle_startup_mode': 'not wired into Mobile settings-sync yet',
+  },
+};
+
+function platformSyncGapReason(platform, group, leaf) {
+  const table = PLATFORM_SYNC_GAPS[platform];
+  return table ? table[group + '.' + leaf] : undefined;
+}
+
 // ---------- list surfaces (addons / plugins), identity by url ----------
 
 /**
@@ -160,15 +217,18 @@ function findSecretKey(obj, path = '') {
 /**
  * Overlay shareable leaves from master's blob onto a copy of target's blob.
  * Target's version and every untouched leaf (incl. its secrets) are preserved.
- * Returns { result, report:{ changed:[...], skippedSecrets:[...], skippedPersonal:[...] } }.
+ * `platform` ('tv'|'mobile'), when given, flags leaves against PLATFORM_SYNC_GAPS —
+ * they are still written, just also listed in wontApply so the UI can say so.
+ * Returns { result, report:{ changed:[...], skippedSecrets:[...], skippedPersonal:[...], wontApply:[...] } }.
  */
-function mergeSettingsBlob(masterBlob, targetBlob, opts = {}) {
+function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
   const out = deepClone(targetBlob || { version: (masterBlob && masterBlob.version) || 1, features: {} });
   if (!out.features) out.features = {};
   const mFeat = (masterBlob && masterBlob.features) || {};
   const changed = [];
   const skippedSecrets = [];
   const skippedPersonal = [];
+  const wontApply = [];
 
   for (const group of Object.keys(mFeat)) {
     const mGroup = mFeat[group];
@@ -195,12 +255,14 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}) {
         // Lazy-create the group only when we actually have a leaf to write.
         if (!out.features[group] || typeof out.features[group] !== 'object') out.features[group] = {};
         out.features[group][leaf] = deepClone(mLeaf);
+        const gapReason = platform && platformSyncGapReason(platform, group, leaf);
+        if (gapReason) wontApply.push(group + '.' + leaf + ' — ' + gapReason);
         changed.push(group + '.' + leaf);
       }
     }
   }
 
-  return { result: out, report: { changed, skippedSecrets, skippedPersonal } };
+  return { result: out, report: { changed, skippedSecrets, skippedPersonal, wontApply } };
 }
 
 // ---------- top-level: plan one target ----------
@@ -266,7 +328,7 @@ function planTarget(master, target, options) {
       const mBlob = master.settings[platform];
       const tBlob = target.settings ? target.settings[platform] : null;
       if (!mBlob) continue;
-      const { result, report: r } = mergeSettingsBlob(mBlob, tBlob, options.settings || {});
+      const { result, report: r } = mergeSettingsBlob(mBlob, tBlob, options.settings || {}, platform);
       report.settings[platform] = r;
       if (r.changed.length) {
         ops.push({ surface: 'settings:' + platform, rpc: 'sync_push_profile_settings_blob',
@@ -302,7 +364,7 @@ function planAll(master, targets, baseOptions) {
 
 const __api = {
   planTarget, planAll, reconcileList, reconcileCollections, mergeSettingsBlob,
-  SECRET_LEAF, // exported for tests
+  SECRET_LEAF, PLATFORM_SYNC_GAPS, // exported for tests
 };
 if (typeof module !== 'undefined' && module.exports) module.exports = __api;
 if (typeof window !== 'undefined') window.NumaxEngine = __api;
