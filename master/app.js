@@ -61,6 +61,7 @@
   const syCreds = { copy: false, replace: false };
   const PLATS = ['tv', 'mobile', 'desktop'];
   const PLAT_LABEL = { tv: 'TV app', mobile: 'Mobile app', desktop: 'Desktop app' };
+  const PLAT_SHORT = { tv: 'TV', mobile: 'mobile', desktop: 'desktop' };
   const sySel = { addons: new Set(), plugins: new Set(), collections: new Set(), settings: new Set() };
   const syTargets = new Set(); let syPlans = null;
 
@@ -388,12 +389,12 @@
     const slice = sliceProfile(backup, idx);
     const live = { tv: null, mobile: null }, upd = { tv: null, mobile: null };
     const keysIncluded = accountKeysIncluded(id);
-    try { const c = A.client(store, id); for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
+    try { const c = A.client(store, id); for (const pl of PLATS) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
     const watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
     const watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
     pfMembership = await getMembership(id);
     pfEdit = { meta: { ...meta }, addons: JSON.parse(JSON.stringify(slice.addons)), plugins: JSON.parse(JSON.stringify(slice.plugins)), collections: JSON.parse(JSON.stringify(slice.collections)), settings: JSON.parse(JSON.stringify(live)), upd, watched, watchProgress };
-    pfPlat = live.tv ? 'tv' : (live.mobile ? 'mobile' : 'tv');
+    pfPlat = PLATS.find(p => live[p]) || 'tv';
     renderPfEditor(); if (!silent) logAct('Opened ' + meta.name, 'info');
   }
   const dirty = k => { pfDirty[k] = true; };
@@ -527,12 +528,15 @@
   // ---- settings editor (schema-driven) ----
   function renderSettingsEditor() {
     const wrap = $('pf-settings'); clr(wrap);
-    const plats = ['tv', 'mobile'].filter(p => pfEdit.settings[p] && pfEdit.settings[p].features);
+    // TV / Mobile / Desktop, each rendered from that platform's own tab set. Desktop
+    // shares the mobile definitions because NuvioDesktop writes the same feature groups
+    // and only swaps the platform string (see nuvio-settings-schema.js header).
+    const plats = PLATS.filter(p => pfEdit.settings[p] && pfEdit.settings[p].features);
     if (!plats.length) { wrap.appendChild(el('p', 'empty sm', 'No settings found for this profile.')); return; }
     if (!plats.includes(pfPlat)) pfPlat = plats[0];
     const bar = el('div', 'set-platbar');
-    plats.forEach(p => { const b = el('button', p === pfPlat ? 'on' : '', p === 'tv' ? 'TV app' : 'Mobile app'); b.onclick = () => { pfPlat = p; pfTab = 0; renderSettingsEditor(); }; bar.appendChild(b); });
-    const save = el('button', 'btn btn-solid btn-xs', 'Save ' + (pfPlat === 'tv' ? 'TV' : 'mobile') + ' settings'); save.style.marginLeft = 'auto'; save.onclick = () => savePfSettings(pfPlat); bar.appendChild(save);
+    plats.forEach(p => { const b = el('button', p === pfPlat ? 'on' : '', PLAT_LABEL[p] || p); b.onclick = () => { pfPlat = p; pfTab = 0; renderSettingsEditor(); }; bar.appendChild(b); });
+    const save = el('button', 'btn btn-solid btn-xs', 'Save ' + PLAT_SHORT[pfPlat] + ' settings'); save.style.marginLeft = 'auto'; save.onclick = () => savePfSettings(pfPlat); bar.appendChild(save);
     wrap.appendChild(bar);
 
     const tabs = SCHEMA[pfPlat] || [];
@@ -540,7 +544,7 @@
     tabs.forEach((t, i) => { const b = el('button', 'set-tab' + (i === pfTab ? ' on' : ''), t.title); b.onclick = () => { pfTab = i; renderSettingsEditor(); }; tabBar.appendChild(b); });
     wrap.appendChild(tabBar);
 
-    const search = el('input'); search.type = 'search'; search.placeholder = 'Search ' + (pfPlat === 'tv' ? 'TV' : 'mobile') + ' settings'; search.className = 'set-search';
+    const search = el('input'); search.type = 'search'; search.placeholder = 'Search ' + PLAT_SHORT[pfPlat] + ' settings'; search.className = 'set-search';
     search.oninput = () => filterSettings(search.value.trim().toLowerCase()); wrap.appendChild(search);
 
     const body = el('div'); body.id = 'set-body'; wrap.appendChild(body);
@@ -875,24 +879,55 @@
     sySel.collections = new Set((s.collections || []).map(collKey));
     sySel.settings = defTokens(s.settings || {});
   }
-  // ---- settings selection: one token per (platform, block) ----
-  // A "block" is a top-level feature group in the settings blob. Blocks are read from
-  // the LIVE blob, never from nuvio-settings-schema.js, which is what lets this cover
-  // the desktop platform at all — there is no desktop schema. Copying moves a block
-  // verbatim, so no field is ever remapped and nothing can land in the wrong place.
-  const blocksFor = (pl) => {
+  // ---- settings selection: one token per (platform, settings tab) ----
+  // The tabs are exactly the ones on Nuvio's own settings pages — Appearance,
+  // Experience, Layout, Playback, Integrations, Advanced for TV; Layout, Playback,
+  // Streams, Content & Discovery, Integrations, Trakt, Notifications for mobile and
+  // desktop — because nuvio-settings-schema.js is extracted from their account bundle.
+  // Selecting a tab copies exactly the fields that tab shows, nothing else. The same
+  // schema drives the profile editor, so both surfaces work off one definition.
+  const tabsFor = (pl) => (SCHEMA && SCHEMA[pl]) || [];
+  // The (feature,key) pairs a tab owns, limited to what the source blob actually holds.
+  function tabFields(pl, tab) {
     const blob = (sySnap && sySnap.settings && sySnap.settings[pl]) || null;
-    if (!blob || !E || !E.listSettingsBlocks) return [];
-    return E.listSettingsBlocks(blob, { includeSecrets: sySettingsIncludeKeys, includePersonal: true });
-  };
+    const feat = (blob && blob.features) || {};
+    const out = [];
+    (tab.groups || []).forEach(g => (g.fields || []).forEach(f => {
+      const gv = feat[f.feature];
+      if (gv === undefined) return;
+      if (isPayload(f.feature)) {
+        if (typeof gv !== 'string' || !gv.trim()) return;
+        let o = {}; try { o = JSON.parse(gv); } catch { return; }
+        if (!(f.key in o)) return;
+      } else if (!gv || typeof gv !== 'object' || !(f.key in gv)) return;
+      out.push(f);
+    }));
+    return out;
+  }
+  // A tab is offered when the source has at least one of its fields and at least one of
+  // those is copyable under the current opt-ins.
+  function tabStat(pl, tab) {
+    const fields = tabFields(pl, tab);
+    let copyable = 0, secrets = 0;
+    fields.forEach(f => {
+      if (SECRET_LEAF.test(f.key)) secrets++;
+      const blocked = E && E.leafIsShareable
+        ? !E.leafIsShareable(f.feature, f.key, { includeSecrets: sySettingsIncludeKeys, includePersonal: true })
+        : (SECRET_LEAF.test(f.key) && !sySettingsIncludeKeys);
+      if (!blocked) copyable++;
+    });
+    return { total: fields.length, copyable, secrets };
+  }
   function defTokens(settings) {
     const t = new Set();
-    for (const pl of Object.keys(settings)) {
-      const blob = settings[pl]; if (!blob || !blob.features) continue;
-      const blocks = (E && E.listSettingsBlocks) ? E.listSettingsBlocks(blob, { includeSecrets: true, includePersonal: true }) : [];
-      // Default on, matching Nuvio's dialog (all platforms ticked) — except personal
-      // taste, which stays opt-in, and blocks with nothing copyable in them.
-      blocks.forEach(b => { if (b.copyable > 0 && !PERSONAL_GROUP.test(b.group)) t.add(pl + '::' + b.group); });
+    for (const pl of PLATS) {
+      if (!settings[pl] || !settings[pl].features) continue;
+      tabsFor(pl).forEach(tab => {
+        const fields = (tab.groups || []).flatMap(g => g.fields || []);
+        const feat = settings[pl].features;
+        const present = fields.some(f => feat[f.feature] !== undefined);
+        if (present) t.add(pl + '::' + tab.key);   // all tabs on by default, like Nuvio's dialog
+      });
     }
     return t;
   }
@@ -917,25 +952,48 @@
     sySel.plugins = new Set((sySnap.plugins || []).map(p => p.url));
     sySel.collections = new Set((sySnap.collections || []).map(collKey));
     sySel.settings = new Set();
-    PLATS.forEach(pl => blocksFor(pl).forEach(b => { if (b.group === 'player_settings' && b.copyable > 0) sySel.settings.add(pl + '::' + b.group); }));
+    PLATS.forEach(pl => tabsFor(pl).forEach(tab => { if (tab.key === 'playback' && tabStat(pl, tab).copyable > 0) sySel.settings.add(pl + '::' + tab.key); }));
     $('sy-cat-addons').checked = true; $('sy-cat-plugins').checked = true; $('sy-cat-collections').checked = true;
     $('sy-cat-settings').checked = sySel.settings.size > 0;
     $('sy-cat-watchprogress').checked = false; $('sy-cat-watched').checked = false;
     renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
   }
+
+  // Sync Desk settings are split into TV / Mobile / Desktop / API keys sections so the
+  // list stays short — pick a section, then tick the tabs inside it.
+  let sySetSection = null;
   function renderSyTree() {
     const tree = $('sy-settings-tree'); clr(tree);
     const settings = (sySnap && sySnap.settings) || {};
     const plats = PLATS.filter(p => settings[p] && settings[p].features && Object.keys(settings[p].features).length);
-    if (!plats.length) { tree.appendChild(el('p', 'empty sm', 'No settings on source.')); return; }
+    const sections = plats.concat(['keys']);
+    if (!plats.length && !sySnapExt.credentials.length) { tree.appendChild(el('p', 'empty sm', 'No settings on source.')); return; }
+    if (!sections.includes(sySetSection)) sySetSection = sections[0];
 
-    plats.forEach(pl => {
-      const blocks = blocksFor(pl);
-      const usable = blocks.filter(b => b.copyable > 0);
-      const toks = usable.map(b => pl + '::' + b.group);
+    // section bar
+    const bar = el('div', 'sy-set-sections');
+    sections.forEach(sec => {
+      const isKeys = sec === 'keys';
+      const b = el('button', 'sy-set-sec' + (sec === sySetSection ? ' on' : ''));
+      b.type = 'button';
+      b.appendChild(el('span', '', isKeys ? 'API keys' : (PLAT_LABEL[sec] || sec)));
+      if (!isKeys) {
+        const tabs = tabsFor(sec).filter(t => tabStat(sec, t).total > 0);
+        const n = tabs.filter(t => sySel.settings.has(sec + '::' + t.key)).length;
+        const c = el('span', 'sy-set-sec-n', n + '/' + tabs.length); b.appendChild(c);
+      } else if (syCreds.copy) b.appendChild(el('span', 'sy-set-sec-n', 'on'));
+      b.onclick = () => { sySetSection = sec; renderSyTree(); };
+      bar.appendChild(b);
+    });
+    tree.appendChild(bar);
+
+    if (sySetSection !== 'keys') {
+      const pl = sySetSection;
+      const tabs = tabsFor(pl).map(t => ({ tab: t, stat: tabStat(pl, t) })).filter(x => x.stat.total > 0);
+      if (!tabs.length) { tree.appendChild(el('p', 'empty sm', 'Nothing synced for this app on the source profile.')); return; }
+      const toks = tabs.filter(x => x.stat.copyable > 0).map(x => pl + '::' + x.tab.key);
       const selN = toks.filter(t => sySel.settings.has(t)).length;
 
-      // platform header doubles as select-all for that platform
       const head = el('label', 'pick set-plat-head');
       const hcb = el('input'); hcb.type = 'checkbox';
       hcb.checked = toks.length > 0 && selN === toks.length;
@@ -943,38 +1001,35 @@
       hcb.onchange = () => { toks.forEach(t => hcb.checked ? sySel.settings.add(t) : sySel.settings.delete(t)); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
       head.appendChild(hcb);
       const hb = el('div', 'pb');
-      hb.appendChild(el('div', 'pn', PLAT_LABEL[pl] || pl));
-      hb.appendChild(el('div', 'ps', selN + ' of ' + toks.length + ' selected'));
+      hb.appendChild(el('div', 'pn', 'All ' + (PLAT_LABEL[pl] || pl) + ' settings'));
+      hb.appendChild(el('div', 'ps', selN + ' of ' + toks.length + ' tab' + (toks.length === 1 ? '' : 's') + ' selected'));
       head.appendChild(hb); tree.appendChild(head);
 
-      blocks.forEach(b => {
-        const tok = pl + '::' + b.group;
+      tabs.forEach(({ tab, stat }) => {
+        const tok = pl + '::' + tab.key;
         const row = el('label', 'pick set-block');
-        if (!b.copyable) {
+        if (!stat.copyable) {
           row.style.opacity = '.5';
           row.appendChild(el('span', 'cb-spacer', ''));
           const nb = el('div', 'pb');
-          nb.appendChild(el('div', 'pn', b.label));
-          nb.appendChild(el('div', 'ps', b.total ? 'nothing copyable here' : 'not set on the source'));
+          nb.appendChild(el('div', 'pn', tab.title));
+          nb.appendChild(el('div', 'ps', 'only API keys here — use the API keys section'));
           row.appendChild(nb); tree.appendChild(row); return;
         }
         const cb = el('input'); cb.type = 'checkbox'; cb.checked = sySel.settings.has(tok);
         cb.onchange = () => { cb.checked ? sySel.settings.add(tok) : sySel.settings.delete(tok); renderSyTree(); updateSyCounts(); scheduleLivePreview(); };
         row.appendChild(cb);
         const bb = el('div', 'pb');
-        bb.appendChild(el('div', 'pn', b.label));
-        const bits = [];
-        if (b.payload) bits.push('1 block');
-        else bits.push(b.copyable + ' setting' + (b.copyable === 1 ? '' : 's') + (b.copyable < b.total ? ' of ' + b.total : ''));
-        if (PERSONAL_GROUP.test(b.group)) bits.push('personal — off by default');
-        if (b.secrets) bits.push(b.secrets + ' key' + (b.secrets === 1 ? '' : 's'));
+        bb.appendChild(el('div', 'pn', tab.title));
+        const bits = [stat.copyable + ' setting' + (stat.copyable === 1 ? '' : 's') + (stat.copyable < stat.total ? ' of ' + stat.total : '')];
+        if (tab.subtitle) bits.push(tab.subtitle);
         bb.appendChild(el('div', 'ps', bits.join(' · ')));
         row.appendChild(bb); tree.appendChild(row);
       });
-    });
+      return;
+    }
 
-    // ---- API keys / provider credentials, as its own item (Nuvio's model) ----
-    tree.appendChild(el('div', 'set-plat-head-lbl', 'API keys'));
+    // ---- API keys / provider credentials, as its own section (Nuvio's model) ----
     const linked = accountKeysIncluded(syA);
     const found = (sySnapExt.credentials || []).length;
     const crow = el('label', 'pick set-block');
@@ -1017,9 +1072,9 @@
     const flags = { copyTv: false, copyMobile: false, copyDesktop: false };
     if (settingsOn) {
       for (const pl of PLATS) {
-        const usable = blocksFor(pl).filter(b => b.copyable > 0);
+        const usable = tabsFor(pl).filter(t => tabStat(pl, t).copyable > 0);
         if (!usable.length) continue;
-        const selN = usable.filter(b => sySel.settings.has(pl + '::' + b.group)).length;
+        const selN = usable.filter(t => sySel.settings.has(pl + '::' + t.key)).length;
         if (selN === 0) continue;
         if (selN !== usable.length) return { ok: false, why: 'only part of the ' + (PLAT_LABEL[pl] || pl) + ' settings selected' };
         flags['copy' + pl.charAt(0).toUpperCase() + pl.slice(1)] = true;
@@ -1148,11 +1203,29 @@
       collections: (s.collections || []).filter(c => sySel.collections.has(collKey(c))),
       settings: {},
     };
-    // Selection is per block now: a chosen block is carried across whole and untouched,
-    // so the values that land on the target are byte-for-byte the source's own.
-    for (const pl of Object.keys(s.settings || {})) {
-      const blob = s.settings[pl]; const feat = (blob && blob.features) || {}; const of = {};
-      for (const g of Object.keys(feat)) { if (sySel.settings.has(pl + '::' + g)) of[g] = feat[g]; }
+    // Selection is per settings tab. The master carries exactly the fields those tabs
+    // show, copied straight out of the source blob — including fields that live inside
+    // a mobile/desktop *_payload JSON string, which are rebuilt into a payload holding
+    // only the selected keys (the engine then overlays those onto the target's payload).
+    for (const pl of PLATS) {
+      const blob = s.settings && s.settings[pl]; const feat = (blob && blob.features) || {};
+      if (!blob) continue;
+      const of = {}; const payloads = {};
+      tabsFor(pl).forEach(tab => {
+        if (!sySel.settings.has(pl + '::' + tab.key)) return;
+        tabFields(pl, tab).forEach(f => {
+          const gv = feat[f.feature];
+          if (isPayload(f.feature)) {
+            let o = {}; try { o = JSON.parse(gv); } catch { return; }
+            if (!(f.key in o)) return;
+            (payloads[f.feature] = payloads[f.feature] || {})[f.key] = o[f.key];
+          } else {
+            if (!gv || typeof gv !== 'object' || !(f.key in gv)) return;
+            (of[f.feature] = of[f.feature] || {})[f.key] = gv[f.key];
+          }
+        });
+      });
+      Object.keys(payloads).forEach(g => { of[g] = JSON.stringify(payloads[g]); });
       if (Object.keys(of).length) out.settings[pl] = { version: blob.version, features: of };
     }
     return out;

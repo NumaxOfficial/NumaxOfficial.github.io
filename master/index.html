@@ -389,6 +389,13 @@
   .pick .pb{ flex:1; min-width:0; }
   .pick .pn{ font-size:13px; }
   .pick .ps{ font-size:11px; color:var(--t45); font-family:ui-monospace,monospace; }
+  /* sync desk settings sections: TV / Mobile / Desktop / API keys */
+  .sy-set-sections{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px; }
+  .sy-set-sec{ display:inline-flex; align-items:center; gap:6px; padding:5px 11px; border-radius:999px;
+    border:1px solid var(--line); background:var(--surface); color:var(--t45); font-size:12px; font-weight:600; cursor:pointer; }
+  .sy-set-sec:hover{ color:var(--t); }
+  .sy-set-sec.on{ background:var(--surface-2); border-color:var(--t45); color:var(--t); }
+  .sy-set-sec-n{ font-family:ui-monospace,monospace; font-size:10px; opacity:.7; }
   /* settings copy tree: platform header, then its blocks indented under it */
   .pick.set-plat-head{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line-2); }
   .pick.set-plat-head:first-child{ margin-top:0; padding-top:2px; border-top:0; }

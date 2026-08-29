@@ -40,9 +40,15 @@ const SECRET_LEAF = /(api_?key|client_id|token|secret|access_token|refresh|passw
 // Compared with underscores removed and case folded so the TV spelling
 // (dismissed_next_up_keys) and the mobile payload spelling (dismissedNextUpKeys)
 // both hit the same entry.
+//
+// This list is now exactly Nuvio's own. Their account bundle carries a per-platform
+// map of fields it deliberately leaves out (tp for TV, tN for mobile); the only
+// watch-related entries in either are dismissed_next_up_keys / dismissedNextUpKeys.
+// library_source_mode and watch_progress_source appear in NEITHER, and are ordinary
+// settings on their Integrations > Trakt panel ("Library Source", "Watch Progress",
+// whose value can be Nuvio Sync). They were wrongly blocked here as account identity,
+// which is precisely why choosing Nuvio Sync never copied to another profile.
 const ACCOUNT_LEAF_NAMES = new Set([
-  'librarysourcemode',      // library_source_mode  / librarySourceMode
-  'watchprogresssource',    // watch_progress_source / watchProgressSource
   'dismissednextupkeys',    // dismissed_next_up_keys / dismissedNextUpKeys
 ]);
 const isAccountLeaf = (leaf) => ACCOUNT_LEAF_NAMES.has(String(leaf).replace(/_/g, '').toLowerCase());
@@ -146,15 +152,16 @@ function listSettingsBlocks(blob, opts = {}) {
 // rather than left as a guess. Re-add one only after watching that specific
 // field fail to take effect on a real device, and say so in the message.
 //
-// Confirmed so far (observed 2026-08-29 on a live account):
-//   tv  mdblist_settings.mdblist_api_key — pushed successfully, TV app kept
-//       using its own key; the same push DID take effect on mobile.
-const PLATFORM_SYNC_GAPS = {
-  tv: {
-    'mdblist_settings.mdblist_api_key': 'the TV app kept its own key when this was last tested — set it in the TV app directly',
-  },
-  mobile: {},
-};
+// Now empty, and the reason is worth keeping: the one entry that used to live here
+// (an API key "not applying") turned out not to be a per-field quirk at all. Nuvio's
+// apps strip EVERY credential out of the settings blob before pushing and keep their
+// own local value when a blob comes down — NuvioDesktop's
+// ProfileSettingsCredentialPolicy.kt does exactly that via withoutProfileCredentials
+// and preservingLocalProfileCredentials. So no API key has ever travelled inside a
+// settings blob, for any field, on any platform. Keys move through the
+// provider_credentials table instead, which is how Numax now copies them. A warning
+// on individual fields would have been describing the wrong mechanism entirely.
+const PLATFORM_SYNC_GAPS = { tv: {}, mobile: {}, desktop: {} };
 
 function platformSyncGapReason(platform, group, leaf) {
   const table = PLATFORM_SYNC_GAPS[platform];
@@ -296,6 +303,14 @@ function sanitizePayloadString(group, str, opts, targetStr) {
   if (typeof targetStr === 'string' && targetStr.trim()) { try { tgt = JSON.parse(targetStr); } catch { tgt = null; } }
   const stripped = [];
   const cleaned = scrubPayload(parsed, tgt, opts, group, '', stripped);
+  // Merge mode overlays only the keys the caller actually selected onto the target's
+  // own payload, so picking one tab out of a payload group (mobile/desktop keep whole
+  // screens in a single JSON string) copies just that tab's fields and leaves the rest
+  // of the target's screen alone. Replace mode takes the sanitized payload as-is.
+  if (opts.blockMode !== 'replace' && tgt && typeof tgt === 'object' && !Array.isArray(tgt)
+      && cleaned && typeof cleaned === 'object' && !Array.isArray(cleaned)) {
+    return { value: JSON.stringify(Object.assign({}, tgt, cleaned)), stripped };
+  }
   return { value: JSON.stringify(cleaned), stripped };
 }
 
