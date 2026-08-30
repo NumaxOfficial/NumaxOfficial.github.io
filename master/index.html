@@ -471,6 +471,300 @@
     .set-field{ grid-template-columns:1fr; }
     .set-field .sf-c{ justify-content:flex-start; }
   }
+
+  /* ==================================================================
+     MOTION LAYER
+     Presentation only. Every rule below reacts to a class or state the
+     app already sets; none of them changes what a control does.
+     Driven by ui-motion.js. See the reduced-motion block at the end.
+     ================================================================== */
+  :root{
+    --mo-micro:130ms;      /* hover / colour shifts            */
+    --mo-press:100ms;      /* button press                     */
+    --mo-switch:170ms;     /* switch, checkbox                 */
+    --mo-pop:220ms;        /* popover                          */
+    --mo-tab:220ms;        /* tab indicator                    */
+    --mo-expand:260ms;     /* expansion / avatar spread        */
+    --mo-dialog:240ms;     /* dialog                           */
+    --mo-page:280ms;       /* page + pane content              */
+    --mo-ease:cubic-bezier(.22,.61,.36,1);      /* ease-out    */
+    --mo-spring:cubic-bezier(.34,1.28,.56,1);   /* small settle */
+  }
+
+  /* ---- focus is never communicated by motion alone ---- */
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .btn:focus-visible, .navbtn:focus-visible, .pchip:focus-visible, .sy-chip:focus-visible{ outline-offset:3px; }
+
+  /* ---- page + pane content transitions ---- */
+  @keyframes mo-enter{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:none; } }
+  @keyframes mo-enter-soft{ from{ opacity:0; transform:translateY(5px); filter:blur(3px); } to{ opacity:1; transform:none; filter:blur(0); } }
+  [data-panel].mo-enter{ animation:mo-enter var(--mo-page) var(--mo-ease) both; }
+  .pf-pane.mo-enter, .mo-enterable.mo-enter{ animation:mo-enter-soft var(--mo-page) var(--mo-ease) both; }
+  #set-body{ animation:mo-enter var(--mo-tab) var(--mo-ease) both; }
+
+  /* ---- sliding active indicators ---- */
+  .mo-bar{ position:relative; }
+  .mo-ind{
+    position:absolute; z-index:0; pointer-events:none; opacity:0; border-radius:10px;
+    transition:left var(--mo-tab) var(--mo-ease), top var(--mo-tab) var(--mo-ease),
+               width var(--mo-tab) var(--mo-ease), height var(--mo-tab) var(--mo-ease),
+               opacity var(--mo-micro) linear;
+  }
+  .mo-ind-live{ opacity:1; }
+  .mo-ind-rail{ background:var(--surface-2); }
+  .mo-ind-rail::before{ content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px; background:var(--accent); }
+  .mo-ind-underline{ background:transparent; border-radius:0; box-shadow:inset 0 -2px 0 var(--accent); }
+  .mo-ind-pill{ background:#fff; }
+  .mo-ind-ghost{ background:var(--surface-2); border:1px solid var(--t45); border-radius:999px; }
+  .set-tabs .mo-ind{ border-radius:9px; }
+
+  /* items sit above their shared indicator, and give up their own background */
+  .sidebar .navbtn, .pf-tabs-bar .pf-editor-tab, .set-tabs .set-tab,
+  .set-platbar button, .sy-set-sections .sy-set-sec{ position:relative; z-index:1; }
+  .sidebar .navbtn.on{ background:transparent; }
+  .sidebar .navbtn.on::before{ display:none; }
+  .sidebar .navbtn.on:hover{ background:transparent; }
+  .pf-tabs-bar .pf-editor-tab.on{ border-bottom-color:transparent; }
+  .set-tabs .set-tab.on{ background:transparent; }
+  .set-platbar button.on{ background:transparent; }
+  .sy-set-sections .sy-set-sec.on{ background:transparent; }
+  @media (max-width:900px){
+    /* sidebar is a horizontal strip here — the rail travels along the bottom */
+    .sidebar .mo-ind-rail::before{ left:9px; right:9px; top:auto; bottom:2px; width:auto; height:2px; }
+  }
+
+  /* ---- navigation feedback ---- */
+  .navbtn{ transition:color var(--mo-micro) var(--mo-ease), background var(--mo-micro) var(--mo-ease); }
+  .navbtn svg{ transition:transform var(--mo-micro) var(--mo-ease), color var(--mo-micro) var(--mo-ease); }
+  .navbtn:hover svg{ transform:scale(1.1); }
+  .navbtn.on svg{ color:var(--accent); }
+  .navbtn:active{ transform:scale(.985); }
+  .pf-editor-tab, .set-tab, .set-platbar button, .sy-set-sec{ transition:color var(--mo-micro) var(--mo-ease); }
+
+  /* ---- press + hover feedback on controls ---- */
+  .btn{ transition:background var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease),
+                   color var(--mo-micro) var(--mo-ease), transform var(--mo-press) var(--mo-ease),
+                   box-shadow var(--mo-micro) var(--mo-ease); }
+  .btn:active:not(:disabled){ transform:scale(.972); }
+  .iconbtn, .sy-linkbtn, .link, .sy-carry-choose, .tgt-selall{ transition:color var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease), background var(--mo-micro) var(--mo-ease), transform var(--mo-press) var(--mo-ease); }
+  .iconbtn:active:not(:disabled), .sy-carry-choose:active:not(:disabled){ transform:scale(.93); }
+  .seg button, .swatch{ transition:background var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease), color var(--mo-micro) var(--mo-ease), transform var(--mo-press) var(--mo-ease); }
+  .seg button:active:not(:disabled), .swatch:active:not(.locked){ transform:scale(.975); }
+
+  /* ---- selection: profile chips ---- */
+  .pchip, .sy-chip{ transition:border-color var(--mo-micro) var(--mo-ease), background var(--mo-micro) var(--mo-ease),
+                                transform var(--mo-press) var(--mo-ease), box-shadow var(--mo-expand) var(--mo-ease); }
+  .pchip:active, .sy-chip:active{ transform:scale(.968); }
+  .pchip .av, .sy-chip .av, .pmini .av{ transition:transform var(--mo-expand) var(--mo-spring); }
+  .pchip:hover .av, .sy-chip:hover .av{ transform:scale(1.06); }
+  /* the selected source is the one glow that persists — it anchors the whole desk */
+  #sy-source .pchip.on{ box-shadow:0 0 0 1px rgba(229,57,53,.34), 0 8px 24px -10px rgba(229,57,53,.6); }
+  /* check marks are always laid out, so selecting never shifts the row */
+  .sy-chip .chk{ display:grid; transform:scale(0); transition:transform var(--mo-switch) var(--mo-spring); }
+  .sy-chip.on .chk{ transform:scale(1); }
+  .pchip.multi .chk{ display:grid; transform:scale(0); transition:transform var(--mo-switch) var(--mo-spring); }
+  .pchip.multi.on .chk{ transform:scale(1); }
+
+  /* ---- switch ---- */
+  .tog{ transition:background var(--mo-switch) var(--mo-ease), border-color var(--mo-switch) var(--mo-ease), box-shadow var(--mo-micro) var(--mo-ease); }
+  .tog::after{ transition:left var(--mo-switch) var(--mo-spring), width var(--mo-switch) var(--mo-ease), background var(--mo-switch) var(--mo-ease); }
+  .tog:not(:disabled):active::after{ width:26px; }
+  .tog.on:not(:disabled):active::after{ left:19px; width:26px; }
+  .tog:hover:not(:disabled){ border-color:rgba(255,255,255,.3); }
+
+  /* ---- checkbox ---- */
+  .sy-carry-row input[type=checkbox], .pick input[type=checkbox], .confirm input[type=checkbox]{
+    appearance:none; -webkit-appearance:none; position:relative; flex:none;
+    width:17px; height:17px; border-radius:5px; cursor:pointer;
+    border:1.5px solid var(--line); background:var(--surface-2);
+    transition:background var(--mo-switch) var(--mo-ease), border-color var(--mo-switch) var(--mo-ease);
+  }
+  .sy-carry-row input[type=checkbox]:hover, .pick input[type=checkbox]:hover, .confirm input[type=checkbox]:hover{ border-color:rgba(255,255,255,.34); }
+  .sy-carry-row input[type=checkbox]::after, .pick input[type=checkbox]::after, .confirm input[type=checkbox]::after{
+    content:""; position:absolute; left:5px; top:1.5px; width:4px; height:9px;
+    border:solid #fff; border-width:0 2px 2px 0;
+    transform:rotate(45deg) scale(0); transform-origin:center;
+    transition:transform var(--mo-switch) var(--mo-spring);
+  }
+  .sy-carry-row input[type=checkbox]:checked, .pick input[type=checkbox]:checked, .confirm input[type=checkbox]:checked,
+  .sy-carry-row input[type=checkbox]:indeterminate, .pick input[type=checkbox]:indeterminate{
+    background:var(--accent); border-color:var(--accent);
+  }
+  .sy-carry-row input[type=checkbox]:checked::after, .pick input[type=checkbox]:checked::after, .confirm input[type=checkbox]:checked::after{ transform:rotate(45deg) scale(1); }
+  .sy-carry-row input[type=checkbox]:indeterminate::after, .pick input[type=checkbox]:indeterminate::after{
+    left:3px; top:7px; width:9px; height:0; border-width:0 0 2px 0; transform:none;
+  }
+  .sy-carry-row input[type=checkbox]:disabled, .pick input[type=checkbox]:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* ---- rows that respond to the pointer ---- */
+  .sy-carry-row, .pick, .erow, .acct, .watched-row{ transition:background var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease); }
+  /* hover tint stays inside each row's own box so existing indentation
+     (.pick.set-block / .set-sub) and separator widths are untouched */
+  .sy-carry-row{ border-radius:8px; }
+  .sy-carry-row:hover{ background:rgba(255,255,255,.028); }
+  .pick{ border-radius:8px; }
+  .pick:hover{ background:rgba(255,255,255,.03); }
+  .erow:hover, .acct:hover{ border-color:rgba(255,255,255,.17); }
+
+  /* ---- list entry ---- */
+  @keyframes mo-in{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  @keyframes mo-in-flat{ from{ opacity:0; } to{ opacity:1; } }
+  .acct, .sy-card-report, .mo-act-row{ animation:mo-in 260ms var(--mo-ease) both; }
+  .acct:nth-child(2){ animation-delay:35ms; } .acct:nth-child(3){ animation-delay:70ms; }
+  .acct:nth-child(4){ animation-delay:105ms; } .acct:nth-child(n+5){ animation-delay:130ms; }
+  .sy-card-report:nth-child(2){ animation-delay:30ms; } .sy-card-report:nth-child(3){ animation-delay:60ms; }
+  .sy-card-report:nth-child(4){ animation-delay:90ms; } .sy-card-report:nth-child(n+5){ animation-delay:110ms; }
+  .mo-act-row:nth-child(2){ animation-delay:25ms; } .mo-act-row:nth-child(3){ animation-delay:50ms; }
+  .mo-act-row:nth-child(n+4){ animation-delay:70ms; }
+  /* reorderable lists re-render on every move — keep their entry instant-feeling */
+  .erow{ animation:mo-in-flat 150ms linear both; }
+
+  /* ---- shimmer: only ever while real async work is in flight ---- */
+  @keyframes mo-shimmer{ from{ background-position:160% 0; } to{ background-position:-60% 0; } }
+  .shimmer{
+    background-image:linear-gradient(100deg, var(--t45) 22%, rgba(255,255,255,.95) 44%, rgba(255,255,255,.95) 50%, var(--t45) 70%);
+    background-size:220% 100%; background-repeat:no-repeat;
+    -webkit-background-clip:text; background-clip:text;
+    color:transparent; -webkit-text-fill-color:transparent;
+    animation:mo-shimmer 1.5s linear infinite;
+  }
+
+  /* ---- glow: only when something just became possible ---- */
+  @keyframes mo-glow{ 0%{ box-shadow:0 0 0 0 rgba(229,57,53,.5); } 70%{ box-shadow:0 0 0 13px rgba(229,57,53,0); } 100%{ box-shadow:0 0 0 0 rgba(229,57,53,0); } }
+  .mo-glow{ animation:mo-glow 900ms var(--mo-ease) 1; }
+  @keyframes mo-flow{ 0%,100%{ box-shadow:0 0 0 0 rgba(229,57,53,0); } 50%{ box-shadow:0 0 0 4px rgba(229,57,53,.14); } }
+  .mo-flowing .sy-chip.on{ animation:mo-flow 1.15s ease-in-out infinite; }
+
+  /* ---- dialogs ---- */
+  @keyframes mo-dlg-bg{ from{ opacity:0; } to{ opacity:1; } }
+  @keyframes mo-dlg-card{ from{ opacity:0; transform:scale(.94) translateY(12px); } to{ opacity:1; transform:none; } }
+  .modal-root .modal-bg{ animation:mo-dlg-bg var(--mo-dialog) var(--mo-ease) both; }
+  .modal-root .modal-card{ animation:mo-dlg-card var(--mo-dialog) var(--mo-spring) both; }
+  .modal-root.mo-closing .modal-bg{ animation:mo-dlg-bg 120ms var(--mo-ease) reverse both; }
+  .modal-root.mo-closing .modal-card{ animation:mo-dlg-card 120ms var(--mo-ease) reverse both; }
+  .modal-root.mo-closing{ pointer-events:none; }
+  .modal-title{ font-size:16px; font-weight:700; letter-spacing:-.01em; margin-bottom:8px; }
+  .modal-details{ margin-top:12px; padding:11px 13px; border-radius:10px; background:var(--surface-2); border:1px solid var(--line-2); }
+  .modal-details li{ list-style:none; font-size:12.5px; line-height:1.55; color:var(--t55); padding-left:15px; position:relative; }
+  .modal-details li + li{ margin-top:5px; }
+  .modal-details li::before{ content:""; position:absolute; left:2px; top:7px; width:4px; height:4px; border-radius:50%; background:var(--t35); }
+  .modal-details li b{ color:var(--t70); font-weight:600; }
+  .modal-card.danger-card{ border-color:rgba(229,57,53,.4); box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(229,57,53,.12); }
+
+  /* ---- morphing popover ---- */
+  .mo-pop-layer{ position:fixed; inset:0; z-index:90; }
+  .mo-pop-layer[hidden]{ display:none; }
+  .mo-pop-scrim{ position:absolute; inset:0; background:rgba(0,0,0,.28); }
+  .mo-pop{
+    position:absolute; display:flex; flex-direction:column; overflow:hidden;
+    background:#101010; border:1px solid var(--line); border-radius:14px;
+    box-shadow:0 24px 64px rgba(0,0,0,.62), 0 0 0 1px rgba(255,255,255,.02);
+  }
+  @keyframes mo-pop-in{ from{ opacity:0; transform:scale(.93) translateY(-5px); } to{ opacity:1; transform:none; } }
+  @keyframes mo-pop-out{ from{ opacity:1; transform:none; } to{ opacity:0; transform:scale(.975) translateY(-3px); } }
+  .mo-pop-in{ animation:mo-pop-in var(--mo-pop) var(--mo-ease) both; }
+  .mo-pop-out{ animation:mo-pop-out 150ms var(--mo-ease) both; }
+  .mo-pop-head{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--line-2); flex:none; }
+  .mo-pop-title{ flex:1; font-size:13px; font-weight:700; }
+  .mo-pop-x{ flex:none; background:transparent; border:none; color:var(--t45); font-size:19px; line-height:1; cursor:pointer; padding:0 3px; transition:color var(--mo-micro); }
+  .mo-pop-x:hover{ color:var(--t); }
+  .mo-pop .sy-carry-chooser{ display:block; flex:1; min-height:0; margin:0; padding:10px 14px 14px;
+    background:none; border:none; border-radius:0; max-height:none; overflow-y:auto; }
+  .mo-pop .sy-carry-chooser::-webkit-scrollbar{ width:5px; }
+  .mo-pop .sy-carry-chooser::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+  /* the trigger visibly holds the open surface */
+  .sy-carry-choose[aria-expanded="true"]{ border-color:var(--accent); background:rgba(229,57,53,.11); color:var(--t); }
+  .sy-carry-choose span{ display:inline-block; transition:transform var(--mo-micro) var(--mo-ease); }
+  .sy-carry-choose[aria-expanded="true"] span{ transform:rotate(90deg); }
+
+  /* ---- snap rails ---- */
+  .mo-rail-wrap{ position:relative; }
+  .mo-rail{ overflow-x:auto; overflow-y:hidden; scroll-snap-type:x proximity; scrollbar-width:none; }
+  .mo-rail::-webkit-scrollbar{ display:none; }
+  .mo-rail > *{ flex-wrap:nowrap; flex:0 0 auto; }
+  .mo-rail .pchip{ scroll-snap-align:center; flex:none; }
+  .pf-head-r .pf-picker-scroll.mo-rail{ overflow-y:hidden; overflow-x:auto; padding-right:0; display:flex; align-items:center; }
+  .mo-rail-fade-l{ -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 30px); mask-image:linear-gradient(90deg,transparent 0,#000 30px); }
+  .mo-rail-fade-r{ -webkit-mask-image:linear-gradient(270deg,transparent 0,#000 30px); mask-image:linear-gradient(270deg,transparent 0,#000 30px); }
+  .mo-rail-fade-l.mo-rail-fade-r{ -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 30px,#000 calc(100% - 30px),transparent 100%); mask-image:linear-gradient(90deg,transparent 0,#000 30px,#000 calc(100% - 30px),transparent 100%); }
+  .mo-rail-btn{
+    position:absolute; transform:translate(-50%,-50%); z-index:3;
+    width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+    background:rgba(16,16,16,.94); border:1px solid var(--line); color:var(--t70);
+    font-size:15px; line-height:1; cursor:pointer; opacity:0;
+    transition:opacity var(--mo-micro) var(--mo-ease), color var(--mo-micro), border-color var(--mo-micro);
+  }
+  .mo-rail-wrap:hover .mo-rail-btn, .mo-rail-btn:focus-visible{ opacity:1; }
+  .mo-rail-btn:hover{ color:var(--t); border-color:rgba(255,255,255,.3); }
+  .mo-rail-btn.mo-rail-off{ opacity:0; pointer-events:none; }
+
+  /* ---- avatar group ----
+     Names stay in the DOM and in the accessibility tree; they are only
+     collapsed visually, and every chip carries its own label. */
+  .mo-avgroup{ display:flex; flex-wrap:nowrap; gap:0; align-items:center; }
+  .mo-avgroup .pmini{
+    margin-left:-11px; padding:3px; position:relative;
+    transition:margin var(--mo-expand) var(--mo-ease), padding var(--mo-expand) var(--mo-ease),
+               transform var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease),
+               background var(--mo-micro) var(--mo-ease);
+  }
+  .mo-avgroup .pmini:first-child{ margin-left:0; }
+  .mo-avgroup .pmini > span:last-child{
+    max-width:0; opacity:0; overflow:hidden; white-space:nowrap; margin-left:0;
+    transition:max-width var(--mo-expand) var(--mo-ease), opacity var(--mo-micro) var(--mo-ease), margin var(--mo-expand) var(--mo-ease);
+  }
+  .mo-avgroup:hover .pmini, .mo-avgroup:focus-within .pmini{ margin-left:6px; padding:3px 11px 3px 3px; }
+  .mo-avgroup:hover .pmini:first-child, .mo-avgroup:focus-within .pmini:first-child{ margin-left:0; }
+  .mo-avgroup:hover .pmini > span:last-child, .mo-avgroup:focus-within .pmini > span:last-child{ max-width:170px; opacity:1; margin-left:7px; }
+  .mo-avgroup .pmini:hover{ transform:translateY(-2px); z-index:2; border-color:rgba(255,255,255,.3); }
+  .mo-avgroup .mo-av-hidden{ display:none; }
+  .mo-avgroup .mo-av-more{ padding:6px 11px; font-weight:700; color:var(--t55); }
+  .mo-avgroup:hover .mo-av-more, .mo-avgroup:focus-within .mo-av-more{ padding:6px 11px; }
+
+  /* ---- animated backgrounds ---- */
+  .mo-bg-host{ position:relative; }
+  .mo-bg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
+  .mo-bg-host > *:not(.mo-bg){ position:relative; z-index:1; }
+  .mo-panel-bg{ position:absolute; inset:0; z-index:0; pointer-events:none; }
+  .panel[data-panel="drive"]{ position:relative; }
+  .panel[data-panel="drive"] > *:not(.mo-panel-bg){ position:relative; z-index:1; }
+  #view-landing{ position:relative; }
+  .mo-fw{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:60; }
+  .mo-fw-host{ position:relative; }
+
+  /* ---- intentional empty states ---- */
+  .mo-empty{ display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+    min-height:min(46vh,340px); padding:36px 20px; border-radius:14px; overflow:hidden; }
+  .mo-empty .mo-empty-ic{ width:44px; height:44px; border-radius:13px; display:grid; place-items:center; margin-bottom:16px;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--t45); }
+  .mo-empty .mo-empty-ic svg{ width:21px; height:21px; }
+  .mo-empty h4{ font-size:15px; font-weight:700; color:var(--t70); margin-bottom:7px; }
+  .mo-empty p{ font-size:13px; color:var(--t45); max-width:38ch; line-height:1.55; }
+  .mo-act-row{ display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-top:1px solid var(--line-2); }
+  .mo-act-row:first-child{ border-top:none; }
+  .mo-act-t{ font-family:ui-monospace,monospace; font-size:11px; color:var(--t35); width:54px; flex:none; padding-top:1px; }
+  .mo-act-dot{ width:6px; height:6px; border-radius:50%; flex:none; margin-top:6px; background:var(--t35); }
+  .mo-act-row.ok .mo-act-dot{ background:#7bd88f; }
+  .mo-act-row.err .mo-act-dot{ background:#ff8a80; }
+  .mo-act-m{ flex:1; font-size:13px; line-height:1.5; color:var(--t70); }
+  .mo-act-row.ok .mo-act-m{ color:#7bd88f; }
+  .mo-act-row.err .mo-act-m{ color:#ff8a80; }
+
+  /* ==================================================================
+     Reduced motion: decoration stops, state still reads clearly.
+     Canvases paint a single static frame (ui-motion.js handles that);
+     fireworks and pulses are removed outright.
+     ================================================================== */
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{
+      animation-duration:.01ms !important; animation-iteration-count:1 !important;
+      transition-duration:.01ms !important; scroll-behavior:auto !important;
+    }
+    .shimmer{ animation:none !important; background-image:none !important; color:var(--t55) !important; -webkit-text-fill-color:currentColor !important; }
+    .mo-flowing .sy-chip.on{ animation:none !important; box-shadow:0 0 0 2px rgba(229,57,53,.2) !important; }
+    .mo-fw{ display:none !important; }
+    .navbtn:hover svg, .pchip:hover .av, .sy-chip:hover .av, .mo-avgroup .pmini:hover{ transform:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -478,6 +772,7 @@
 
 <!-- ============ LANDING ============ -->
 <div class="view current" id="view-landing">
+  <div class="mo-panel-bg" data-bg="bubble" aria-hidden="true"></div>
   <div class="land-wrap">
     <div class="land-top">
       <span class="sb-brand" style="padding:0"><span class="wm" style="font-weight:800;letter-spacing:.12em">NUMAX</span></span>
@@ -715,7 +1010,7 @@
                 <span class="inline-status" id="sy-pv-status"></span>
               </div>
               <div class="sy-review-body">
-                <div class="sy-empty-state" id="sy-review-empty">
+                <div class="sy-empty-state mo-enterable" id="sy-review-empty" data-bg="hole">
                   <svg viewBox="0 0 200 180" fill="none" stroke="currentColor" stroke-width="1.4">
                     <rect x="46" y="30" width="92" height="120" rx="6" fill="rgba(255,255,255,.02)"/>
                     <path d="M60 62h56M60 78h48M60 94h56M60 110h32" stroke-linecap="round"/>
@@ -725,7 +1020,7 @@
                   <h4>Choose recipients to see a change summary</h4>
                   <p>Select one or more profiles to preview what will be copied before applying any changes.</p>
                 </div>
-                <div id="sy-review-full" style="display:none">
+                <div id="sy-review-full" class="mo-enterable" style="display:none">
                   <div class="sy-metrics" id="sy-metrics"></div>
                   <div class="sy-grid" id="sy-results"></div>
                   <div class="sy-review-foot" id="sy-review-foot" style="display:none"></div>
@@ -750,6 +1045,7 @@
 
     <!-- drive -->
     <section class="panel" data-panel="drive" style="display:none">
+      <div class="mo-panel-bg" data-bg="hexagon" aria-hidden="true"></div>
       <div class="phead"><span class="eyebrow">Google Drive</span><h1>Back up and restore.</h1>
         <p>Backups and templates live in your own Drive, using access limited to files Numax creates. Choose what goes in, name it, and restore any part later.</p></div>
       <div class="card"><div class="chead"><h3>Connection</h3><span class="spacer"></span><span class="inline-status" id="dr-status">Connected via sign-in.</span></div></div>
@@ -760,7 +1056,7 @@
         <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
         <div class="actbar"><button class="btn btn-primary" id="dr-backup-btn">Back up to Drive</button><div class="inline-status" id="dr-backup-log"></div></div></div>
       <div class="card"><div class="chead"><h3>Restore</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="dr-restore-refresh">Refresh list</button></div>
-        <div id="dr-restore-list"><p class="empty sm">Loading backups…</p></div>
+        <div id="dr-restore-list"><p class="empty sm shimmer">Loading backups…</p></div>
         <div id="dr-restore-config" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px"></div></div>
     </section>
 
@@ -808,6 +1104,7 @@
 <script src="./engine.js"></script>
 <script src="./meta.js"></script>
 <script src="./nuvio-settings-schema.js"></script>
+<script src="./ui-motion.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

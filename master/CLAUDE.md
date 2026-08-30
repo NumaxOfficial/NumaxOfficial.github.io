@@ -208,6 +208,60 @@ newer sideloaded build on the same device synced correctly.
 - `avatarId`-based preset avatars fall back to initial letter — hook exists
   but the catalog mapping data isn't wired up yet.
 
+## Motion layer (`ui-motion.js`)
+
+Added 2026-08-30. There is no framework, bundler or npm in this repo — the
+Animate UI / Motion Primitives components were reproduced as plain CSS + JS,
+not installed. **`ui-motion.js` owns no application state.** It observes the
+classes and inline `display` flips `app.js` already performs and animates
+around them, so it can be deleted and the app still works identically.
+
+The contract, in both directions:
+
+- **It reads:** `.on` (nav buttons, tabs, platform bar, sync sections),
+  `[data-panel]` / `.pf-pane` / `.mo-enterable` display flips,
+  `.sy-carry-chooser.open`, `.modal-root` display, `#sy-apply[disabled]`,
+  `#sy-pv-status.shimmer`, and `data-bg` attributes.
+- **`app.js` calls into it** only via `window.NumaxMotion` — `avatarGroup()`,
+  `celebrate()`, `rail()`, `mountBg()` — always through the optional `M.` /
+  `celebrate()` guards near the top of `app.js`, never as a hard dependency.
+- Loaded **before** `app.js` in `index.html`.
+
+Things that will silently break if changed without care:
+
+- **The trailing-ellipsis convention.** `status()` adds the shimmer class only
+  when a message ends in `…` and has no ok/err class. Every in-progress message
+  in `app.js` ends in `…` and no static label does — keep it that way, or
+  shimmer will land on a label that never stops.
+- **The `.sy-carry-chooser` elements are moved, never rebuilt.** The morphing
+  popover relocates the live node into a floating surface and puts it back on
+  close. `renderSyItem()` / `renderSyTree()` clearing and refilling them is
+  fine; replacing the node itself, or changing its `id`, is not.
+- **The sliding indicators replace per-item backgrounds.** `.navbtn.on`,
+  `.set-tab.on`, `.set-platbar button.on`, `.sy-set-sec.on` have had their own
+  backgrounds overridden to transparent — the shared `.mo-ind` draws them. Bars
+  that `app.js` destroys and rebuilds (settings tabs, platform bar, sync
+  sections) still slide because `lastBox` remembers the previous geometry.
+- Backgrounds are one canvas engine, one look per screen, paused by
+  IntersectionObserver and `visibilitychange`. Verified 2026-08-30: exactly one
+  canvas draws at a time, ~60fps visible, **zero** draws while the tab is
+  hidden. Don't add a second `data-bg` to a screen that already has one.
+
+## Verifying UI changes without Node
+
+`file://` won't work — the browser pane serves it as a `data:` snapshot and the
+relative `<script src>` tags never load, so every module reads as `undefined`.
+Serve it instead (Python is present, Node is not):
+
+```
+python -m http.server 8731
+```
+
+then drive it at `http://localhost:8731/`. Measurement beats screenshots here:
+the pane scales oddly, and `requestAnimationFrame` is throttled while the pane
+is hidden, so a `getBoundingClientRect()` taken too soon after a click will
+read a stale position and look like a bug that isn't one.
+
 ## Style
 
 - Solid dark-navy background, Fraunces / Space Grotesk / Space Mono

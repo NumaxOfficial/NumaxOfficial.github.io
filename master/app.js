@@ -14,6 +14,10 @@
   const mem = (() => { const m = {}; return { getItem: k => (k in m ? m[k] : null), setItem: (k, v) => { m[k] = v; }, removeItem: k => { delete m[k]; } }; })();
   const store = S.makeStore(mem);
   const $ = id => document.getElementById(id);
+  // presentation-only helpers (ui-motion.js). Every call is optional —
+  // the app behaves identically if the motion layer failed to load.
+  const M = window.NumaxMotion || {};
+  const celebrate = n => { if (M.celebrate && n) M.celebrate(n); };
 
   // ---- secret handling ----
   const SECRET_LEAF = (E && E.SECRET_LEAF) || /(api_?key|client_id|token|secret|access_token|refresh|password)/i;
@@ -72,13 +76,40 @@
   const host = u => { try { return new URL(u).host; } catch { return String(u || ''); } };
   const el = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
   const clr = n => { while (n && n.firstChild) n.removeChild(n.firstChild); };
-  const status = (n, m, c) => { if (n) { n.textContent = m || ''; n.className = 'inline-status' + (c ? ' ' + c : ''); } };
+  // A trailing ellipsis is this app's existing convention for "async work is
+  // running". Binding the shimmer to exactly that means it can never sit on a
+  // static label, and it always stops when the message is replaced or cleared.
+  const status = (n, m, c) => {
+    if (!n) return;
+    const t = m || '';
+    n.textContent = t;
+    n.className = 'inline-status' + (c ? ' ' + c : '') + (!c && /…$/.test(t) ? ' shimmer' : '');
+  };
+  // Intentional empty state; ui-motion.js mounts the contained background from
+  // data-bg and handles pausing it and honouring reduced motion.
+  function emptyState(bg, title, body, iconPath) {
+    const w = el('div', 'mo-empty'); if (bg) w.setAttribute('data-bg', bg);
+    if (iconPath) { const ic = el('div', 'mo-empty-ic'); ic.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">' + iconPath + '</svg>'; w.appendChild(ic); }
+    w.appendChild(el('h4', '', title)); w.appendChild(el('p', '', body)); return w;
+  }
 
   // in-app modal — replaces browser confirm/prompt (no native "top" dialogs)
   function uiModal(opts) {
     return new Promise(resolve => {
       const root = $('modal-root'), inp = $('modal-input'), ok = $('modal-ok'), cancel = $('modal-cancel');
-      $('modal-msg').textContent = opts.message || '';
+      // Destructive confirmations spell out what happens, what data is affected,
+      // whether it is Numax-only or the real Nuvio account, and whether it can be
+      // undone. `details` entries are authored here — interpolate only escaped text.
+      const msgBox = $('modal-msg'); clr(msgBox);
+      if (opts.title) msgBox.appendChild(el('div', 'modal-title', opts.title));
+      msgBox.appendChild(el('div', '', opts.message || ''));
+      if (opts.details && opts.details.length) {
+        const ul = el('ul', 'modal-details');
+        opts.details.forEach(d => { const li = el('li'); li.innerHTML = d; ul.appendChild(li); });
+        msgBox.appendChild(ul);
+      }
+      const card = root.querySelector('.modal-card');
+      if (card) card.classList.toggle('danger-card', !!opts.danger);
       if (opts.input) { inp.style.display = ''; inp.value = opts.defaultVal || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30); } else inp.style.display = 'none';
       ok.textContent = opts.okLabel || 'Confirm'; ok.className = 'btn ' + (opts.danger ? 'danger-btn' : 'btn-primary');
       cancel.style.display = opts.noCancel ? 'none' : '';
@@ -137,10 +168,19 @@
   }
   function renderActivity() {
     const b = $('act-list'); clr(b);
-    if (!activity.length) { b.appendChild(el('p', 'empty', 'Nothing yet.')); return; }
-    activity.forEach(a => { const r = el('div', 'rline'); r.style.borderTop = '1px solid var(--line-2)'; r.style.padding = '9px 0';
-      r.appendChild(el('span', '', new Date(a.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))).style.cssText = 'font-family:ui-monospace,monospace;font-size:11px;color:var(--t35);width:54px;flex:none';
-      const m = el('span', '', a.msg); m.style.color = a.lvl === 'err' ? '#ff8a80' : a.lvl === 'ok' ? '#7bd88f' : 'var(--t70)'; r.appendChild(m); b.appendChild(r); });
+    if (!activity.length) {
+      b.appendChild(emptyState('stars', 'Nothing has happened yet.',
+        'Links, previews, saves, backups, restores and template applies from this session show up here, newest first.',
+        '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'));
+      return;
+    }
+    activity.forEach(a => {
+      const r = el('div', 'mo-act-row' + (a.lvl === 'ok' ? ' ok' : a.lvl === 'err' ? ' err' : ''));
+      r.appendChild(el('span', 'mo-act-t', new Date(a.t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })));
+      r.appendChild(el('span', 'mo-act-dot'));
+      r.appendChild(el('span', 'mo-act-m', a.msg));
+      b.appendChild(r);
+    });
   }
 
   // (mascot/bird-flight system removed)
@@ -315,11 +355,14 @@
       const ren = el('button', 'btn btn-ghost btn-xs', 'Rename'); ren.onclick = () => startRename(nmText, rec.accountId);
       const rm = el('button', 'btn btn-ghost btn-xs danger', 'Unlink'); rm.onclick = () => unlink(rec.accountId, rec.label || rec.email);
       head.appendChild(ren); head.appendChild(rm); card.appendChild(head);
-      const prof = el('div', 'acct-profiles'); prof.appendChild(el('span', 'muted sm', 'Loading profiles…')); card.appendChild(prof); box.appendChild(card);
+      const prof = el('div', 'acct-profiles'); prof.appendChild(el('span', 'muted sm shimmer', 'Loading profiles…')); card.appendChild(prof); box.appendChild(card);
       loadAccount(rec.accountId).then(({ profiles }) => {
         if (gen !== acGen) return; // a newer refreshAccounts() already replaced this row — don't paint a detached one
         clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
         profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); });
+        // Summary-only list, so the avatars overlap and spread on hover. Names stay
+        // in the DOM (and in the accessibility tree) collapsed, never removed.
+        if (M.avatarGroup) M.avatarGroup(prof, 6);
       })
         .catch(e => { if (gen !== acGen) return; clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
     }
@@ -331,7 +374,17 @@
     i.addEventListener('blur', commit);
   }
   async function unlink(id, name) {
-    if (!(await uiConfirm('Unlink ' + name + '? This removes it from your Numax registry — your Nuvio account is untouched.', { danger: true, okLabel: 'Unlink' }))) return;
+    if (!(await uiModal({
+      title: 'Unlink ' + name + '?',
+      message: 'Numax will forget this Nuvio account and stop showing its profiles.',
+      details: [
+        'Affects <b>Numax only</b> — it removes the entry from the linked-account registry in your Google Drive.',
+        'Your <b>Nuvio account is not touched</b>: its profiles, add-ons, plugins, collections, settings and watch history all stay exactly as they are.',
+        'Templates and backups you already saved stay in your Drive.',
+        '<b>Reversible</b> — link it again any time with its email and password.'
+      ],
+      danger: true, okLabel: 'Unlink'
+    }))) return;
     store.remove(id); inval(id); if (pfA === id) { pfA = pfI = pfEdit = null; } if (syA === id) { syA = syI = sySnap = null; }
     await saveRegistry(); logAct('Unlinked ' + name, 'info'); refreshAccounts();
   }
@@ -373,7 +426,7 @@
     renderPfPicker(sel.value);
   }
   async function renderPfPicker(id) {
-    const box = $('pf-profiles'); clr(box); box.appendChild(el('span', 'muted sm', 'Loading…'));
+    const box = $('pf-profiles'); clr(box); box.appendChild(el('span', 'muted sm shimmer', 'Loading…'));
     let profiles; try { profiles = (await loadAccount(id)).profiles; } catch (e) { clr(box); box.appendChild(el('span', 'muted sm err-text', e.message)); return; }
     clr(box); if (!profiles.length) { box.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
     const keep = (id === pfA && profiles.some(p => p.index === pfI)) ? pfI : profiles[0].index;
@@ -708,20 +761,41 @@
   async function refreshTemplates() {
     const box = $('tpl-list'); clr(box); status($('tpl-status'), '');
     if (!gAuth.token) { box.appendChild(el('p', 'empty', 'Sign in with Google to see templates.')); return; }
-    box.appendChild(el('p', 'muted sm', 'Loading…'));
+    box.appendChild(el('p', 'muted sm shimmer', 'Loading…'));
     let files; try { files = await driveFindByProp('numax', 'template'); } catch (e) { clr(box); box.appendChild(el('p', 'empty err-text', e.message)); return; }
-    clr(box); if (!files.length) { box.appendChild(el('p', 'empty', 'No templates yet. Save one from a profile\'s editor.')); return; }
+    clr(box);
+    if (!files.length) {
+      box.appendChild(emptyState('stars', 'No templates yet.',
+        'Open a profile, then use “Save as template” to keep its add-ons, plugins, collections or settings for reuse on any other profile.',
+        '<rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/>'));
+      return;
+    }
     files.forEach(f => {
       const kind = (f.appProperties && f.appProperties.tkind) || 'template';
+      const tname = f.name.replace(/^numax-tpl-/, '').replace(/\.json$/, '');
       const row = el('div', 'erow');
-      const b = el('div', 'eb'); b.appendChild(el('div', 'en', f.name.replace(/^numax-tpl-/, '').replace(/\.json$/, ''))); b.appendChild(el('div', 'es', kind + ' · ' + (f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''))); row.appendChild(b);
+      const b = el('div', 'eb'); b.appendChild(el('div', 'en', tname)); b.appendChild(el('div', 'es', kind + ' · ' + (f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''))); row.appendChild(b);
       const ap = el('button', 'btn btn-solid btn-xs', 'Apply'); ap.onclick = () => openTemplateApply(f); row.appendChild(ap);
-      const del = el('button', 'iconbtn', '✕'); del.title = 'Delete template'; del.onclick = async () => { if (!(await uiConfirm('Delete this template?', { danger: true, okLabel: 'Delete' }))) return; await driveDelete(f.id); logAct('Deleted a template', 'info'); refreshTemplates(); }; row.appendChild(del);
+      const del = el('button', 'iconbtn', '✕'); del.title = 'Delete template';
+      del.onclick = async () => {
+        if (!(await uiModal({
+          title: 'Delete “' + tname + '”?',
+          message: 'This template will be removed from your Google Drive.',
+          details: [
+            'Affects <b>Numax only</b> — it deletes the template file Numax created in your Drive.',
+            'Profiles you already applied this template to are <b>not changed</b>.',
+            '<b>Not reversible</b> — Numax cannot recover the file once it is deleted.'
+          ],
+          danger: true, okLabel: 'Delete'
+        }))) return;
+        await driveDelete(f.id); logAct('Deleted a template', 'info'); refreshTemplates();
+      };
+      row.appendChild(del);
       box.appendChild(row);
     });
   }
   async function openTemplateApply(file) {
-    const card = $('tpl-apply-card'), body = $('tpl-apply-body'); card.style.display = ''; clr(body); body.appendChild(el('p', 'muted sm', 'Reading template…'));
+    const card = $('tpl-apply-card'), body = $('tpl-apply-body'); card.style.display = ''; clr(body); body.appendChild(el('p', 'muted sm shimmer', 'Reading template…'));
     $('tpl-apply-title').textContent = 'Apply ' + file.name.replace(/^numax-tpl-/, '').replace(/\.json$/, '');
     let doc; try { doc = await driveDownload(file.id); } catch (e) { clr(body); body.appendChild(el('p', 'empty err-text', e.message)); return; }
     clr(body);
@@ -807,6 +881,7 @@
           if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_entries: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
         }
         invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
+        if (!fails.length) celebrate(res.closest('.card') || res);
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
     };
     res.appendChild(ap);
@@ -827,7 +902,7 @@
     renderSySource(sel.value);
   }
   async function renderSySource(id) {
-    const box = $('sy-source'); clr(box); box.appendChild(el('span', 'muted sm', 'Loading…'));
+    const box = $('sy-source'); clr(box); box.appendChild(el('span', 'muted sm shimmer', 'Loading…'));
     let profiles; try { profiles = (await loadAccount(id)).profiles; } catch (e) { clr(box); box.appendChild(el('span', 'muted sm err-text', e.message)); return; }
     clr(box); if (!profiles.length) { box.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
     const keep = (id === syA && profiles.some(p => p.index === syI)) ? syI : profiles[0].index;
@@ -1369,7 +1444,26 @@
   }
 
   async function syncApply() {
-    if (!syPlans) return; $('sy-apply').disabled = true; status($('sy-status'), 'Applying…'); let ok = 0, fail = 0;
+    if (!syPlans) return;
+    // Overwrite (and partial mirrors) can drop items a recipient currently has. The
+    // review list already itemises them and the confirm checkbox is still the gate;
+    // this states the consequence in words immediately before anything is written.
+    const remPlans = syPlans.filter(x => x.plan.hasRemovals);
+    if (remPlans.length) {
+      const names = remPlans.map(x => tidName(x.tid).name);
+      if (!(await uiModal({
+        title: 'Apply changes and remove items?',
+        message: 'Numax is about to write to ' + syPlans.length + ' profile' + (syPlans.length === 1 ? '' : 's') + '.',
+        details: [
+          'Writes to <b>your live Nuvio account</b>, not just to Numax — recipients pick the change up on their devices.',
+          '<b>' + esc(names.join(', ')) + '</b> will lose items they currently have that the source does not.',
+          'Every addition, update and removal is itemised in Review changes.',
+          '<b>Not reversible from Numax</b> — restore from a Drive backup, or copy the items back, if you change your mind.'
+        ],
+        danger: true, okLabel: 'Apply changes'
+      }))) return;
+    }
+    $('sy-apply').disabled = true; status($('sy-status'), 'Applying…'); let ok = 0, fail = 0;
     for (const { aid, plan, extras, nuvio } of syPlans) {
       const hasExtras = (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length);
       const doCreds = syCreds.copy && (sySnapExt.credentials || []).length;
@@ -1411,6 +1505,7 @@
     invalAll();
     status($('sy-status'), 'Done — ' + ok + ' change' + (ok === 1 ? '' : 's') + (fail ? ', ' + fail + ' failed.' : '.'), fail ? 'err' : 'ok');
     logAct('Applied sync: ' + ok + ' ok' + (fail ? ', ' + fail + ' failed' : ''), fail ? 'err' : 'ok');
+    if (ok && !fail) celebrate(document.querySelector('.sy-review-card'));
     syPlans = null; selectSource(syA, syI);
   }
 
@@ -1442,18 +1537,18 @@
       for (const aid of Object.keys(by)) { const c = A.client(store, aid); const { backup } = await loadAccount(aid); for (const idx of by[aid]) { const slice = sliceProfile(backup, idx); const meta = cache[aid].profiles.find(p => p.index === idx) || { name: 'Profile ' + idx }; const settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = keys ? row.settings_json : stripKeys(row.settings_json); } out.profiles.push({ account: accountName(aid), accountId: aid, profileIndex: idx, name: meta.name, addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings }); } }
       status(log, 'Uploading…'); const files = await driveFindByProp('numax', 'backup'); const existing = files.find(f => f.name === (safeName(name).endsWith('.json') ? safeName(name) : safeName(name) + '.json'));
       const r = await driveUpload(safeName(name).endsWith('.json') ? safeName(name) : safeName(name) + '.json', out, { numax: 'backup' }, existing && existing.id);
-      status(log, (existing ? 'Updated ' : 'Saved ') + r.name + ' (' + out.profiles.length + ' profile' + (out.profiles.length === 1 ? '' : 's') + ').', 'ok'); logAct((existing ? 'Updated' : 'Saved') + ' backup "' + r.name + '"', 'ok'); refreshRestore();
+      status(log, (existing ? 'Updated ' : 'Saved ') + r.name + ' (' + out.profiles.length + ' profile' + (out.profiles.length === 1 ? '' : 's') + ').', 'ok'); logAct((existing ? 'Updated' : 'Saved') + ' backup "' + r.name + '"', 'ok'); celebrate($('dr-backup-btn').closest('.card')); refreshRestore();
     } catch (e) { status(log, 'Backup failed: ' + e.message, 'err'); } finally { $('dr-backup-btn').disabled = false; }
   }
   let restoreDoc = null;
   async function refreshRestore() {
     const box = $('dr-restore-list'); clr(box); if (!gAuth.token) { box.appendChild(el('p', 'empty sm', 'Connect Google Drive.')); return; }
-    box.appendChild(el('p', 'muted sm', 'Loading…')); let files; try { files = await driveFindByProp('numax', 'backup'); } catch (e) { clr(box); box.appendChild(el('p', 'empty err-text', e.message)); return; }
+    box.appendChild(el('p', 'muted sm shimmer', 'Loading…')); let files; try { files = await driveFindByProp('numax', 'backup'); } catch (e) { clr(box); box.appendChild(el('p', 'empty err-text', e.message)); return; }
     clr(box); if (!files.length) { box.appendChild(el('p', 'empty sm', 'No backups yet.')); return; }
     files.forEach(f => { const row = el('div', 'erow'); const b = el('div', 'eb'); b.appendChild(el('div', 'en', f.name)); b.appendChild(el('div', 'es', f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : '')); row.appendChild(b); const op = el('button', 'btn btn-solid btn-xs', 'Open'); op.onclick = () => loadRestore(f); row.appendChild(op); box.appendChild(row); });
   }
   async function loadRestore(file) {
-    const cfg = $('dr-restore-config'); cfg.style.display = ''; clr(cfg); cfg.appendChild(el('p', 'muted sm', 'Reading ' + file.name + '…'));
+    const cfg = $('dr-restore-config'); cfg.style.display = ''; clr(cfg); cfg.appendChild(el('p', 'muted sm shimmer', 'Reading ' + file.name + '…'));
     try { restoreDoc = await driveDownload(file.id); restoreDoc._file = file; } catch (e) { clr(cfg); cfg.appendChild(el('p', 'empty err-text', e.message)); return; }
     if (!Array.isArray(restoreDoc.profiles) || !restoreDoc.profiles.length) { clr(cfg); cfg.appendChild(el('p', 'empty sm', 'No profiles in that backup.')); return; }
     clr(cfg); cfg.appendChild(el('div', 'set-group-h', 'Restore from ' + file.name));
@@ -1515,7 +1610,17 @@
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
     togWire('st-readkeys', setReadKeys);
-    $('st-signout').onclick = async () => { if (!(await uiConfirm('Sign out of Google on this device? Your accounts and templates stay in your Drive.', { danger: true, okLabel: 'Sign out' }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
+    $('st-signout').onclick = async () => { if (!(await uiModal({
+      title: 'Sign out of Google?',
+      message: 'Numax will forget this session on this device.',
+      details: [
+        'Affects <b>this device only</b> — nothing is deleted anywhere.',
+        'Linked accounts, templates and backups stay in <b>your Google Drive</b>.',
+        'Any unsaved edits open in the Profile editor will be lost.',
+        '<b>Reversible</b> — sign back in with Google and everything comes back.'
+      ],
+      danger: true, okLabel: 'Sign out'
+    }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
   window.addEventListener('DOMContentLoaded', () => { wire(); renderActivity(); });
