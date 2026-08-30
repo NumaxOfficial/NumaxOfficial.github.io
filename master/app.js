@@ -450,41 +450,72 @@
     pfPlat = PLATS.find(p => live[p]) || 'tv';
     renderPfEditor(); if (!silent) logAct('Opened ' + meta.name, 'info');
   }
-  const dirty = k => { pfDirty[k] = true; };
+  const dirty = k => { pfDirty[k] = true; updateSaveButtonsState(); };
+  function updateHeadStats() {
+    if (!pfEdit) return;
+    $('pf-stat-addons-n').textContent = pfEdit.addons.length;
+    $('pf-stat-plugins-n').textContent = pfEdit.plugins.length;
+    $('pf-stat-collections-n').textContent = (pfEdit.collections || []).length;
+  }
+  function renderHeadAvatar() {
+    const box = $('pf-avatar-big'); if (!box) return; clr(box);
+    if (pfEdit) box.appendChild(avatar(pfEdit.meta, 72));
+  }
+  function updatePhotoPreview() {
+    const box = $('pf-photo-preview'); if (!box || !pfEdit) return; clr(box);
+    const typed = $('pf-photo-input').value.trim();
+    box.appendChild(avatar(typed ? { ...pfEdit.meta, avatarUrl: typed } : pfEdit.meta, 40));
+  }
   function renderPfEditor() {
     if (!pfEdit) return;
     $('pf-name-input').value = pfEdit.meta.name || '';
+    $('pf-photo-input').value = '';
     renderPfList('addons'); renderPfList('plugins'); renderPfCollections(); renderSettingsEditor();
     renderPfWatched(); renderPfWatchProgress();
+    renderHeadAvatar(); updateHeadStats(); updatePhotoPreview();
+    updateSaveButtonsState();
     switchPfEditorTab(pfEditorTab);
   }
 
-  function orderControls(kind, arr, i) {
-    const box = el('div', 'ord');
-    const up = el('button', 'iconbtn', '↑'); up.style.cssText = 'width:22px;height:16px;font-size:10px'; up.disabled = i === 0; up.title = 'Move up';
-    const dn = el('button', 'iconbtn', '↓'); dn.style.cssText = 'width:22px;height:16px;font-size:10px'; dn.disabled = i === arr.length - 1; dn.title = 'Move down';
-    up.onclick = () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; dirty(kind); (kind === 'collections' ? renderPfCollections : () => renderPfList(kind))(); };
-    dn.onclick = () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; dirty(kind); (kind === 'collections' ? renderPfCollections : () => renderPfList(kind))(); };
-    box.appendChild(up); box.appendChild(dn); return box;
+  function dragHandle() {
+    const b = el('button', 'draghandle'); b.type = 'button'; b.title = 'Drag to reorder'; b.tabIndex = -1;
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>';
+    return b;
+  }
+  // native HTML5 drag-and-drop: `arr` is spliced in place and `after()` re-renders.
+  function wireRowDrag(row, arr, i, after) {
+    row.draggable = true;
+    row.addEventListener('dragstart', e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); requestAnimationFrame(() => row.classList.add('dragging')); });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    row.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    row.addEventListener('drop', e => {
+      e.preventDefault(); e.stopPropagation();
+      const from = Number(e.dataTransfer.getData('text/plain'));
+      if (Number.isNaN(from) || from === i) return;
+      const [moved] = arr.splice(from, 1); arr.splice(i, 0, moved);
+      after();
+    });
   }
   function renderPfList(kind) {
     const box = $('pf-' + kind); clr(box); const list = pfEdit[kind];
     if (!list.length) { box.appendChild(el('p', 'empty sm', 'No ' + kind + '.')); }
     list.forEach((item, i) => {
-      const row = el('div', 'erow'); row.appendChild(orderControls(kind, list, i));
+      const row = el('div', 'erow'); row.appendChild(dragHandle());
+      wireRowDrag(row, list, i, () => { dirty(kind); renderPfList(kind); });
       const tog = el('button', 'tog' + (item.enabled !== false ? ' on' : '')); tog.onclick = () => { item.enabled = !(item.enabled !== false); tog.classList.toggle('on', item.enabled); dirty(kind); };
       row.appendChild(tog);
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', item.name || host(item.url))); b.appendChild(el('div', 'es', host(item.url))); row.appendChild(b);
       const del = el('button', 'iconbtn', '✕'); del.onclick = () => { list.splice(i, 1); dirty(kind); renderPfList(kind); }; row.appendChild(del);
       box.appendChild(row);
     });
-    const save = el('button', 'btn btn-solid btn-xs', 'Save ' + kind + ' to this profile'); save.onclick = () => savePfList(kind); box.appendChild(save);
+    updateHeadStats();
   }
   function renderPfCollections() {
     const box = $('pf-collections'); clr(box); const list = pfEdit.collections;
     if (!Array.isArray(list) || !list.length) { box.appendChild(el('p', 'empty sm', 'No collections.')); }
     (list || []).forEach((c, i) => {
-      const row = el('div', 'erow'); row.appendChild(orderControls('collections', list, i));
+      const row = el('div', 'erow'); row.appendChild(dragHandle());
+      wireRowDrag(row, list, i, () => { dirty('collections'); renderPfCollections(); });
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', collLabel(c)));
       const folders = (c && Array.isArray(c.folders)) ? c.folders : [];
       b.appendChild(el('div', 'es', folders.length ? folders.length + ' folder' + (folders.length === 1 ? '' : 's') : 'No folders')); row.appendChild(b);
@@ -493,23 +524,17 @@
       box.appendChild(row);
       const fbox = el('div', 'subrow'); fbox.dataset.folders = i; fbox.style.display = 'none'; box.appendChild(fbox);
     });
-    const save = el('button', 'btn btn-solid btn-xs', 'Save collections to this profile'); save.onclick = () => savePfCollections(); box.appendChild(save);
+    updateHeadStats();
   }
   function toggleFolders(row, coll, idx) {
     const box = row.nextSibling; if (!box) return;
     if (box.style.display !== 'none') { box.style.display = 'none'; clr(box); return; }
     box.style.display = ''; clr(box);
     (coll.folders || []).forEach((f, j) => {
-      const fr = el('div', 'erow'); fr.appendChild(orderControls2(coll.folders, j, () => { dirty('collections'); toggleFolders(row, coll, idx); toggleFolders(row, coll, idx); }));
+      const fr = el('div', 'erow'); fr.appendChild(dragHandle());
+      wireRowDrag(fr, coll.folders, j, () => { dirty('collections'); toggleFolders(row, coll, idx); toggleFolders(row, coll, idx); });
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', (f && (f.title || f.name)) || 'Folder ' + (j + 1))); fr.appendChild(b); box.appendChild(fr);
     });
-  }
-  function orderControls2(arr, i, after) {
-    const box = el('div', 'ord');
-    const up = el('button', 'iconbtn', '↑'); up.style.cssText = 'width:22px;height:16px;font-size:10px'; up.disabled = i === 0;
-    const dn = el('button', 'iconbtn', '↓'); dn.style.cssText = 'width:22px;height:16px;font-size:10px'; dn.disabled = i === arr.length - 1;
-    up.onclick = () => { [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]]; after(); }; dn.onclick = () => { [arr[i + 1], arr[i]] = [arr[i], arr[i + 1]]; after(); };
-    box.appendChild(up); box.appendChild(dn); return box;
   }
 
   // ---- watched / watch progress ----
@@ -589,7 +614,6 @@
     if (!plats.includes(pfPlat)) pfPlat = plats[0];
     const bar = el('div', 'set-platbar');
     plats.forEach(p => { const b = el('button', p === pfPlat ? 'on' : '', PLAT_LABEL[p] || p); b.onclick = () => { pfPlat = p; pfTab = 0; renderSettingsEditor(); }; bar.appendChild(b); });
-    const save = el('button', 'btn btn-solid btn-xs', 'Save ' + PLAT_SHORT[pfPlat] + ' settings'); save.style.marginLeft = 'auto'; save.onclick = () => savePfSettings(pfPlat); bar.appendChild(save);
     wrap.appendChild(bar);
 
     const tabs = SCHEMA[pfPlat] || [];
@@ -655,67 +679,96 @@
   function multiOptions(f) { const src = /plugin/i.test(f.title) ? pfEdit.plugins : pfEdit.addons; return (src || []).map(x => ({ value: x.url, label: x.name || host(x.url) })); }
 
   // ---- profile saves ----
-  async function savePfIdentity() {
-    const name = $('pf-name-input').value.trim(); if (!name) { status($('pf-save-status'), 'Give the profile a name.', 'err'); return; }
-    if (name === pfEdit.meta.name) { status($('pf-save-status'), 'Name unchanged.', 'info'); return; }
-    status($('pf-save-status'), 'Renaming…');
-    try {
-      const c = A.client(store, pfA); const live = rawList(await c.pullProfiles()); if (!live.length) throw new Error("Couldn't read profiles.");
-      if (!live.find(p => p.profile_index === pfI)) throw new Error('Profile no longer exists.');
-      const next = live.map(p => { const r = normRow(p); if (p.profile_index === pfI) r.name = name.slice(0, 60); return r; });
-      if (live.map(p => p.profile_index).sort().join() !== next.map(p => p.profile_index).sort().join()) throw new Error('Profile list changed — reload.');
-      await c.rpc('sync_push_profiles', { p_profiles: next, p_client_max_profiles: 6 });
-      pfEdit.meta.name = name; inval(pfA); status($('pf-save-status'), 'Saved.', 'ok'); logAct('Renamed profile to ' + name, 'ok'); renderPfPicker(pfA);
-    } catch (e) { status($('pf-save-status'), "Couldn't rename: " + e.message, 'err'); }
+  // Two sticky buttons replace the old per-tab save buttons: the red one commits every
+  // dirty section at once (see saveAllDirty), the white one saves a template and is only
+  // enabled once everything is saved (pfDirty empty) — see updateSaveButtonsState.
+  const SAVE_LABEL = { addons: 'add-ons', plugins: 'plugins', collections: 'collections', 'settings-tv': 'TV settings', 'settings-mobile': 'mobile settings', 'settings-desktop': 'desktop settings', identity: 'name/photo' };
+  function updateSaveButtonsState() {
+    const isDirty = Object.keys(pfDirty).length > 0;
+    const saveBtn = $('pf-save-btn'), tplBtn = $('pf-tpl-profile');
+    if (saveBtn) saveBtn.disabled = !isDirty;
+    if (tplBtn) tplBtn.disabled = isDirty;
   }
-  async function savePfList(kind) {
-    status($('pf-save-status'), 'Saving ' + kind + '…');
-    try {
-      const c = A.client(store, pfA);
-      const rows = pfEdit[kind].map((x, i) => { const r = { url: x.url, name: x.name ?? null, enabled: x.enabled !== false, sort_order: i }; if (kind === 'plugins' && x.repo_type !== undefined) r.repo_type = x.repo_type; return r; });
-      await c.rpc(kind === 'addons' ? 'sync_push_addons' : 'sync_push_plugins', { [kind === 'addons' ? 'p_addons' : 'p_plugins']: rows, p_profile_id: pfI, p_origin_client_id: 'numax-web' });
-      inval(pfA); status($('pf-save-status'), 'Saved ' + kind + '.', 'ok'); logAct('Saved ' + kind + ' to ' + pfEdit.meta.name, 'ok');
-    } catch (e) { status($('pf-save-status'), "Couldn't save " + kind + ': ' + e.message, 'err'); }
+  function refreshCurrentChip() {
+    const chip = document.querySelector('#pf-profiles .pchip.on'); if (!chip || !pfEdit) return;
+    clr(chip); chip.appendChild(avatar(pfEdit.meta, 42)); chip.appendChild(el('span', 'pcn', pfEdit.meta.name));
   }
-  async function savePfCollections() {
-    status($('pf-save-status'), 'Saving…');
-    try { await A.client(store, pfA).rpc('sync_push_collections', { p_profile_id: pfI, p_collections_json: pfEdit.collections, p_origin_client_id: 'numax-web' }); inval(pfA); status($('pf-save-status'), 'Saved collections.', 'ok'); logAct('Saved collections to ' + pfEdit.meta.name, 'ok'); }
-    catch (e) { status($('pf-save-status'), "Couldn't save collections: " + e.message, 'err'); }
+  // shared by the sticky Save button and by applying a template's "profile" part
+  async function pushProfileIdentity(accountId, idx, { name, avatarUrl }) {
+    const c = A.client(store, accountId); const live = rawList(await c.pullProfiles()); if (!live.length) throw new Error("couldn't read profiles");
+    if (!live.find(p => p.profile_index === idx)) throw new Error('profile no longer exists');
+    const next = live.map(p => { const r = normRow(p); if (p.profile_index === idx) { if (name) r.name = name.slice(0, 60); if (avatarUrl) r.avatar_url = avatarUrl; } return r; });
+    if (live.map(p => p.profile_index).sort().join() !== next.map(p => p.profile_index).sort().join()) throw new Error('profile list changed — reload');
+    await c.rpc('sync_push_profiles', { p_profiles: next, p_client_max_profiles: 6 });
   }
-  async function savePfSettings(plat) {
+  async function saveIdentityKind() {
+    const name = $('pf-name-input').value.trim(); if (!name) throw new Error('give the profile a name');
+    const photoUrl = $('pf-photo-input').value.trim();
+    await pushProfileIdentity(pfA, pfI, { name, avatarUrl: photoUrl || null });
+    pfEdit.meta.name = name; if (photoUrl) pfEdit.meta.avatarUrl = photoUrl;
+  }
+  async function saveListKind(kind) {
+    const c = A.client(store, pfA);
+    const rows = pfEdit[kind].map((x, i) => { const r = { url: x.url, name: x.name ?? null, enabled: x.enabled !== false, sort_order: i }; if (kind === 'plugins' && x.repo_type !== undefined) r.repo_type = x.repo_type; return r; });
+    await c.rpc(kind === 'addons' ? 'sync_push_addons' : 'sync_push_plugins', { [kind === 'addons' ? 'p_addons' : 'p_plugins']: rows, p_profile_id: pfI, p_origin_client_id: 'numax-web' });
+  }
+  async function saveCollectionsKind() {
+    await A.client(store, pfA).rpc('sync_push_collections', { p_profile_id: pfI, p_collections_json: pfEdit.collections, p_origin_client_id: 'numax-web' });
+  }
+  async function saveSettingsKind(plat) {
     const blob = pfEdit.settings[plat]; if (!blob) return;
-    status($('pf-save-status'), 'Saving settings…');
-    try {
-      const c = A.client(store, pfA);
-      await c.rpc('sync_push_profile_settings_blob', { p_profile_id: pfI, p_settings_json: blob, p_platform: plat, p_origin_client_id: 'numax-web' });
-      const row = await c.pullSettings(pfI, plat); if (row) pfEdit.upd[plat] = row.updated_at || null;
-      inval(pfA); status($('pf-save-status'), 'Saved settings.', 'ok'); logAct('Saved ' + plat + ' settings to ' + pfEdit.meta.name, 'ok');
-    } catch (e) { const conflict = (A.ConflictError && e instanceof A.ConflictError) || /40001|409|another device/i.test(e.message || ''); status($('pf-save-status'), conflict ? 'These settings changed elsewhere — reopen the profile and try again.' : "Couldn't save: " + e.message, 'err'); }
+    const c = A.client(store, pfA);
+    try { await c.rpc('sync_push_profile_settings_blob', { p_profile_id: pfI, p_settings_json: blob, p_platform: plat, p_origin_client_id: 'numax-web' }); }
+    catch (e) { const conflict = (A.ConflictError && e instanceof A.ConflictError) || /40001|409|another device/i.test(e.message || ''); throw new Error(conflict ? 'changed elsewhere — reopen the profile and try again' : e.message); }
+    const row = await c.pullSettings(pfI, plat); if (row) pfEdit.upd[plat] = row.updated_at || null;
+  }
+  async function saveAllDirty() {
+    const kinds = Object.keys(pfDirty); if (!kinds.length) return;
+    status($('pf-save-status'), 'Saving…');
+    const okList = [], failList = [];
+    for (const k of kinds) {
+      try {
+        if (k === 'addons' || k === 'plugins') await saveListKind(k);
+        else if (k === 'collections') await saveCollectionsKind();
+        else if (k.startsWith('settings-')) await saveSettingsKind(k.slice('settings-'.length));
+        else if (k === 'identity') await saveIdentityKind();
+        okList.push(k); delete pfDirty[k];
+      } catch (e) { failList.push((SAVE_LABEL[k] || k) + ': ' + e.message); }
+    }
+    if (okList.length) {
+      inval(pfA); logAct('Saved ' + okList.map(k => SAVE_LABEL[k] || k).join(', ') + ' to ' + pfEdit.meta.name, 'ok');
+      updateHeadStats();
+      if (okList.includes('identity')) { renderHeadAvatar(); refreshCurrentChip(); }
+    }
+    status($('pf-save-status'), failList.length ? "Couldn't save " + failList.join('; ') : 'Saved ' + okList.map(k => SAVE_LABEL[k] || k).join(', ') + '.', failList.length ? 'err' : 'ok');
+    updateSaveButtonsState();
   }
 
   // ======================================================================
   // TEMPLATES (on Drive)
   // ======================================================================
-  function pfSettingsForTemplate(includeKeys) {
+  function pfSettingsForTemplate(includeKeys, plats) {
     const out = {};
-    for (const pl of ['tv', 'mobile']) { const b = pfEdit.settings[pl]; if (b && b.features) out[pl] = includeKeys ? JSON.parse(JSON.stringify(b)) : stripKeys(JSON.parse(JSON.stringify(b))); }
+    for (const pl of (plats && plats.length ? plats : PLATS)) { const b = pfEdit.settings[pl]; if (b && b.features) out[pl] = includeKeys ? JSON.parse(JSON.stringify(b)) : stripKeys(JSON.parse(JSON.stringify(b))); }
     return out;
   }
   // one combined template save, driven by the "Save as template" picker modal
   const TPL_PARTS = [
+    { key: 'profile', label: 'Profile (name & photo)', count: () => 1 },
     { key: 'addons', label: 'Add-ons', count: () => (pfEdit.addons || []).length },
     { key: 'plugins', label: 'Plugins', count: () => (pfEdit.plugins || []).length },
     { key: 'collections', label: 'Collections', count: () => (pfEdit.collections || []).length },
-    { key: 'settings', label: 'Settings', count: () => ((pfEdit.settings.tv || pfEdit.settings.mobile) ? 1 : 0) },
+    { key: 'settings', label: 'Settings', count: () => (PLATS.some(pl => pfEdit.settings[pl] && pfEdit.settings[pl].features) ? 1 : 0) },
     { key: 'watchprogress', label: 'Watch Progress', count: () => (pfEdit.watchProgress || []).length },
     { key: 'watched', label: 'Watched', count: () => (pfEdit.watched || []).length },
   ];
+  PF_TAB_LABEL.profile = 'Profile';
   async function openSaveTemplateModal() {
     if (!gAuth.token) { await uiAlert('Sign in with Google first.'); return; }
     if (!pfEdit) { await uiAlert('Open a profile first.'); return; }
     const root = $('tpl-save-root'), list = $('tpl-save-list'), ok = $('tpl-save-ok'), cancel = $('tpl-save-cancel'), bg = $('tpl-save-bg');
     clr(list);
-    const checks = {};
+    const checks = {}, platChecks = {};
     TPL_PARTS.forEach(part => {
       const n = part.count(); const empty = !n;
       const row = el('label', 'pick'); if (empty) row.style.opacity = '.5';
@@ -723,6 +776,19 @@
       const b = el('div', 'pb'); b.appendChild(el('div', 'pn', part.label));
       b.appendChild(el('div', 'ps', empty ? 'none on this profile' : (part.key === 'settings' ? 'available' : n + ' item' + (n === 1 ? '' : 's'))));
       row.appendChild(b); list.appendChild(row);
+      // settings is per-platform — TV, mobile, desktop are separate blobs on the server,
+      // so let the user pick which of this profile's platforms actually go into the template.
+      if (part.key === 'settings' && !empty) {
+        const platRow = el('div', 'tpl-plat-row');
+        PLATS.forEach(pl => {
+          const has = !!(pfEdit.settings[pl] && pfEdit.settings[pl].features);
+          const lab = el('label', 'tpl-plat-pick'); if (!has) lab.style.opacity = '.4';
+          const pcb = el('input'); pcb.type = 'checkbox'; pcb.checked = has; pcb.disabled = !has; platChecks[pl] = pcb;
+          lab.appendChild(pcb); lab.appendChild(el('span', '', PLAT_LABEL[pl] || pl));
+          platRow.appendChild(lab);
+        });
+        list.appendChild(platRow);
+      }
     });
     root.style.display = '';
     return new Promise(resolve => {
@@ -732,26 +798,29 @@
         const kinds = TPL_PARTS.map(p => p.key).filter(k => checks[k].checked && !checks[k].disabled);
         if (!kinds.length) { await uiAlert('Pick at least one thing to save.'); resolve(); return; }
         let includeKeys = false;
+        const selectedPlats = PLATS.filter(pl => platChecks[pl] && platChecks[pl].checked && !platChecks[pl].disabled);
         if (kinds.includes('settings')) {
+          if (!selectedPlats.length) { await uiAlert('Pick at least one platform for Settings, or uncheck Settings.'); resolve(); return; }
           if (accountKeysIncluded(pfA)) includeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this template?', { okLabel: 'Include keys' });
           else await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values to include — settings will save without keys.');
         }
-        await saveTemplateParts(kinds, includeKeys);
+        await saveTemplateParts(kinds, includeKeys, selectedPlats);
         resolve();
       };
       ok.onclick = () => done(true); cancel.onclick = () => done(false); bg.onclick = () => done(false);
     });
   }
-  async function saveTemplateParts(kinds, includeKeys) {
+  async function saveTemplateParts(kinds, includeKeys, plats) {
     const isWholeProfile = kinds.length === TPL_PARTS.length;
     const label = isWholeProfile ? 'profile' : kinds.map(k => PF_TAB_LABEL[k] || k).join(', ');
     const name = await uiPrompt('Name this template', pfEdit.meta.name + ' ' + label); if (name == null || !name.trim()) return;
     const tkind = isWholeProfile ? 'profile' : kinds.join('+');
     const payload = { app: 'numax', kind: 'template', tkind, name, savedAt: new Date().toISOString(), from: pfEdit.meta.name };
+    if (kinds.includes('profile')) payload.profile = { name: pfEdit.meta.name, avatarUrl: pfEdit.meta.avatarUrl || null };
     if (kinds.includes('addons')) payload.addons = pfEdit.addons;
     if (kinds.includes('plugins')) payload.plugins = pfEdit.plugins;
     if (kinds.includes('collections')) payload.collections = pfEdit.collections;
-    if (kinds.includes('settings')) payload.settings = pfSettingsForTemplate(includeKeys);
+    if (kinds.includes('settings')) payload.settings = pfSettingsForTemplate(includeKeys, plats);
     if (kinds.includes('watchprogress')) payload.watchProgress = pfEdit.watchProgress || [];
     if (kinds.includes('watched')) payload.watched = pfEdit.watched || [];
     status($('pf-save-status'), 'Saving template…');
@@ -814,11 +883,11 @@
       try {
         const master = { addons: doc.addons || [], plugins: doc.plugins || [], collections: doc.collections || [], settings: doc.settings || {} };
         const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
-        if (doc.settings && Object.keys(doc.settings).length) { state.settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
+        if (doc.settings && Object.keys(doc.settings).length) { state.settings = {}; for (const pl of Object.keys(doc.settings)) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
         const cats = { addons: !!(doc.addons), plugins: !!(doc.plugins), collections: !!(doc.collections), settings: !!(doc.settings && Object.keys(doc.settings).length) };
         // includeSecrets:true here is safe — a template only carries key values if the save-time "include API keys?" prompt was answered yes
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx });
+        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx, identity: doc.profile });
       } catch (e) { status(st, e.message, 'err'); }
     };
   }
@@ -865,7 +934,8 @@
     }
     if (extras && Array.isArray(extras.watched) && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Watched</span><span class="tag add">+${extras.watched.length}</span>`; d.appendChild(x); }
     if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Progress</span><span class="tag add">+${extras.watchProgress.length}</span>`; d.appendChild(x); }
-    const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length));
+    if (extras && extras.identity && extras.identity.name) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Profile</span><span class="tag upd">name & photo</span>`; d.appendChild(x); }
+    const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name));
     if (!plan.hasChanges && !hasExtras) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
@@ -874,11 +944,12 @@
     ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…');
       try {
         const rr = await A.client(store, accountId).applyPlan(plan, { dryRun: false }); const fails = (rr.results || []).filter(x => !x.ok);
-        // extras: push watched/progress in addition to plan
+        // extras: push watched/progress/identity in addition to plan
         if (extras && extras.profileId != null) {
           const c = A.client(store, accountId);
           if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_items: extras.watched.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
           if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_entries: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
+          if (extras.identity && extras.identity.name) { try { await pushProfileIdentity(accountId, extras.profileId, extras.identity); } catch (e) { fails.push({ ok: false, surface: 'profile', error: e.message }); } }
         }
         invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
         if (!fails.length) celebrate(res.closest('.card') || res);
@@ -1578,8 +1649,12 @@
     $('ac-link-btn').onclick = linkAccount; $('ac-pass').addEventListener('keydown', e => { if (e.key === 'Enter') linkAccount(); });
     $('ac-reload').onclick = reloadAccounts;
     togWire('ac-readkeys', setReadKeys);
-    $('pf-account').onchange = () => renderPfPicker($('pf-account').value); $('pf-save-identity').onclick = savePfIdentity;
+    $('pf-account').onchange = () => renderPfPicker($('pf-account').value);
+    $('pf-name-input').addEventListener('input', () => dirty('identity'));
+    $('pf-photo-input').addEventListener('input', () => { dirty('identity'); updatePhotoPreview(); });
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
+    document.querySelectorAll('.pf-stat').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
+    $('pf-save-btn').onclick = saveAllDirty;
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
     $('sy-oldapp-dismiss').onclick = () => { $('sy-oldapp-notice').style.display = 'none'; };
