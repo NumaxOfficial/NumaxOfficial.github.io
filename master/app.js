@@ -1487,6 +1487,7 @@
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
+    $('sy-oldapp-dismiss').onclick = () => { $('sy-oldapp-notice').style.display = 'none'; };
     $('sy-select-all').onclick = sySelectAll;
     $('sy-deselect-all').onclick = syDeselectAll;
     $('sy-dev-choice').onclick = syDevChoice;

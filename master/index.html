@@ -182,6 +182,12 @@
   .sy-review-foot .foot-note.warn{ color:#f0c060; }
   .sy-review-foot .confirm{ margin:0; }
 
+  .sy-oldapp-notice{ display:flex; align-items:center; gap:10px; margin-top:12px; padding:10px 14px; border-radius:11px; background:rgba(255,152,0,.1); border:1px solid rgba(255,152,0,.28); color:#f0c060; font-size:12.5px; line-height:1.4; }
+  .sy-oldapp-notice svg{ width:18px; height:18px; flex:none; }
+  .sy-oldapp-notice span{ flex:1; }
+  .sy-oldapp-notice button{ flex:none; background:none; border:none; color:inherit; opacity:.7; font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
+  .sy-oldapp-notice button:hover{ opacity:1; }
+
   @media (max-width:1100px){ .sy-cols{ grid-template-columns:1fr; } .sy-left{ overflow-y:visible; } .panel[data-panel="sync"]{ height:auto; overflow:auto; } .panel[data-panel="sync"] #sy-body{ min-height:0; } .sy-right .sy-review-card{ min-height:400px; } }
 
   /* watched / watch progress tab */
@@ -602,7 +608,9 @@
     <!-- sync -->
     <section class="panel" data-panel="sync" style="display:none">
       <div class="phead"><span class="eyebrow">Sync desk</span><h1>Copy one profile's setup to others.</h1>
-        <p>Pick a source, choose exactly what to carry, pick which profiles receive it, then preview before anything is written.</p></div>
+        <p>Pick a source, choose exactly what to carry, pick which profiles receive it, then preview before anything is written.</p>
+        <div class="sy-oldapp-notice" id="sy-oldapp-notice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 17h.01"/></svg><span>Not seeing a synced change on a device? It may be running an outdated Nuvio build, please make sure you're on the newest version.</span><button type="button" id="sy-oldapp-dismiss" aria-label="Dismiss">&times;</button></div>
+      </div>
       <p class="empty" id="sy-empty">Link a Nuvio account to start syncing.</p>
       <div id="sy-body">
         <div class="sy-cols">

@@ -181,6 +181,24 @@ whether it's a regression or something more specific (a field this sweep
 doesn't cover, e.g. desktop platform or addons/plugins/collections/watch
 state, none of which this tool exercises yet).
 
+**API key copy (TMDB/MDBList/debrid) verified working 2026-08-29**,
+including the "overwrite matching keys" case: Test 1 -> Test 2, keys
+marked with a test value, copied via `sync_copy_profile_setup` with
+`p_replace_provider_credentials: true`, confirmed changed server-side,
+then restored. Both Numax's push and Nuvio's own server-side copy work
+correctly for this.
+
+If a future "mobile [feature] didn't sync" report comes in and the data
+checks out server-side (as above), **check the reporter's actual app
+build before re-diagnosing the sync logic.** Root-caused once already:
+an old sideloaded iOS build (pulled from the App Store before Nuvio was
+taken down, can't auto-update) predates Nuvio's sync feature entirely and
+silently keeps using its own locally-cached values — indistinguishable
+from a real sync failure unless you check the account page's own version
+banner ("Data sync requires Android TV 0.7.9 Beta or newer, mobile 0.2.9
+Beta or newer... older clients will not sync account data at all"). A
+newer sideloaded build on the same device synced correctly.
+
 ## Current known in-progress items
 
 - API keys badge on Accounts tab renders before `loadAccount()` resolves —
