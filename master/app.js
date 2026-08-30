@@ -483,16 +483,32 @@
     return b;
   }
   // native HTML5 drag-and-drop: `arr` is spliced in place and `after()` re-renders.
+  // Hovering the top/bottom half of a row decides insert-before/after; the
+  // motion layer (if present) previews that slot with a snap-in line.
   function wireRowDrag(row, arr, i, after) {
     row.draggable = true;
     row.addEventListener('dragstart', e => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(i)); requestAnimationFrame(() => row.classList.add('dragging')); });
-    row.addEventListener('dragend', () => row.classList.remove('dragging'));
-    row.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging');
+      window.NumaxMotion && window.NumaxMotion.dropline && window.NumaxMotion.dropline(null);
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+      const rect = row.getBoundingClientRect();
+      const dropAfter = (e.clientY - rect.top) > rect.height / 2;
+      row.dataset.dropAfter = dropAfter ? '1' : '';
+      window.NumaxMotion && window.NumaxMotion.dropline && window.NumaxMotion.dropline(row.parentElement, dropAfter ? row.nextElementSibling : row);
+    });
     row.addEventListener('drop', e => {
       e.preventDefault(); e.stopPropagation();
       const from = Number(e.dataTransfer.getData('text/plain'));
-      if (Number.isNaN(from) || from === i) return;
-      const [moved] = arr.splice(from, 1); arr.splice(i, 0, moved);
+      const dropAfter = row.dataset.dropAfter === '1';
+      window.NumaxMotion && window.NumaxMotion.dropline && window.NumaxMotion.dropline(null);
+      if (Number.isNaN(from)) return;
+      let to = i + (dropAfter ? 1 : 0);
+      if (from < to) to--;
+      if (to === from) return;
+      const [moved] = arr.splice(from, 1); arr.splice(to, 0, moved);
       after();
     });
   }

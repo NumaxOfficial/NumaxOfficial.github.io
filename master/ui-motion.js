@@ -419,6 +419,7 @@
     host.insertBefore(c, host.firstChild);
     var ctx = c.getContext('2d');
     if (!ctx) return;
+    var holeCol = (kind === 'hole') ? (host.getAttribute('data-bg-color') || '229,57,53') : '';
     var w = 0, h = 0, dpr = 1, t = 0, id = 0, live = false, seen = true, parts = null, frame = 0, last = 0;
 
     function size() {
@@ -454,11 +455,11 @@
         var cx = w * 0.5, cy = h * 0.5, R = Math.max(w, h) * 0.52;
         var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.62);
         g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(0.62, 'rgba(229,57,53,0.055)');
-        g.addColorStop(1, 'rgba(229,57,53,0)');
+        g.addColorStop(0.62, 'rgba(' + holeCol + ',0.055)');
+        g.addColorStop(1, 'rgba(' + holeCol + ',0)');
         ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
         ctx.beginPath(); ctx.arc(cx, cy, R * 0.15, 0, TAU);
-        ctx.strokeStyle = 'rgba(229,57,53,0.20)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.strokeStyle = 'rgba(' + holeCol + ',0.20)'; ctx.lineWidth = 1; ctx.stroke();
         for (i = 0; i < parts.length; i++) {
           p = parts[i];
           p.r -= p.sp * dt;
@@ -466,7 +467,7 @@
           if (p.r < 0.13) { p.r = 1.05 + Math.random() * 0.25; p.a = Math.random() * TAU; }
           var fade = Math.min(1, (p.r - 0.13) * 4.5) * Math.min(1, (1.25 - p.r) * 3.2);
           ctx.globalAlpha = Math.max(0, fade) * 0.5;
-          ctx.fillStyle = p.z > 1.2 ? 'rgba(255,255,255,0.75)' : 'rgba(229,57,53,0.95)';
+          ctx.fillStyle = p.z > 1.2 ? 'rgba(255,255,255,0.75)' : 'rgba(' + holeCol + ',0.95)';
           ctx.beginPath(); ctx.arc(cx + Math.cos(p.a) * p.r * R, cy + Math.sin(p.a) * p.r * R, p.z * 0.9, 0, TAU); ctx.fill();
         }
         ctx.globalAlpha = 1;
@@ -612,6 +613,30 @@
   }
 
   // ===============================================================
+  // 9b. Drag-reorder insertion line
+  //
+  // A single shared spacer div. app.js still owns dragover/drop and the
+  // real array splice — this only previews the target slot. The "magnetic
+  // snap" is just the spacer's own height/margin transition: as it grows
+  // from 0, the browser reflows the surrounding rows frame by frame, which
+  // reads as the list sliding to make room.
+  // ===============================================================
+  var dlLine = null;
+  function dropline(container, before) {
+    if (!container) {
+      if (dlLine) {
+        dlLine.classList.remove('show');
+        var l = dlLine;
+        setTimeout(function () { if (!l.classList.contains('show') && l.parentNode) l.parentNode.removeChild(l); }, 200);
+      }
+      return;
+    }
+    if (!dlLine) { dlLine = D.createElement('div'); dlLine.className = 'mo-dropline'; dlLine.setAttribute('aria-hidden', 'true'); }
+    if (dlLine.nextSibling !== before && dlLine !== before) container.insertBefore(dlLine, before || null);
+    raf(function () { dlLine.classList.add('show'); });
+  }
+
+  // ===============================================================
   // 10. Observers — the only inputs to everything above
   // ===============================================================
   var mo = new MutationObserver(function (recs) {
@@ -646,6 +671,7 @@
     avatarGroup: avatarGroup,
     rail: rail,
     mountBg: mountBg,
+    dropline: dropline,
     reduced: reduced,
     refresh: schedule
   };
