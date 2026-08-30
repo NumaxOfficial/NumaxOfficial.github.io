@@ -49,11 +49,11 @@
   .pf-head-r{ border-left:1px solid var(--line-2); padding-left:26px; display:flex; flex-direction:column; gap:12px; min-width:0; }
   .pf-head-r .eyebrow{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:700; text-shadow:0 0 14px rgba(229,57,53,.5), 0 0 30px rgba(229,57,53,.25); }
   .pf-head-r .fld-label{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--t45); font-weight:700; margin-top:4px; }
-  .pf-head-r .pf-picker-scroll{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
-  .pf-head-r .pf-picker-scroll::-webkit-scrollbar{ width:5px; }
+  .pf-head-r .pf-picker-scroll{ flex:none; overflow-y:hidden; overflow-x:auto; padding-right:0; }
+  .pf-head-r .pf-picker-scroll::-webkit-scrollbar{ height:5px; }
   .pf-head-r .pf-picker-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
-  .pf-head-r .chip-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
-  .pf-head-r .pchip{ padding:8px 6px; min-width:0; border-radius:12px; }
+  .pf-head-r .chip-grid{ display:flex; flex-wrap:nowrap; gap:8px; }
+  .pf-head-r .pchip{ padding:8px 6px; width:66px; flex:none; border-radius:12px; }
   .pf-head-r .pchip .av{ width:34px; height:34px; font-size:14px; }
   .pf-head-r .pchip .pcn{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; }
 
@@ -919,6 +919,11 @@
           <label class="fld"><span>Profile photo URL</span><input id="pf-photo-input" type="url" placeholder="https://…" maxlength="500"></label>
           <div class="pf-photo-preview" id="pf-photo-preview"></div>
           <span class="spacer"></span>
+          <span class="inline-status" id="pf-save-status"></span>
+          <div class="pf-save-fabs">
+            <button type="button" class="pf-fab pf-fab-save" id="pf-save-btn" disabled title="Save to profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h8V4M8 20v-6h8v6"/></svg><span>Save to profile</span></button>
+            <button type="button" class="pf-fab pf-fab-tpl" id="pf-tpl-profile" disabled title="Save as template"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg><span>Save as template</span></button>
+          </div>
         </div>
         <div class="sy-card pf-tabs-card">
           <div class="pf-tabs-bar" id="pf-editor-tabs">
@@ -932,11 +937,6 @@
           <div class="pf-tabs-header" id="pf-editor-pane-head">
             <h3 id="pf-editor-pane-title">Add-ons</h3>
             <span class="spacer"></span>
-            <span class="inline-status" id="pf-save-status"></span>
-            <div class="pf-save-fabs">
-              <button type="button" class="pf-fab pf-fab-save" id="pf-save-btn" disabled title="Save to profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h8V4M8 20v-6h8v6"/></svg><span>Save to profile</span></button>
-              <button type="button" class="pf-fab pf-fab-tpl" id="pf-tpl-profile" disabled title="Save as template"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg><span>Save as template</span></button>
-            </div>
           </div>
           <div class="pf-panes-wrap">
             <div id="pf-pane-addons" class="pf-pane"><div id="pf-addons"></div></div>
