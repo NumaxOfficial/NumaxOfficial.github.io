@@ -512,6 +512,30 @@
       after();
     });
   }
+  // Rows have their own dragover/drop, but the small gaps *between* rows (and the
+  // empty space below the last one) belong to no row's listener — without this,
+  // hovering there shows the browser's default "not-allowed" cursor even though
+  // dropping is fine. One dragover/drop pair on the container covers those gaps;
+  // row-level drop already stopPropagation()s, so this only ever fires for a drop
+  // that missed every row. `rowSelector` is scoped to direct children only, since
+  // pf-collections nests each folder's own `.erow` rows one level deeper.
+  function wireListDropzone(box, arr, after, rowSelector) {
+    rowSelector = rowSelector || ':scope > .erow';
+    box.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    box.addEventListener('drop', e => {
+      e.preventDefault();
+      const from = Number(e.dataTransfer.getData('text/plain'));
+      window.NumaxMotion && window.NumaxMotion.dropline && window.NumaxMotion.dropline(null);
+      if (Number.isNaN(from)) return;
+      const rows = [...box.querySelectorAll(rowSelector)];
+      let to = rows.length;
+      for (let k = 0; k < rows.length; k++) { if (e.clientY < rows[k].getBoundingClientRect().top + rows[k].getBoundingClientRect().height / 2) { to = k; break; } }
+      if (from < to) to--;
+      if (to === from) return;
+      const [moved] = arr.splice(from, 1); arr.splice(to, 0, moved);
+      after();
+    });
+  }
   function renderPfList(kind) {
     const box = $('pf-' + kind); clr(box); const list = pfEdit[kind];
     if (!list.length) { box.appendChild(el('p', 'empty sm', 'No ' + kind + '.')); }
@@ -524,6 +548,7 @@
       const del = el('button', 'iconbtn', '✕'); del.onclick = () => { list.splice(i, 1); dirty(kind); renderPfList(kind); }; row.appendChild(del);
       box.appendChild(row);
     });
+    if (list.length) wireListDropzone(box, list, () => { dirty(kind); renderPfList(kind); });
     updateHeadStats();
   }
   function renderPfCollections() {
@@ -540,6 +565,7 @@
       box.appendChild(row);
       const fbox = el('div', 'subrow'); fbox.dataset.folders = i; fbox.style.display = 'none'; box.appendChild(fbox);
     });
+    if (list && list.length) wireListDropzone(box, list, () => { dirty('collections'); renderPfCollections(); });
     updateHeadStats();
   }
   function toggleFolders(row, coll, idx) {
@@ -551,6 +577,7 @@
       wireRowDrag(fr, coll.folders, j, () => { dirty('collections'); toggleFolders(row, coll, idx); toggleFolders(row, coll, idx); });
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', (f && (f.title || f.name)) || 'Folder ' + (j + 1))); fr.appendChild(b); box.appendChild(fr);
     });
+    if (coll.folders && coll.folders.length) wireListDropzone(box, coll.folders, () => { dirty('collections'); toggleFolders(row, coll, idx); toggleFolders(row, coll, idx); });
   }
 
   // ---- watched / watch progress ----
@@ -837,6 +864,15 @@
     if (kinds.includes('plugins')) payload.plugins = pfEdit.plugins;
     if (kinds.includes('collections')) payload.collections = pfEdit.collections;
     if (kinds.includes('settings')) payload.settings = pfSettingsForTemplate(includeKeys, plats);
+    // Keys inside a settings blob are cosmetic only — the apps that matter (mobile,
+    // desktop, and per the same schema note likely TV too) read provider keys from the
+    // separate provider_credentials table and ignore whatever sits in settings_json.
+    // So "include keys" also has to carry the real credential rows, the same table
+    // Sync Desk's key-copy already uses, or the copied key silently never takes effect.
+    if (kinds.includes('settings') && includeKeys) {
+      try { payload.credentials = await A.client(store, pfA).pullProviderCredentials(pfI); }
+      catch (e) { logAct("Couldn't read API keys for template: " + e.message, 'err'); }
+    }
     if (kinds.includes('watchprogress')) payload.watchProgress = pfEdit.watchProgress || [];
     if (kinds.includes('watched')) payload.watched = pfEdit.watched || [];
     status($('pf-save-status'), 'Saving template…');
@@ -903,7 +939,7 @@
         const cats = { addons: !!(doc.addons), plugins: !!(doc.plugins), collections: !!(doc.collections), settings: !!(doc.settings && Object.keys(doc.settings).length) };
         // includeSecrets:true here is safe — a template only carries key values if the save-time "include API keys?" prompt was answered yes
         const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx, identity: doc.profile });
+        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx, identity: doc.profile, credentials: doc.credentials, credentialsReplace: msel.value === 'overwrite' });
       } catch (e) { status(st, e.message, 'err'); }
     };
   }
@@ -951,7 +987,8 @@
     if (extras && Array.isArray(extras.watched) && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Watched</span><span class="tag add">+${extras.watched.length}</span>`; d.appendChild(x); }
     if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Progress</span><span class="tag add">+${extras.watchProgress.length}</span>`; d.appendChild(x); }
     if (extras && extras.identity && extras.identity.name) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Profile</span><span class="tag upd">name & photo</span>`; d.appendChild(x); }
-    const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name));
+    if (extras && Array.isArray(extras.credentials) && extras.credentials.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">API keys</span><span class="tag add">+${extras.credentials.length}</span>`; d.appendChild(x); }
+    const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name) || (extras.credentials && extras.credentials.length));
     if (!plan.hasChanges && !hasExtras) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
@@ -966,6 +1003,17 @@
           if (Array.isArray(extras.watched) && extras.watched.length) { try { await c.rpc('sync_push_watched_items', { p_items: extras.watched.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'watched', error: e.message }); } }
           if (Array.isArray(extras.watchProgress) && extras.watchProgress.length) { try { await c.rpc('sync_push_watch_progress', { p_entries: extras.watchProgress.map(stripWatchRow), p_profile_id: extras.profileId, p_origin_client_id: 'numax-web' }); } catch (e) { fails.push({ ok: false, surface: 'progress', error: e.message }); } }
           if (extras.identity && extras.identity.name) { try { await pushProfileIdentity(accountId, extras.profileId, extras.identity); } catch (e) { fails.push({ ok: false, surface: 'profile', error: e.message }); } }
+          // Additive by provider, same as Sync Desk's key copy: a provider the target
+          // already has is left alone unless the caller opted into overwrite, and a
+          // provider only the target has is never touched either way.
+          if (Array.isArray(extras.credentials) && extras.credentials.length) {
+            try {
+              const existing = await c.pullProviderCredentials(extras.profileId);
+              const have = new Set(existing.map(x => x.provider));
+              const toWrite = extras.credentials.filter(x => extras.credentialsReplace || !have.has(x.provider));
+              if (toWrite.length) await c.pushProviderCredentials(extras.profileId, toWrite, 'numax-web');
+            } catch (e) { fails.push({ ok: false, surface: 'credentials', error: e.message }); }
+          }
         }
         invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
         if (!fails.length) celebrate(res.closest('.card') || res);
@@ -1266,9 +1314,13 @@
       let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
       const tgt = profiles.filter(p => !(rec.accountId === syA && p.index === syI)); if (!tgt.length) continue;
       const group = el('div', 'sy-ct-group');
-      group.appendChild(el('div', 'sy-ct-group-lbl', (accountName(rec.accountId) || '').toUpperCase()));
+      const head = el('div', 'sy-ct-group-head');
+      head.appendChild(el('div', 'sy-ct-group-lbl', (accountName(rec.accountId) || '').toUpperCase()));
+      const acctBtn = el('button', 'sy-ct-group-selall'); acctBtn.type = 'button';
+      head.appendChild(acctBtn); group.appendChild(head);
       const chips = el('div', 'sy-ct-chips');
       const acctTids = [];
+      const syncAcctBtn = () => { acctBtn.textContent = acctTids.every(t => syTargets.has(t)) ? 'Deselect all' : 'Select all'; };
       tgt.forEach(p => {
         const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); acctTids.push(tid);
         const c = el('button', 'sy-chip'); c.type = 'button'; c.dataset.tid = tid;
@@ -1276,26 +1328,37 @@
         const chk = el('span', 'chk'); chk.textContent = '✓'; c.appendChild(chk);
         c.onclick = () => {
           const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid);
-          c.classList.toggle('on', !on); updateApplyBtnLabel(); scheduleLivePreview();
+          c.classList.toggle('on', !on); syncAcctBtn(); updateApplyBtnLabel(); scheduleLivePreview();
         };
         chips.appendChild(c);
       });
+      acctBtn.onclick = () => {
+        const allOn = acctTids.every(t => syTargets.has(t));
+        acctTids.forEach(t => allOn ? syTargets.delete(t) : syTargets.add(t));
+        chips.querySelectorAll('.sy-chip').forEach(c => c.classList.toggle('on', syTargets.has(c.dataset.tid)));
+        syncAcctBtn(); updateApplyBtnLabel(); scheduleLivePreview();
+      };
+      syncAcctBtn();
       group.appendChild(chips); box.appendChild(group);
-      // per-account select-all is available via the header "Select all" — no per-account button in this design
-      group._acctTids = acctTids;
       any = true;
     }
     if (!any) box.appendChild(el('p', 'empty sm', 'No other profiles to sync into.'));
   }
+  function syncAllAcctSelAllLabels() {
+    document.querySelectorAll('#sy-targets .sy-ct-group').forEach(group => {
+      const btn = group.querySelector('.sy-ct-group-selall'); const chips = [...group.querySelectorAll('.sy-chip')];
+      if (btn && chips.length) btn.textContent = chips.every(c => c.classList.contains('on')) ? 'Deselect all' : 'Select all';
+    });
+  }
   function sySelectAll() {
     allSyTids.forEach(t => syTargets.add(t));
     document.querySelectorAll('#sy-targets .sy-chip').forEach(c => c.classList.add('on'));
-    updateApplyBtnLabel(); scheduleLivePreview();
+    syncAllAcctSelAllLabels(); updateApplyBtnLabel(); scheduleLivePreview();
   }
   function syDeselectAll() {
     syTargets.clear();
     document.querySelectorAll('#sy-targets .sy-chip').forEach(c => c.classList.remove('on'));
-    updateApplyBtnLabel(); renderReviewEmpty();
+    syncAllAcctSelAllLabels(); updateApplyBtnLabel(); renderReviewEmpty();
   }
 
   // ---- live preview ----
