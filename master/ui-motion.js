@@ -403,7 +403,7 @@
   // ===============================================================
   // 8. Canvas backgrounds
   //
-  // One engine, four looks. Each pauses when scrolled out of view or when
+  // One engine, three looks. Each pauses when scrolled out of view or when
   // the tab is hidden, is capped at 2x device pixel ratio, sits behind
   // content and never takes pointer events. Under reduced motion each one
   // paints a single static frame instead of running a loop.
@@ -420,7 +420,7 @@
     var ctx = c.getContext('2d');
     if (!ctx) return;
     var holeCol = (kind === 'hole') ? (host.getAttribute('data-bg-color') || '229,57,53') : '';
-    var w = 0, h = 0, dpr = 1, t = 0, id = 0, live = false, seen = true, parts = null, frame = 0, last = 0;
+    var w = 0, h = 0, dpr = 1, t = 0, id = 0, live = false, seen = true, parts = null, last = 0;
 
     function size() {
       var r = host.getBoundingClientRect();
@@ -491,28 +491,6 @@
           ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.stroke();
         }
         ctx.globalAlpha = 1;
-      } else if (kind === 'hexagon') {
-        var s = 26, hy = s * 0.866, ox = (t * 3) % (s * 1.5);
-        var fx = w * (0.5 + 0.42 * Math.cos(t * 0.32)), fy = h * (0.5 + 0.42 * Math.sin(t * 0.24));
-        var reach = Math.max(w, h) * 0.45;
-        ctx.lineWidth = 1;
-        var col = -1;
-        for (var x = -s; x < w + s * 2; x += s * 1.5) {
-          col++;
-          for (var y = (col % 2 ? hy : 0) - hy; y < h + hy * 2; y += hy * 2) {
-            var xx = x - ox;
-            var d = Math.sqrt((xx - fx) * (xx - fx) + (y - fy) * (y - fy));
-            var a = 0.030 + 0.075 * Math.max(0, 1 - d / reach);
-            ctx.strokeStyle = 'rgba(229,57,53,' + a.toFixed(3) + ')';
-            ctx.beginPath();
-            for (var k = 0; k < 6; k++) {
-              var ang = TAU / 6 * k;
-              var nx = xx + s * 0.5 * Math.cos(ang), ny = y + s * 0.5 * Math.sin(ang);
-              if (k) ctx.lineTo(nx, ny); else ctx.moveTo(nx, ny);
-            }
-            ctx.closePath(); ctx.stroke();
-          }
-        }
       }
     }
     function loop(now) {
@@ -520,8 +498,6 @@
       id = raf(loop);
       var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
       last = now;
-      // hexagon is the most expensive look; run it at half rate
-      if (kind === 'hexagon' && (frame++ & 1)) return;
       t += dt; draw(dt);
     }
     function start() { if (live || reduced()) return; live = true; last = 0; id = raf(loop); }

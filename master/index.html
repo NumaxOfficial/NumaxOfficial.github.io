@@ -13,6 +13,8 @@
     --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.06);
     --t:#fff; --t70:rgba(255,255,255,.72); --t55:rgba(255,255,255,.55); --t45:rgba(255,255,255,.45); --t35:rgba(255,255,255,.35);
     --accent:#E53935; --accent-2:#c62828; --ok:#43A047; --warn:#f0a020;
+    --glass-bg:rgba(6,6,8,.58); --glass-bg-2:rgba(8,8,10,.68); --glass-border:rgba(255,255,255,.08);
+    --glass-glow:0 0 0 1px rgba(255,255,255,.035) inset, 0 1px 0 rgba(255,255,255,.04) inset;
     --r:12px; --r-lg:16px; --r-xl:22px;
     --f:"Inter", system-ui, -apple-system, sans-serif;
   }
@@ -112,7 +114,7 @@
   .sy-left::-webkit-scrollbar{ width:5px; }
   .sy-left::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
   .sy-right .sy-review-card{ flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0; padding:0; }
-  .sy-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; }
+  .sy-card{ background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--glass-border); border-radius:14px; padding:18px 20px; box-shadow:var(--glass-glow); }
   .sy-card-h{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
   .sy-card-h h3{ font-size:15px; font-weight:700; letter-spacing:-.005em; }
   .sy-card-h .spacer{ flex:1; }
@@ -241,7 +243,7 @@
   .watched-se{ font-size:11px; color:var(--t55); font-weight:600; }
   .wp-bar{ height:4px; width:80px; background:var(--surface-3); border-radius:2px; overflow:hidden; }
   .wp-bar-fill{ height:100%; background:var(--accent); border-radius:2px; }
-  .pf-section{ border:1px solid var(--line); border-radius:4px; padding:0; margin-bottom:18px; background:var(--surface); }
+  .pf-section{ border:1px solid var(--glass-border); border-radius:4px; padding:0; margin-bottom:18px; background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); box-shadow:var(--glass-glow); }
   .pf-section-head{ display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line-2); }
   .pf-editor-tabs{ display:flex; gap:2px; border-bottom:1px solid var(--line-2); padding:0 18px; overflow-x:auto; }
   .pf-editor-tab{ flex:none; border:none; border-bottom:2px solid transparent; background:transparent; color:var(--t55); padding:12px 14px; font-size:13.5px; font-weight:600; cursor:pointer; border-radius:0; }
@@ -250,7 +252,7 @@
   .pf-editor-body{ padding:18px; }
   .modal-root{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; }
   .modal-bg{ position:absolute; inset:0; background:rgba(0,0,0,.66); backdrop-filter:blur(2px); }
-  .modal-card{ position:relative; background:#111; border:1px solid var(--line); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:0 24px 70px rgba(0,0,0,.6); }
+  .modal-card{ position:relative; background:var(--glass-bg-2); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:var(--glass-glow), 0 24px 70px rgba(0,0,0,.6); }
   .modal-msg{ font-size:14.5px; line-height:1.5; color:var(--t); }
   .modal-input{ margin-top:14px; }
   .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
@@ -261,7 +263,7 @@
 
   .view{ display:none; }
   .view.current{ display:block; }
-  #view-app.current{ display:grid; }
+  #view-app.current{ display:grid; position:relative; z-index:1; }
 
   .muted{ color:var(--t45); }
   .sm{ font-size:12.5px; }
@@ -347,7 +349,7 @@
   .hchip{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:12.5px; color:var(--t55); }
   .hchip svg{ width:14px; height:14px; color:var(--accent); }
 
-  .signin-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-xl); padding:30px 30px; }
+  .signin-card{ background:var(--glass-bg); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); border:1px solid var(--glass-border); border-radius:var(--r-xl); padding:30px 30px; box-shadow:var(--glass-glow); }
   .signin-card .eyebrow{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:700; }
   .signin-card h2{ font-size:26px; font-weight:700; letter-spacing:-.02em; margin:8px 0 10px; }
   .signin-card p{ color:var(--t55); font-size:13.5px; line-height:1.55; }
@@ -381,7 +383,7 @@
   .sb-user b{ font-size:13px; display:block; }
   .sb-user span{ font-size:11px; color:var(--t35); }
 
-  .main{ overflow-y:auto; background:radial-gradient(120% 60% at 100% 0, rgba(229,57,53,.05), transparent 45%), var(--bg); }
+  .main{ overflow-y:auto; background:radial-gradient(120% 60% at 100% 0, rgba(229,57,53,.05), transparent 45%); }
   .topbar{ position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px; padding:14px clamp(20px,3vw,38px); background:rgba(0,0,0,.72); backdrop-filter:blur(10px); border-bottom:1px solid var(--line-2); }
   .crumb{ font-size:13px; color:var(--t45); }
   .crumb b{ color:var(--t); font-weight:600; }
@@ -391,7 +393,7 @@
   .phead h1{ font-size:clamp(26px,3.2vw,34px); font-weight:800; letter-spacing:-.02em; margin-top:8px; }
   .phead p{ color:var(--t55); font-size:14.5px; margin-top:8px; max-width:64ch; line-height:1.5; }
 
-  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); padding:20px 22px; margin-bottom:18px; }
+  .card{ background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--glass-border); border-radius:var(--r-lg); padding:20px 22px; margin-bottom:18px; box-shadow:var(--glass-glow); }
   .card > h3{ font-size:17px; font-weight:700; letter-spacing:-.01em; }
   .chead{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
   .pill-count{ font-family:ui-monospace,monospace; font-size:11.5px; color:var(--t55); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
@@ -778,10 +780,9 @@
   .mo-bg-host{ position:relative; }
   .mo-bg{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:0; }
   .mo-bg-host > *:not(.mo-bg){ position:relative; z-index:1; }
+  div.mo-app-bg{ position:fixed; inset:0; z-index:0; pointer-events:none; }
   .mo-panel-bg{ position:absolute; inset:0; z-index:0; pointer-events:none; }
-  .panel[data-panel="drive"]{ position:relative; }
-  .panel[data-panel="drive"] > *:not(.mo-panel-bg){ position:relative; z-index:1; }
-  #view-landing{ position:relative; }
+  #view-landing{ position:relative; z-index:1; }
   .mo-fw{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:60; }
   .mo-fw-host{ position:relative; }
 
@@ -821,6 +822,7 @@
 </style>
 </head>
 <body>
+<div class="mo-app-bg" data-bg="stars" aria-hidden="true"></div>
 <div class="land-glow" aria-hidden="true"></div>
 
 <!-- ============ LANDING ============ -->
@@ -906,7 +908,7 @@
 
     <!-- profile -->
     <section class="panel" data-panel="profile" style="display:none">
-      <div class="sy-card pf-head-card" data-bg="stars">
+      <div class="sy-card pf-head-card">
         <div class="pf-head-l">
           <span class="eyebrow">Profile</span>
           <h1>Open one profile and edit it.</h1>
@@ -1099,7 +1101,7 @@
                 <span class="inline-status" id="sy-pv-status"></span>
               </div>
               <div class="sy-review-body">
-                <div class="sy-empty-state mo-enterable" id="sy-review-empty" data-bg="hole">
+                <div class="sy-empty-state mo-enterable" id="sy-review-empty">
                   <svg viewBox="0 0 200 180" fill="none" stroke="currentColor" stroke-width="1.4">
                     <rect x="46" y="30" width="92" height="120" rx="6" fill="rgba(255,255,255,.02)"/>
                     <path d="M60 62h56M60 78h48M60 94h56M60 110h32" stroke-linecap="round"/>
@@ -1134,7 +1136,6 @@
 
     <!-- drive -->
     <section class="panel" data-panel="drive" style="display:none">
-      <div class="mo-panel-bg" data-bg="hexagon" aria-hidden="true"></div>
       <div class="phead"><span class="eyebrow">Google Drive</span><h1>Back up and restore.</h1>
         <p>Backups and templates live in your own Drive, using access limited to files Numax creates. Choose what goes in, name it, and restore any part later.</p></div>
       <div class="card"><div class="chead"><h3>Connection</h3><span class="spacer"></span><span class="inline-status" id="dr-status">Connected via sign-in.</span></div></div>
