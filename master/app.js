@@ -85,6 +85,209 @@
     n.textContent = t;
     n.className = 'inline-status' + (c ? ' ' + c : '') + (!c && /…$/.test(t) ? ' shimmer' : '');
   };
+  // ---- async reads that can never hang a placeholder ----
+  // Every network read here used to be an un-timed fetch sitting behind a
+  // "Loading…"/"Reading…" placeholder that only cleared on the success path.
+  // A stalled request therefore shimmered forever, and several early-return
+  // paths never cleared theirs at all. These two helpers make both impossible:
+  // a read resolves, times out, or throws, and the placeholder always reaches
+  // a terminal state — content, empty, or a readable error.
+  const READ_TIMEOUT = 25000;
+  function withTimeout(p, ms, what) {
+    let t;
+    const limit = new Promise((_, rej) => {
+      t = setTimeout(() => rej(new Error((what || 'That') + ' took too long — check your connection and try again.')), ms || READ_TIMEOUT);
+    });
+    return Promise.race([Promise.resolve(p), limit]).finally(() => clearTimeout(t));
+  }
+  // Runs an async load into `box` behind a shimmer, then hands the emptied box
+  // back to the caller to fill. `stale()` lets a caller abandon a load whose
+  // surface has since been replaced, without leaving the shimmer behind.
+  async function loadInto(box, label, run, opts) {
+    if (!box) return undefined;
+    const o = opts || {};
+    clr(box); box.appendChild(el('p', 'muted sm shimmer', label));
+    let out;
+    try {
+      out = await withTimeout(run(), o.timeout, label.replace(/…\s*$/, ''));
+    } catch (e) {
+      if (!(o.stale && o.stale())) { clr(box); box.appendChild(el('p', 'empty sm err-text', (o.prefix || '') + e.message)); }
+      return undefined;
+    }
+    if (o.stale && o.stale()) return undefined;
+    clr(box);
+    return { value: out };
+  }
+
+  // ---- iOS-style select ----------------------------------------------------
+  // A native <select> styles its closed box but NOT its open list: that list is
+  // drawn by the OS and lands as a flat grey rectangle on top of a dark themed
+  // page. This wraps the real <select> — which stays in the DOM as the single
+  // source of truth, so every existing `.value` read and 'change' listener
+  // keeps working — and draws the closed control and the popup list itself.
+  // A MutationObserver keeps the label in sync with options added later
+  // (several selects are populated after an async profile read).
+  const prefersReducedMotion = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  let openSelect = null;
+  function closeSelect() {
+    if (!openSelect) return;
+    const o = openSelect; openSelect = null;
+    o.list.classList.remove('open');
+    o.btn.setAttribute('aria-expanded', 'false');
+    if (prefersReducedMotion()) o.list.remove(); else setTimeout(() => o.list.remove(), 160);
+    document.removeEventListener('keydown', o.key, true);
+    window.removeEventListener('resize', closeSelect);
+    document.removeEventListener('scroll', closeSelect, true);
+  }
+
+  function enhanceSelect(sel) {
+    if (!sel || sel.dataset.enhanced) return null;
+    sel.dataset.enhanced = '1';
+    const wrap = el('div', 'nsel');
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+    sel.classList.add('nsel-native');
+    // The custom button is the control; keep the native element out of the tab
+    // order and out of the accessibility tree so it is not announced twice.
+    sel.setAttribute('aria-hidden', 'true');
+    sel.tabIndex = -1;
+
+    const btn = el('button', 'nsel-btn'); btn.type = 'button';
+    btn.setAttribute('aria-haspopup', 'listbox');
+    btn.setAttribute('aria-expanded', 'false');
+    const lab = el('span', 'nsel-lab');
+    const car = el('span', 'nsel-car');
+    car.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m7 10 5 5 5-5"/></svg>';
+    btn.appendChild(lab); btn.appendChild(car);
+    wrap.appendChild(btn);
+
+    const sync = () => {
+      const o = sel.options[sel.selectedIndex];
+      lab.textContent = o ? (o.dataset.label || o.textContent) : '';
+      btn.disabled = sel.disabled || !sel.options.length;
+    };
+    sync();
+    new MutationObserver(sync).observe(sel, { childList: true, subtree: true, attributes: true });
+    sel.addEventListener('change', sync);
+
+    btn.onclick = e => {
+      e.preventDefault(); e.stopPropagation();
+      if (openSelect && openSelect.btn === btn) { closeSelect(); return; }
+      closeSelect();
+      const list = el('div', 'nsel-list'); list.setAttribute('role', 'listbox');
+      [...sel.options].forEach((op, i) => {
+        const row = el('div', 'nsel-opt' + (i === sel.selectedIndex ? ' on' : ''));
+        row.setAttribute('role', 'option');
+        row.setAttribute('aria-selected', i === sel.selectedIndex ? 'true' : 'false');
+        const tx = el('div', 'nsel-tx');
+        tx.appendChild(el('div', 'nsel-t', op.dataset.label || op.textContent));
+        if (op.dataset.hint) tx.appendChild(el('div', 'nsel-h', op.dataset.hint));
+        row.appendChild(tx);
+        const ck = el('span', 'nsel-ck');
+        ck.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+        row.appendChild(ck);
+        row.onclick = () => {
+          if (sel.selectedIndex !== i) { sel.selectedIndex = i; sel.dispatchEvent(new Event('change', { bubbles: true })); }
+          sync(); closeSelect();
+        };
+        list.appendChild(row);
+      });
+      document.body.appendChild(list);
+      // Measured, then clamped into the viewport in both axes — a list opened
+      // from a control near the bottom flips above rather than running off.
+      const r = btn.getBoundingClientRect();
+      const lw = Math.max(r.width, 200);
+      list.style.width = lw + 'px';
+      const lh = list.offsetHeight;
+      let top = r.bottom + 6;
+      if (top + lh > window.innerHeight - 8) top = Math.max(8, (r.top - lh - 6 >= 8) ? r.top - lh - 6 : window.innerHeight - lh - 8);
+      list.style.left = Math.round(Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - lw - 8))) + 'px';
+      list.style.top = Math.round(top) + 'px';
+      list.style.transformOrigin = (top < r.top ? 'bottom' : 'top') + ' center';
+      requestAnimationFrame(() => list.classList.add('open'));
+      btn.setAttribute('aria-expanded', 'true');
+
+      const key = ev => {
+        if (ev.key === 'Escape') { ev.preventDefault(); closeSelect(); btn.focus(); }
+        else if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+          ev.preventDefault();
+          const n = sel.options.length; if (!n) return;
+          sel.selectedIndex = (sel.selectedIndex + (ev.key === 'ArrowDown' ? 1 : n - 1)) % n;
+          sel.dispatchEvent(new Event('change', { bubbles: true })); sync();
+          [...list.children].forEach((c, i) => c.classList.toggle('on', i === sel.selectedIndex));
+        } else if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); closeSelect(); btn.focus(); }
+      };
+      document.addEventListener('keydown', key, true);
+      window.addEventListener('resize', closeSelect);
+      document.addEventListener('scroll', closeSelect, true);
+      openSelect = { btn, list, key };
+    };
+    return { sync };
+  }
+  document.addEventListener('click', e => { if (openSelect && !openSelect.list.contains(e.target)) closeSelect(); });
+  // Upgrade everything already on the page, and anything rendered later.
+  function enhanceAllSelects(root) {
+    (root || document).querySelectorAll('select.sel:not([data-enhanced])').forEach(enhanceSelect);
+  }
+
+  // Builds a select from plain data and enhances it. `hint` becomes the
+  // secondary line in the popup — the long "Merge — add it, keep everything
+  // else" labels read far better split into a title and a description.
+  function mkSelect(items, cls) {
+    const sel = el('select', 'sel' + (cls ? ' ' + cls : ''));
+    items.forEach(it => {
+      const o = document.createElement('option');
+      o.value = it.value; o.textContent = it.label;
+      o.dataset.label = it.label; if (it.hint) o.dataset.hint = it.hint;
+      sel.appendChild(o);
+    });
+    const host = el('div', 'nsel-host');
+    host.appendChild(sel);
+    enhanceSelect(sel);
+    return {
+      node: host,
+      select: sel,
+      value: () => sel.value,
+      onChange: fn => sel.addEventListener('change', fn),
+    };
+  }
+
+  // ---- disclosure ----------------------------------------------------------
+  // Collapsed by default, height-animated open. Used to demote long reference
+  // lists (a repo's scrapers) below the controls that actually do something.
+  function mkDisclosure(title, sub, openByDefault) {
+    const node = el('div', 'disc');
+    const head = el('button', 'disc-h'); head.type = 'button';
+    const tx = el('div', 'disc-tx');
+    tx.appendChild(el('div', 'disc-t', title));
+    if (sub) tx.appendChild(el('div', 'disc-s', sub));
+    head.appendChild(tx);
+    const car = el('span', 'disc-car');
+    car.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m7 10 5 5 5-5"/></svg>';
+    head.appendChild(car);
+    const wrap = el('div', 'disc-w');
+    const body = el('div', 'disc-b');
+    wrap.appendChild(body); node.appendChild(head); node.appendChild(wrap);
+    let on = !!openByDefault;
+    const paint = anim => {
+      node.classList.toggle('open', on);
+      head.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (!anim || prefersReducedMotion()) { wrap.style.height = on ? 'auto' : '0px'; return; }
+      const h = body.scrollHeight;
+      if (on) {
+        wrap.style.height = '0px';
+        requestAnimationFrame(() => { wrap.style.height = h + 'px'; });
+        setTimeout(() => { if (on) wrap.style.height = 'auto'; }, 320);
+      } else {
+        wrap.style.height = h + 'px';
+        requestAnimationFrame(() => { wrap.style.height = '0px'; });
+      }
+    };
+    head.onclick = () => { on = !on; paint(true); };
+    paint(false);
+    return { node, body, head };
+  }
+
   // Intentional empty state; ui-motion.js mounts the contained background from
   // data-bg and handles pausing it and honouring reduced motion.
   function emptyState(bg, title, body, iconPath) {
@@ -239,7 +442,7 @@
 
   async function driveFindByProp(k, v) {
     const q = encodeURIComponent(`appProperties has { key='${k}' and value='${v}' } and trashed=false`);
-    const r = await fetch(`${DRIVE}/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime,appProperties)&orderBy=modifiedTime desc`, { headers: auth() }).then(r => r.json());
+    const r = await withTimeout(fetch(`${DRIVE}/files?q=${q}&spaces=drive&fields=files(id,name,modifiedTime,appProperties)&orderBy=modifiedTime desc`, { headers: auth() }).then(r => r.json()), READ_TIMEOUT, 'Reading Google Drive');
     return (r && r.files) || [];
   }
   async function driveUpload(name, obj, appProps, existingId) {
@@ -250,7 +453,7 @@
     const r = await fetch(url, { method: existingId ? 'PATCH' : 'POST', headers: { ...auth(), 'Content-Type': `multipart/related; boundary=${boundary}` }, body }).then(r => r.json());
     if (!r || !r.id) throw new Error('Drive did not confirm the write.'); return r;
   }
-  async function driveDownload(id) { const r = await fetch(`${DRIVE}/files/${id}?alt=media`, { headers: auth() }); if (!r.ok) throw new Error('Read failed (' + r.status + ').'); return r.json(); }
+  async function driveDownload(id) { const r = await withTimeout(fetch(`${DRIVE}/files/${id}?alt=media`, { headers: auth() }), READ_TIMEOUT, 'Reading that file from Drive'); if (!r.ok) throw new Error('Read failed (' + r.status + ').'); return r.json(); }
   async function driveDelete(id) { await fetch(`${DRIVE}/files/${id}`, { method: 'DELETE', headers: auth() }); }
 
   // ---- account registry in Drive ----
@@ -281,15 +484,30 @@
   // whether THIS account had API keys included, decided at link time and stored
   // with it — not the live "Read API keys" switch, which only governs new links.
   const accountKeysIncluded = id => { const rec = store.get(id); return !!(rec && rec.keysIncluded); };
+  // Every profile read in the app funnels through here, so the timeout lives
+  // here rather than at ~17 call sites — an un-timed fetch was what left
+  // "Reading profiles…" / "Loading profiles…" shimmering indefinitely.
+  // `inflight` also collapses concurrent reads of the same account, which
+  // previously fired a full account export per caller.
+  const inflight = {};
   async function loadAccount(id, force) {
     const c = cache[id]; if (c && !force) return c;
+    if (!force && inflight[id]) return inflight[id];
+    const p = withTimeout(loadAccountNow(id), READ_TIMEOUT, 'Reading this account')
+      .finally(() => { if (inflight[id] === p) delete inflight[id]; });
+    inflight[id] = p;
+    return p;
+  }
+  async function loadAccountNow(id) {
     const keysIncluded = accountKeysIncluded(id);
     const cl = A.client(store, id); const backup = await cl.exportBackup();
     if (!keysIncluded && Array.isArray(backup.profile_settings_blobs)) backup.profile_settings_blobs = backup.profile_settings_blobs.map(b => b && b.settings_json ? { ...b, settings_json: stripKeys(b.settings_json) } : b);
     const rec = { backup, profiles: normProfiles(backup.profiles) }; cache[id] = rec; return rec;
   }
-  const inval = id => { delete cache[id]; delete membershipCache[id]; };
-  const invalAll = () => Object.keys(cache).forEach(k => delete cache[k]) || Object.keys(membershipCache).forEach(k => delete membershipCache[k]);
+  // Invalidating drops in-flight reads too: a read that started before the
+  // invalidation describes the old state, so it must not be handed out after.
+  const inval = id => { delete cache[id]; delete membershipCache[id]; delete inflight[id]; };
+  const invalAll = () => { Object.keys(cache).forEach(k => delete cache[k]); Object.keys(membershipCache).forEach(k => delete membershipCache[k]); Object.keys(inflight).forEach(k => delete inflight[k]); };
   // whether an account has an active Nuvio Supporter / Supporter Plus membership —
   // gates the supporter-only theme colors the same way Nuvio's own client does.
   async function getMembership(id) {
@@ -938,7 +1156,7 @@
     const tsel = el('select', 'sel'); tw.appendChild(tsel); body.appendChild(tw);
     for (const rec of store.list()) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } profiles.forEach(p => { const o = document.createElement('option'); o.value = rec.accountId + ':' + p.index; o.textContent = p.name + ' · ' + accountName(rec.accountId); tsel.appendChild(o); }); }
     const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:12px'; mw.appendChild(el('span', '', 'How to apply'));
-    const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge">Merge — add and update, keep the rest</option><option value="overwrite">Overwrite — match the template exactly</option>'; mw.appendChild(msel); body.appendChild(mw);
+    const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge</option><option value="overwrite" data-label="Overwrite" data-hint="match the template exactly">Overwrite</option>'; mw.appendChild(msel); body.appendChild(mw);
     const bar = el('div', 'actbar'); const btn = el('button', 'btn btn-primary', 'Preview'); const st = el('div', 'inline-status'); bar.appendChild(btn); bar.appendChild(st); body.appendChild(bar);
     const res = el('div'); res.style.marginTop = '12px'; body.appendChild(res);
     btn.onclick = async () => {
@@ -1006,7 +1224,10 @@
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
     if (plan.hasRemovals) { const w = el('label', 'confirm'); const cb = el('input'); cb.type = 'checkbox'; cb.onchange = () => { confirmed = cb.checked; ap.disabled = !confirmed; }; w.appendChild(cb); w.appendChild(el('span', '', 'This removes items the target has that this doesn\'t. I understand.')); res.appendChild(w); }
-    const ap = el('button', 'btn btn-solid', 'Apply'); ap.disabled = (!plan.hasChanges && !hasExtras) || !confirmed;
+    // Primary red, matching every other commit action on the site — a white
+    // button was the odd one out on the review surfaces.
+    const ap = el('button', 'btn btn-primary', 'Apply'); ap.disabled = (!plan.hasChanges && !hasExtras) || !confirmed;
+    ap.style.marginTop = '4px';
     ap.onclick = async () => { ap.disabled = true; status(st, 'Applying…');
       try {
         const rr = await A.client(store, accountId).applyPlan(plan, { dryRun: false }); const fails = (rr.results || []).filter(x => !x.ok);
@@ -1028,7 +1249,17 @@
             } catch (e) { fails.push({ ok: false, surface: 'credentials', error: e.message }); }
           }
         }
-        invalAll(); status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + '.', fails.length ? 'err' : 'ok'); logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
+        invalAll();
+        // Prove it landed. The push RPCs answer 204 with an empty body, so a
+        // clean response is not evidence the data is actually on the profile —
+        // which is how a write could report success having changed nothing.
+        if (!fails.length && extras && typeof extras.verify === 'function') {
+          status(st, 'Checking it saved…');
+          (await extras.verify()).forEach(m => fails.push({ ok: false, surface: 'verify', error: m }));
+        }
+        status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + ' — checked and saved.', fails.length ? 'err' : 'ok');
+        logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
+        if (fails.length) { const ul = el('ul', 'modal-details'); fails.forEach(f => ul.appendChild(el('li', '', (f.surface ? f.surface + ': ' : '') + f.error))); res.appendChild(ul); }
         if (!fails.length) celebrate(res.closest('.card') || res);
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
     };
@@ -1389,13 +1620,22 @@
     const btn = $('sy-apply'); if (!btn) return;
     btn.textContent = 'Apply to ' + n + ' profile' + (n === 1 ? '' : 's');
   }
+  // Two of these can be in flight at once — the debounced live preview and the
+  // manual Preview button — and each awaits several network reads. Without a
+  // generation guard a stale run could finish last and either paint outdated
+  // numbers or blank the panel while leaving Apply enabled, which would let
+  // someone apply a plan they never actually saw.
+  let syPvGen = 0;
   function renderReviewEmpty() {
+    syPvGen++;   // cancels any preview still in flight
     $('sy-review-empty').style.display = ''; $('sy-review-full').style.display = 'none';
     const sub = $('sy-review-sub'); if (sub) sub.textContent = '';
     status($('sy-pv-status'), '');
     $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; $('sy-apply').disabled = true; syPlans = null;
   }
   async function livePreviewAllTargets() {
+    const gen = ++syPvGen;
+    const current = () => gen === syPvGen;
     if (!sySnap) { renderReviewEmpty(); return; }
     const targets = [...syTargets]; if (!targets.length) { renderReviewEmpty(); return; }
     $('sy-review-empty').style.display = 'none'; $('sy-review-full').style.display = '';
@@ -1425,13 +1665,14 @@
         if (cats.watched && sySnapExt.watched.length) extras.watched = sySnapExt.watched;
         plans.push({ aid, tid, plan, extras, nuvio: nuvioCopyEligibility(aid) });
       }
+      if (!current()) return;   // a newer preview owns the panel now
       syPlans = plans; renderSyReports(plans); renderSyMetrics(plans);
       if (rem) $('sy-confirm-wrap').style.display = ''; else { $('sy-confirm-wrap').style.display = 'none'; $('sy-confirm').checked = false; }
       $('sy-apply').disabled = rem && !$('sy-confirm').checked;
       const sub = $('sy-review-sub'); if (sub) sub.textContent = plans.length + ' profile' + (plans.length === 1 ? '' : 's') + ' selected';
       renderSyReviewFoot(plans, rem);
       status($('sy-pv-status'), 'Live', 'ok');
-    } catch (e) { status($('sy-pv-status'), e.message, 'err'); }
+    } catch (e) { if (current()) status($('sy-pv-status'), e.message, 'err'); }
   }
   function syMaster() {
     const s = sySnap;
@@ -1677,16 +1918,20 @@
   // ======================================================================
   async function refreshDrive() {
     status($('dr-status'), gAuth.token ? (gAuth.user && gAuth.user.email ? 'Connected as ' + gAuth.user.email : 'Connected.') : 'Not connected.', gAuth.token ? 'ok' : 'err');
-    const box = $('dr-backup-picker'); clr(box); const list = store.list(); if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account to choose what to back up.')); return; }
-    const allBtn = el('button', 'btn btn-ghost btn-xs', 'Select all'); allBtn.style.marginBottom = '12px';
+    const box = $('dr-backup-picker'); clr(box); const list = store.list();
+    // refreshRestore() must run on EVERY path: it owns the restore list, whose
+    // placeholder is static markup in index.html. The old early return here
+    // left that placeholder shimmering "Loading backups…" forever.
+    if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account to choose what to back up.')); refreshRestore(); return; }
+    const allBtn = el('button', 'selall-pill', 'Select all');
     allBtn.onclick = () => { const chips = box.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); allBtn.textContent = allOn ? 'Select all' : 'Deselect all'; };
     box.appendChild(allBtn);
     for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
       const acctRow = el('div', 'tgt-acct-row'); acctRow.appendChild(el('div', 'tgt-acct', accountName(rec.accountId)));
-      const acctSelAll = el('button', 'tgt-selall', 'select all');
+      const acctSelAll = el('button', 'selall-pill sm', 'Select all');
       acctRow.appendChild(acctSelAll); box.appendChild(acctRow);
       const grid = el('div', 'tgt-grid'); profiles.forEach(p => { const tid = rec.accountId + ':' + p.index; const c = el('button', 'pchip multi'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => c.classList.toggle('on'); grid.appendChild(c); }); box.appendChild(grid);
-      acctSelAll.onclick = () => { const chips = grid.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'select all' : 'deselect all'; };
+      acctSelAll.onclick = () => { const chips = grid.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'Select all' : 'Deselect all'; };
     }
     refreshRestore();
   }
@@ -1718,7 +1963,7 @@
     const sw = el('label', 'fld'); sw.style.cssText = 'max-width:440px;margin-top:10px'; sw.appendChild(el('span', '', 'Which saved profile')); const src = el('select', 'sel'); restoreDoc.profiles.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name + ' · ' + (p.account || 'backup'); src.appendChild(o); }); sw.appendChild(src); cfg.appendChild(sw);
     const tw = el('label', 'fld'); tw.style.cssText = 'max-width:440px;margin-top:10px'; tw.appendChild(el('span', '', 'Restore into')); const tsel = el('select', 'sel'); tw.appendChild(tsel); cfg.appendChild(tw);
     for (const rec of store.list()) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } profiles.forEach(p => { const o = document.createElement('option'); o.value = rec.accountId + ':' + p.index; o.textContent = p.name + ' · ' + accountName(rec.accountId); tsel.appendChild(o); }); }
-    const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:10px'; mw.appendChild(el('span', '', 'How to apply')); const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge">Merge</option><option value="overwrite">Overwrite</option>'; mw.appendChild(msel); cfg.appendChild(mw);
+    const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:10px'; mw.appendChild(el('span', '', 'How to apply')); const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge</option><option value="overwrite" data-label="Overwrite" data-hint="make this profile match the backup exactly">Overwrite</option>'; mw.appendChild(msel); cfg.appendChild(mw);
     const bar = el('div', 'actbar'); const btn = el('button', 'btn btn-primary', 'Preview restore'); const st = el('div', 'inline-status'); bar.appendChild(btn); bar.appendChild(st); cfg.appendChild(bar); const res = el('div'); res.style.marginTop = '12px'; cfg.appendChild(res);
     btn.onclick = async () => {
       const saved = restoreDoc.profiles[parseInt(src.value, 10)]; const tid = tsel.value; if (!tid) { status(st, 'Pick a target.', 'err'); return; } const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10); const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
@@ -1766,11 +2011,13 @@
   // ---- popover (own mechanism; deliberately not ui-motion's carry-chooser) ----
   let mkPop = null;
   function mkPopKey(e) { if (e.key === 'Escape') closeMkPop(); }
+  function mkPopReplace() { if (mkPop) mkPop.place(); }
   function closeMkPop() {
     if (!mkPop) return;
     mkPop.bg.remove(); mkPop.box.remove(); mkPop = null;
     document.removeEventListener('keydown', mkPopKey);
-    window.removeEventListener('resize', closeMkPop);
+    window.removeEventListener('resize', mkPopReplace);
+    window.removeEventListener('scroll', mkPopReplace, true);
   }
   function openMkPop(anchor, title, sub) {
     closeMkPop();
@@ -1781,14 +2028,22 @@
     document.body.appendChild(bg); document.body.appendChild(box);
     bg.onclick = closeMkPop;
     document.addEventListener('keydown', mkPopKey);
-    window.addEventListener('resize', closeMkPop);
+    // Resizing used to close the popover outright, throwing away whatever the
+    // user had part-filled. Re-place it instead; only Escape or a click on the
+    // backdrop closes it.
+    window.addEventListener('resize', mkPopReplace);
+    window.addEventListener('scroll', mkPopReplace, true);
     // The box is measured, not guessed — and re-measured by place() once async
     // content has filled it, or a list loaded later would hang off-screen.
     const place = () => {
       const r = anchor.getBoundingClientRect(), w = box.offsetWidth, ht = box.offsetHeight;
       const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
       let top = r.bottom + 8;
-      if (top + ht > window.innerHeight - 8) top = (r.top - ht - 8 >= 8) ? r.top - ht - 8 : Math.max(8, window.innerHeight - ht - 8);
+      if (top + ht > window.innerHeight - 8) top = (r.top - ht - 8 >= 8) ? r.top - ht - 8 : window.innerHeight - ht - 8;
+      // Final clamp: the flip-above branch above is only correct while the
+      // anchor is on screen. Clamping unconditionally means the popover can
+      // never be drawn outside the viewport whatever the anchor is doing.
+      top = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - ht - 8));
       box.style.left = Math.round(left) + 'px';
       box.style.top = Math.round(top) + 'px';
     };
@@ -1882,14 +2137,36 @@
   }
 
   // Every linked account's profiles, flattened, for the target pickers.
+  // An account that fails to read is REPORTED, never skipped in silence: the
+  // old version swallowed the error and an unreadable account was then
+  // indistinguishable from "you have no accounts linked".
   async function mkAllProfiles() {
-    const out = [];
+    const targets = [], failed = [];
     for (const rec of store.list()) {
-      let profiles;
-      try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
-      profiles.forEach(p => out.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId) }));
+      try {
+        const { profiles } = await loadAccount(rec.accountId);
+        profiles.forEach(p => targets.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId) }));
+      } catch (e) { failed.push(accountName(rec.accountId) + ' — ' + e.message); }
     }
-    return out;
+    return { targets, failed };
+  }
+  // Shared "pick some profiles" body: renders the list, any per-account read
+  // failure, and the empty state, and returns the usable targets.
+  async function mkFillTargets(box, chosen, onChange, stale) {
+    const got = await loadInto(box, 'Reading profiles…', mkAllProfiles, { stale });
+    if (!got) return null;
+    const { targets, failed } = got.value;
+    // mkTargetList clears the box, so it has to run before the failure lines.
+    if (targets.length) mkTargetList(box, targets, chosen);
+    failed.forEach(f => box.appendChild(el('p', 'empty sm err-text', f)));
+    if (!targets.length) {
+      box.appendChild(el('p', 'empty sm', failed.length
+        ? 'No profiles could be read from the accounts above.'
+        : 'No linked accounts yet — link one on the Nuvio accounts tab.'));
+      return null;
+    }
+    if (onChange) box.addEventListener('mkchange', onChange);
+    return targets;
   }
   function mkTargetList(box, targets, chosen) {
     clr(box);
@@ -1910,6 +2187,8 @@
 
   async function openAddToProfile(anchor, name) {
     const pop = openMkPop(anchor, 'Add ' + name, 'Paste the manifest URL its site gave you.');
+    const mine = pop;
+    const stale = () => mkPop !== mine;
     const inp = el('input'); inp.type = 'url'; inp.placeholder = 'https://…/manifest.json';
     inp.style.cssText = 'width:100%;margin-bottom:10px';
     pop.body.appendChild(inp);
@@ -1918,48 +2197,59 @@
     pop.body.appendChild(nm);
 
     pop.body.appendChild(el('div', 'mk-sec-t', 'Add to'));
-    const tbox = el('div'); tbox.style.marginTop = '6px'; pop.body.appendChild(tbox);
-    tbox.appendChild(el('p', 'muted sm shimmer', 'Reading profiles…'));
+    const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
 
-    const modeW = el('label', 'fld'); modeW.style.marginTop = '12px';
+    const modeW = el('label', 'fld mk-mode');
     modeW.appendChild(el('span', '', 'How to write it'));
-    const msel = el('select', 'sel');
-    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all add-ons with just this</option>';
-    modeW.appendChild(msel); pop.body.appendChild(modeW);
+    const msel = mkSelect([
+      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
+      { value: 'mirror', label: 'Overwrite', hint: 'replace all add-ons with just this' },
+    ]);
+    modeW.appendChild(msel.node); pop.body.appendChild(modeW);
 
     const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
-    const res = el('div'); res.style.marginTop = '8px'; pop.body.appendChild(res);
+    const res = el('div', 'mk-res'); pop.body.appendChild(res);
 
-    const go = el('button', 'btn btn-primary', 'Add'); go.style.width = '100%'; go.disabled = true;
+    const go = el('button', 'btn btn-primary', 'Add'); go.style.width = '100%';
     pop.foot.appendChild(go);
 
     let targets = [];
-    try { targets = await mkAllProfiles(); } catch (e) { clr(tbox); tbox.appendChild(el('p', 'empty sm err-text', e.message)); return; }
-    if (!mkPop) return;
-    if (!targets.length) { clr(tbox); tbox.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
     const chosen = new Set();
-    mkTargetList(tbox, targets, chosen);
-    pop.place();
-    const sync = () => { go.disabled = !(chosen.size && inp.value.trim()); };
-    tbox.addEventListener('mkchange', sync);
-    inp.addEventListener('input', sync);
-
-    go.onclick = () => {
+    const ready = () => chosen.size > 0 && !!inp.value.trim();
+    const run = () => {
       const url = inp.value.trim();
       if (!/^https?:\/\//i.test(url)) { status(st, 'That doesn’t look like a URL.', 'err'); return; }
-      const picked = targets.filter(t => chosen.has(t.aid + ':' + t.idx));
       mkWrite({
         kind: 'addons', master: [{ url, name: nm.value.trim() || name, enabled: true }],
-        targets: picked, mode: msel.value, st, res, btn: go, label: name,
+        targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
+        mode: msel.value(), st, res, btn: go, label: name,
       });
     };
+    const reset = mkBindApply(go, res, st, 'Add', run, ready);
+    msel.onChange(reset);
+    inp.addEventListener('input', reset);
+
+    const got = await mkFillTargets(tbox, chosen, reset, stale);
+    if (stale()) return;
+    if (!got) { go.disabled = true; pop.place(); return; }
+    targets = got;
+    reset();
+    pop.place();
   }
 
   // Shared writer for add-ons and plugins. Reads each target fresh, plans with
   // the engine, shows exactly what changes, requires a tick before any removal,
-  // then applies per target and reports every failure individually.
+  // then applies per target, verifies each write by reading it back, and
+  // reports every failure individually.
+  //
+  // The button is a two-state machine — "plan" then "confirm" — and ANY change
+  // to the selection or the merge/overwrite mode drops it back to "plan".
+  // Previously the mode dropdown never re-planned, so the panel kept showing a
+  // stale result and could apply a plan built for a different selection; and a
+  // "nothing to do" outcome disabled the button permanently, which is why
+  // switching Merge to Overwrite left no way to apply at all.
   async function mkWrite(o) {
-    const { kind, master, targets, mode, st, res, btn, label } = o;
+    const { kind, master, targets, mode, st, res, btn, label, aid } = o;
     btn.disabled = true; clr(res); status(st, 'Reading target profiles…');
     const plans = [];
     try {
@@ -1996,6 +2286,8 @@
     res.appendChild(rep);
     status(st, '');
 
+    // "Nothing to do" is an outcome, not a dead end: the button stays live so
+    // switching Merge -> Overwrite (or picking another profile) re-plans.
     if (!anyChange) { status(st, 'Already there — nothing to do.', 'ok'); btn.disabled = true; return; }
 
     let confirmed = !anyRemoval;
@@ -2016,21 +2308,50 @@
         try {
           const rr = await A.client(store, t.aid).applyPlan(plan, { dryRun: false });
           const bad = (rr.results || []).filter(x => !x.ok);
-          if (bad.length) fails.push(t.name + ': ' + bad.map(b => b.error).join('; ')); else ok++;
+          if (bad.length) { fails.push(t.name + ': ' + bad.map(b => b.error).join('; ')); continue; }
+          ok++;
         } catch (e) { fails.push(t.name + ': ' + e.message); }
       }
       invalAll();
+      // Read back and prove it landed. The push RPCs answer 204 with no body,
+      // so "the server didn't error" is NOT evidence the data is there — which
+      // is exactly how a write could report success while nothing changed.
+      if (ok) {
+        status(st, 'Checking it saved…');
+        const missing = await verifyWrote(plans.filter(x => x.plan.hasChanges), kind, master);
+        missing.forEach(m => fails.push(m));
+      }
       if (fails.length) {
-        status(st, 'Wrote ' + ok + ', failed ' + fails.length + '.', 'err');
+        status(st, fails.length + ' problem' + (fails.length === 1 ? '' : 's') + ' — see below.', 'err');
         const ul = el('ul', 'modal-details'); fails.forEach(f => ul.appendChild(el('li', '', f))); res.appendChild(ul);
         logAct('Marketplace: ' + label + ' — ' + fails.length + ' error(s)', 'err');
       } else {
-        status(st, 'Added to ' + ok + ' profile' + (ok === 1 ? '' : 's') + '.', 'ok');
+        status(st, 'Added to ' + ok + ' profile' + (ok === 1 ? '' : 's') + ' — checked and saved.', 'ok');
         logAct('Marketplace: added ' + label + ' to ' + ok + ' profile(s)', 'ok');
         celebrate(mkPop && mkPop.box);
       }
       if (pfA && pfI != null) openProfile(pfA, pfI, true);
     };
+  }
+
+  // Re-reads each written profile and confirms every item is actually present.
+  // Returns a list of human-readable problems (empty when everything landed).
+  async function verifyWrote(written, kind, master) {
+    const problems = [];
+    const wanted = master.map(m => m.url);
+    const byAccount = new Map();
+    written.forEach(({ t }) => { if (!byAccount.has(t.aid)) byAccount.set(t.aid, []); byAccount.get(t.aid).push(t); });
+    for (const [acct, list] of byAccount) {
+      let backup;
+      try { ({ backup } = await loadAccount(acct, true)); }
+      catch (e) { problems.push('Could not confirm the save: ' + e.message); continue; }
+      list.forEach(t => {
+        const have = new Set((sliceProfile(backup, t.idx)[kind] || []).map(x => x.url));
+        const gone = wanted.filter(u => !have.has(u));
+        if (gone.length) problems.push(t.name + ': Nuvio accepted the write but ' + gone.length + ' item(s) are not there afterwards.');
+      });
+    }
+    return problems;
   }
 
   // ---- plugins ----
@@ -2076,79 +2397,119 @@
     });
   }
 
+  // Binds a marketplace apply button to the inputs that feed its plan, so a
+  // stale plan can never survive a change. Touching the profile ticks or the
+  // merge/overwrite mode puts the button back into its planning state and
+  // clears the previous report — the old code re-planned on ticks only, so
+  // changing the mode left last time's answer (and last time's plan) on screen.
+  function mkBindApply(btn, res, st, planLabel, run, isReady) {
+    const reset = () => {
+      btn.textContent = planLabel;
+      btn.onclick = run;
+      btn.disabled = !isReady();
+      clr(res); status(st, '');
+    };
+    reset();
+    return reset;
+  }
+
   // Nuvio's own Add Plugin dialog never validates a manifest URL before
   // storing it (confirmed: it's exactly url/name/enabled, nothing else) — a
   // manifest Numax's own tab can't preview cross-origin isn't proof the repo
   // is dead, just proof Numax can't see it from here. So install stays
   // available either way; only the scraper list needs a working preview.
+  //
+  // Layout note: the install controls come FIRST and the scraper list is a
+  // collapsed disclosure underneath. It used to be the other way round, which
+  // buried the only actionable control under as many as 200 rows.
+  let mkProvSeq = 0;
   async function openProvider(p) {
+    const seq = ++mkProvSeq;
+    const stale = () => seq !== mkProvSeq;
     const card = $('mk-prov-detail-card'), body = $('mk-prov-detail');
     card.style.display = ''; $('mk-prov-detail-title').textContent = p.name;
-    clr(body); body.appendChild(el('p', 'muted sm shimmer', 'Reading manifest…'));
-    let m = null, previewError = null;
-    try { m = await MK.loadManifest(p.manifestUrl); }
-    catch (e) { previewError = e; }
-    clr(body);
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
+    const got = await loadInto(body, 'Reading manifest…', () => MK.loadManifest(p.manifestUrl).then(v => ({ m: v })).catch(e => ({ err: e })), { stale });
+    if (!got) return;
+    const m = got.value.m, previewError = got.value.err;
+
+    // ---- summary strip ----
+    const sum = el('div', 'mk-sum');
     if (m) {
-      body.appendChild(el('p', 'muted sm', m.name + (m.version ? ' · v' + m.version : '') + ' · ' + m.scrapers.length + ' scrapers'));
-      const note = el('div', 'mk-note'); note.style.margin = '12px 0';
-      note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
-        + '<div>Nuvio stores a plugin as the whole repo, so this installs all ' + m.scrapers.length + ' of its scrapers. Turning individual ones off is done inside the Nuvio app.</div>';
-      body.appendChild(note);
-
-      const srcW = el('div', 'mk-scroll'); srcW.style.margin = '12px 0';
-      m.scrapers.slice(0, 200).forEach(s => {
-        const r = el('div', 'mk-scr');
-        const t = el('div'); t.style.minWidth = '0';
-        t.appendChild(el('div', 'mk-sn', s.name || s.id || 'scraper'));
-        if (s.description) t.appendChild(el('div', 'mk-sd', s.description));
-        r.appendChild(t);
-        const langs = Array.isArray(s.contentLanguage) ? s.contentLanguage.join(' · ').toUpperCase() : '';
-        if (langs) { const c = el('span', 'mk-lang', langs); c.style.marginLeft = 'auto'; r.appendChild(c); }
-        srcW.appendChild(r);
-      });
-      body.appendChild(srcW);
+      sum.appendChild(el('span', 'mk-sum-n', m.name));
+      if (m.version) sum.appendChild(el('span', 'mk-lang', 'v' + m.version));
+      sum.appendChild(el('span', 'mk-lang', m.scrapers.length + ' scrapers'));
     } else {
-      const note = el('div', 'mk-note mk-warn'); note.style.margin = '12px 0';
+      sum.appendChild(el('span', 'mk-sum-n', p.name));
+      sum.appendChild(el('span', 'mk-lang warnish', 'preview unavailable'));
+    }
+    const src = el('button', 'btn btn-ghost btn-xs', 'Open source');
+    src.style.marginLeft = 'auto'; src.onclick = () => openTab(p.rawUrl);
+    sum.appendChild(src);
+    body.appendChild(sum);
+
+    if (!m) {
+      const note = el('div', 'mk-note mk-warn');
       note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v5"/><circle cx="12" cy="16.6" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20.2h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
-        + '<div><b>Could not preview this repo</b> — ' + esc(previewError.message) + '. Scrapers can\'t be listed, but you can still install it by URL; Nuvio\'s own Add Plugin dialog doesn\'t check a manifest before storing it either.</div>';
+        + '<div><b>Could not preview this repo</b> — ' + esc(previewError.message) + '. Scrapers cannot be listed, but you can still install it by URL; Nuvio’s own Add Plugin dialog doesn’t check a manifest before storing it either.</div>';
       body.appendChild(note);
     }
 
-    const src = el('button', 'btn btn-ghost btn-xs', 'Open source');
-    src.onclick = () => openTab(p.rawUrl);
-    body.appendChild(src);
+    // ---- install controls, above the fold ----
+    const inst = el('div', 'mk-install');
+    inst.appendChild(el('div', 'mk-sec-t', 'Install to'));
+    const tbox = el('div', 'mk-tgts'); inst.appendChild(tbox);
 
-    body.appendChild(el('div', 'mk-sec-t', 'Install to')).style.marginTop = '16px';
-    const tbox = el('div'); tbox.style.marginTop = '6px'; body.appendChild(tbox);
-    tbox.appendChild(el('p', 'muted sm shimmer', 'Reading profiles…'));
-
-    const modeW = el('label', 'fld'); modeW.style.cssText = 'max-width:440px;margin-top:12px';
-    modeW.appendChild(el('span', '', 'How to write it'));
-    const msel = el('select', 'sel');
-    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all plugins with just this</option>';
-    modeW.appendChild(msel); body.appendChild(modeW);
+    const modeW = el('label', 'fld mk-mode'); modeW.appendChild(el('span', '', 'How to write it'));
+    const msel = mkSelect([
+      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
+      { value: 'mirror', label: 'Overwrite', hint: 'replace all plugins with just this' },
+    ]);
+    modeW.appendChild(msel.node); inst.appendChild(modeW);
 
     const bar = el('div', 'actbar');
-    const go = el('button', 'btn btn-primary', 'Install'); go.disabled = true;
+    const go = el('button', 'btn btn-primary', 'Install');
     const st = el('div', 'inline-status');
-    bar.appendChild(go); bar.appendChild(st); body.appendChild(bar);
-    const res = el('div'); res.style.marginTop = '10px'; body.appendChild(res);
+    bar.appendChild(go); bar.appendChild(st); inst.appendChild(bar);
+    const res = el('div', 'mk-res'); inst.appendChild(res);
+    body.appendChild(inst);
 
-    let targets = [];
-    try { targets = await mkAllProfiles(); } catch (e) { clr(tbox); tbox.appendChild(el('p', 'empty sm err-text', e.message)); return; }
-    if (!targets.length) { clr(tbox); tbox.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
+    // ---- scrapers, collapsed: context, not the main event ----
+    if (m) {
+      const d = mkDisclosure('What you get',
+        m.scrapers.length + ' scraper' + (m.scrapers.length === 1 ? '' : 's') + ' — Nuvio installs the whole repo');
+      const note = el('div', 'mk-note');
+      note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
+        + '<div>Nuvio stores a plugin as the whole repo, so this installs all ' + m.scrapers.length + ' of its scrapers. Turning individual ones off is done inside the Nuvio app.</div>';
+      d.body.appendChild(note);
+      const srcW = el('div', 'mk-scroll');
+      m.scrapers.slice(0, 200).forEach(sc => {
+        const r = el('div', 'mk-scr');
+        const t = el('div'); t.style.minWidth = '0';
+        t.appendChild(el('div', 'mk-sn', sc.name || sc.id || 'scraper'));
+        if (sc.description) t.appendChild(el('div', 'mk-sd', sc.description));
+        r.appendChild(t);
+        const langs = Array.isArray(sc.contentLanguage) ? sc.contentLanguage.join(' · ').toUpperCase() : '';
+        if (langs) { const c = el('span', 'mk-lang', langs); c.style.marginLeft = 'auto'; r.appendChild(c); }
+        srcW.appendChild(r);
+      });
+      d.body.appendChild(srcW);
+      body.appendChild(d.node);
+    }
+
     const chosen = new Set();
-    mkTargetList(tbox, targets, chosen);
-    tbox.addEventListener('mkchange', () => { go.disabled = !chosen.size; });
-
-    go.onclick = () => mkWrite({
+    const run = () => mkWrite({
       kind: 'plugins',
       master: [{ url: p.manifestUrl, name: (m && m.name) || p.name, enabled: true }],
       targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
-      mode: msel.value, st, res, btn: go, label: p.name,
+      mode: msel.value(), st, res, btn: go, label: p.name,
     });
+    const reset = mkBindApply(go, res, st, 'Install', run, () => chosen.size > 0);
+    msel.onChange(reset);
+    const targets = await mkFillTargets(tbox, chosen, reset, stale);
+    if (!targets) { go.disabled = true; return; }
+    reset();
   }
 
   // ---- collections ----
@@ -2240,21 +2601,37 @@
   }
 
   // Reads this collection's full payload (folders/sources + required
-  // add-ons) from the per-collection snapshot file, then plans+writes it
-  // through engine.planTarget/api.applyPlan exactly like a template apply —
-  // same merge/overwrite choice, same removal-confirm tick, same per-item
-  // failure reporting (renderApplyPlan, shared with Templates/Sync Desk).
+  // add-ons) from the per-collection snapshot file, applies Nuvio's own
+  // install transformation to it, then plans+writes through
+  // engine.planTarget/api.applyPlan exactly like a template apply — same
+  // merge/overwrite choice, same removal-confirm tick, same per-item failure
+  // reporting (renderApplyPlan, shared with Templates/Sync Desk) — and finally
+  // reads the profile back to prove the collection is really there.
+  //
+  // The transformation is the fix for "it said it applied but didn't": Nuvio
+  // rewrites a community collection's id to `<id>-community` and attaches a
+  // `community` block on install, and 93 of the 99 captured payloads are the
+  // raw pre-install form. Writing those unchanged produced a collection Nuvio
+  // does not recognise as an installed community collection. See market.js
+  // `toInstalledCollection` for the verified rule.
   async function openMkCollectionInstall(anchor, c) {
     const pop = openMkPop(anchor, 'Install ' + c.title, 'Adds this collection to one profile.');
-    pop.body.appendChild(el('p', 'muted sm shimmer', 'Reading collection…'));
-    let doc;
-    try { doc = await MK.loadCollectionInstall(c.public_id); }
-    catch (e) { clr(pop.body); pop.body.appendChild(el('p', 'empty sm err-text', 'Could not read this collection: ' + e.message)); return; }
-    if (!mkPop) return; // closed while loading
-    clr(pop.body);
+    const mine = pop;
+    const stale = () => mkPop !== mine;
 
-    if (doc.collections.length > 1) {
-      pop.body.appendChild(el('p', 'muted sm', 'This is a pack of ' + doc.collections.length + ' collections — all install together.'));
+    const got = await loadInto(pop.body, 'Reading collection…', () => MK.loadCollectionInstall(c.public_id),
+      { stale, prefix: 'Could not read this collection: ' });
+    if (!got) { if (!stale()) pop.place(); return; }
+    const doc = got.value;
+
+    // Shape every collection the way Nuvio's own installer would.
+    const version = (c.community && c.community.version) || 1;
+    const stampedAt = Date.now();
+    const collections = doc.collections.map(x =>
+      MK.toInstalledCollection(x, { publicId: c.public_id, version, installedAt: stampedAt }));
+
+    if (collections.length > 1) {
+      pop.body.appendChild(el('p', 'muted sm', 'This is a pack of ' + collections.length + ' collections — all install together.'));
     }
     if (doc.requiredAddons.length) {
       pop.body.appendChild(el('p', 'muted sm', 'Needs: ' + doc.requiredAddons.map(a => a.addonName || a.addonId).join(', ')));
@@ -2268,32 +2645,51 @@
 
     const tw = el('label', 'fld'); tw.appendChild(el('span', '', 'Install to profile'));
     const tsel = el('select', 'sel'); tw.appendChild(tsel); pop.body.appendChild(tw);
-    let targets = [];
-    try { targets = await mkAllProfiles(); } catch (e) { pop.body.appendChild(el('p', 'empty sm err-text', e.message)); return; }
-    if (!mkPop) return;
-    if (!targets.length) { pop.body.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
-    targets.forEach(t => { const o = document.createElement('option'); o.value = t.aid + ':' + t.idx; o.textContent = t.name + ' · ' + t.account; tsel.appendChild(o); });
 
-    const modeW = el('label', 'fld'); modeW.style.marginTop = '12px';
+    const modeW = el('label', 'fld mk-mode');
     modeW.appendChild(el('span', '', 'How to add the collection'));
-    const msel = el('select', 'sel');
-    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all collections with just this</option>';
-    modeW.appendChild(msel); pop.body.appendChild(modeW);
+    const msel = mkSelect([
+      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
+      { value: 'mirror', label: 'Overwrite', hint: 'replace all collections with just this' },
+    ]);
+    modeW.appendChild(msel.node); pop.body.appendChild(modeW);
 
+    const already = el('div'); pop.body.appendChild(already);
     const bar = el('div', 'actbar'); bar.style.marginTop = '12px';
     const btn = el('button', 'btn btn-primary', 'Preview'); const st = el('div', 'inline-status');
     bar.appendChild(btn); bar.appendChild(st); pop.body.appendChild(bar);
-    const res = el('div'); res.style.marginTop = '10px'; pop.body.appendChild(res);
-    pop.place();
+    const res = el('div', 'mk-res'); pop.body.appendChild(res);
 
-    btn.onclick = async () => {
+    const tgot = await loadInto(el('div'), 'Reading profiles…', mkAllProfiles, { stale });
+    if (stale()) return;
+    if (!tgot) { status(st, 'Could not read your profiles.', 'err'); btn.disabled = true; pop.place(); return; }
+    const { targets, failed } = tgot.value;
+    failed.forEach(f => already.appendChild(el('p', 'empty sm err-text', f)));
+    if (!targets.length) {
+      already.appendChild(el('p', 'empty sm', failed.length
+        ? 'No profiles could be read.' : 'No linked accounts yet — link one on the Nuvio accounts tab.'));
+      btn.disabled = true; pop.place(); return;
+    }
+    targets.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t.aid + ':' + t.idx; o.textContent = t.name + ' · ' + t.account;
+      tsel.appendChild(o);
+    });
+    enhanceSelect(tsel);
+
+    // Any change to the target or the mode invalidates a previous preview.
+    const reset = () => { btn.textContent = 'Preview'; btn.onclick = preview; btn.disabled = false; clr(res); status(st, ''); };
+    tsel.addEventListener('change', reset);
+    msel.onChange(reset);
+
+    async function preview() {
       const [aid, iStr] = tsel.value.split(':'); const idx = parseInt(iStr, 10);
-      const mode = msel.value;
+      const mode = msel.value();
       status(st, 'Reading target profile…'); clr(res);
       try {
         const { backup } = await loadAccount(aid, true);
         const state = sliceProfile(backup, idx);
-        const master = { collections: doc.collections };
+        const master = { collections };
         const cats = { collections: true };
         if (doc.requiredAddons.length) {
           const existing = new Map((state.addons || []).map(x => [x.url, x]));
@@ -2306,10 +2702,32 @@
         }
         const plan = E.planTarget(master, state, { categories: cats, modes: { collections: mode, addons: 'merge' }, profileId: idx, originClientId: 'numax-web' });
         status(st, '');
-        renderApplyPlan(res, st, plan, aid, 'Collection installed', {});
+        renderApplyPlan(res, st, plan, aid, 'Collection installed', {
+          verify: () => verifyCollections(aid, idx, collections),
+        });
         pop.place();
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
-    };
+    }
+    reset();
+    pop.place();
+  }
+
+  // Reads a profile's collections back and confirms each installed id is
+  // present. A push RPC answers 204 with no body, so a clean response is not
+  // by itself evidence that anything was stored.
+  async function verifyCollections(accountId, profileId, wanted) {
+    try {
+      const rows = await withTimeout(A.client(store, accountId).rpc('sync_pull_collections', { p_profile_id: profileId }), READ_TIMEOUT, 'Checking the save');
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      let live = row && row.collections_json;
+      // Nuvio has been seen to return this blob as a JSON string rather than an
+      // array; parse rather than treat a string as "no collections".
+      if (typeof live === 'string') { try { live = JSON.parse(live); } catch (e) { live = null; } }
+      if (!Array.isArray(live)) return ['Could not read the profile back to confirm the save.'];
+      const have = new Set(live.map(x => x && x.id));
+      const gone = wanted.filter(w => !have.has(w.id));
+      return gone.length ? ['Nuvio accepted the write but ' + gone.length + ' collection(s) are not on the profile afterwards.'] : [];
+    } catch (e) { return ['Could not confirm the save: ' + e.message]; }
   }
 
   // ======================================================================
@@ -2374,5 +2792,15 @@
     }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
-  window.addEventListener('DOMContentLoaded', () => { wire(); renderActivity(); });
+  window.addEventListener('DOMContentLoaded', () => {
+    wire(); renderActivity();
+    enhanceAllSelects();
+    // Panels are rebuilt constantly (profiles, sync, restore, templates), so a
+    // one-shot pass would miss most selects. Watch instead of chasing call sites.
+    let selScan = 0;
+    new MutationObserver(() => {
+      cancelAnimationFrame(selScan);
+      selScan = requestAnimationFrame(() => enhanceAllSelects());
+    }).observe(document.body, { childList: true, subtree: true });
+  });
 })();

@@ -107,13 +107,17 @@
   .panel[data-panel="sync"] .phead{ flex:none; margin-bottom:0; }
   .panel[data-panel="sync"] #sy-empty{ flex:none; }
   .panel[data-panel="sync"] #sy-body{ flex:1; min-height:0; display:none; }
-  .panel[data-panel="sync"] #sy-body.open{ display:block; }
-  .sy-cols{ display:grid; grid-template-columns:minmax(0, 460px) minmax(0, 1fr); gap:16px; height:100%; }
+  /* Flex column, not block: .sy-cols used to be height:100% of this container
+     while the steps row also lived in it, so the grid hung ~95px past the
+     panel and was clipped by its overflow:hidden. Letting the grid take the
+     REMAINING height instead keeps the desk genuinely viewport-fit. */
+  .panel[data-panel="sync"] #sy-body.open{ display:flex; flex-direction:column; min-height:0; }
+  .sy-cols{ display:grid; grid-template-columns:minmax(0, 460px) minmax(0, 1fr); gap:16px; flex:1; min-height:0; }
   .sy-left, .sy-right{ display:flex; flex-direction:column; gap:14px; min-width:0; min-height:0; }
   .sy-left{ overflow-y:auto; padding-right:6px; }
   .sy-left::-webkit-scrollbar{ width:5px; }
   .sy-left::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.12); border-radius:4px; }
-  .sy-right .sy-review-card{ flex:1; display:flex; flex-direction:column; min-height:0; margin-bottom:0; padding:0; }
+  .sy-right .sy-review-card{ flex:1 1 auto; display:flex; flex-direction:column; min-height:180px; margin-bottom:0; padding:0; }
   .sy-card{ background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--glass-border); border-radius:14px; padding:18px 20px; box-shadow:var(--glass-glow); }
   .sy-card-h{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
   .sy-card-h h3{ font-size:15px; font-weight:700; letter-spacing:-.005em; }
@@ -127,7 +131,7 @@
   .sy-sep{ color:var(--t35); font-size:11px; margin:0 4px; }
 
   /* --- step progress header --- */
-  .sy-steps{ display:flex; align-items:stretch; gap:10px; margin-bottom:16px; }
+  .sy-steps{ display:flex; align-items:stretch; gap:10px; margin-bottom:16px; flex:none; }
   .sy-step{ flex:1; display:flex; align-items:flex-start; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 16px; min-width:0; }
   .sy-step.accent{ border-color:var(--accent); background:rgba(229,57,53,.06); }
   .sy-step-num{ flex:none; width:26px; height:26px; border-radius:50%; background:var(--surface-2); border:1px solid var(--line); display:grid; place-items:center; font-size:12px; font-weight:700; color:var(--t70); }
@@ -183,13 +187,34 @@
   .sy-carry-chooser.open{ display:block; }
   .sy-carry-chooser-bar{ display:flex; gap:10px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px solid var(--line-2); }
 
-  /* --- apply card --- */
+  /* --- apply card ---
+     Lives at the foot of the RIGHT column, directly under the review summary:
+     you read what will change, then commit it, in that order. The review card
+     takes the remaining height (flex:1) and this stays its natural size, so
+     the summary shortens by exactly as much as this needs. */
+  .sy-right .sy-apply-card{ flex:none; }
   .sy-apply-card .sy-mode-row{ display:flex; align-items:center; gap:12px; margin-bottom:8px; }
   .sy-apply-card .sy-mode-row label{ font-size:13px; font-weight:600; flex:none; }
-  .sy-apply-card .sy-mode-row select.sel{ flex:1; }
+  /* the select is wrapped by .nsel now, so the wrapper is the flex child */
+  .sy-apply-card .sy-mode-row .nsel{ flex:1; min-width:0; }
   .sy-apply-card .sy-mode-desc{ font-size:12px; color:var(--t45); margin-bottom:14px; line-height:1.4; }
   .sy-apply-card .sy-btns{ display:flex; gap:10px; flex-wrap:wrap; }
   .sy-apply-card .sy-btns .btn{ flex:1; justify-content:center; min-width:130px; }
+
+  /* Wraps rather than switching on a viewport width: this strip's own column is
+     only ~half the page, so a viewport media query is the wrong measure. The
+     mode block and the buttons sit side by side while both fit and drop onto
+     separate lines when they don't. */
+  .sy-right .sy-apply-card{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; padding:16px 20px; }
+  .sy-right .sy-apply-card .sy-card-h{ display:none; }
+  .sy-apply-main{ flex:1 1 250px; min-width:0; }
+  .sy-apply-main .sy-mode-row{ margin-bottom:6px; }
+  .sy-apply-main .sy-mode-desc{ margin-bottom:0; }
+  .sy-right .sy-apply-card .sy-btns{ flex:0 1 auto; }
+  .sy-right .sy-apply-card .sy-btns .btn{ flex:0 1 auto; min-width:120px; }
+  .sy-right .sy-apply-card #sy-confirm-wrap{ flex:1 1 100%; margin-bottom:0!important; }
+  .sy-right .sy-apply-card #sy-status{ flex:1 1 100%; margin-top:0!important; }
+  .sy-right .sy-apply-card #sy-status:empty{ display:none; }
 
   /* --- review panel --- */
   .sy-review-head{ display:flex; align-items:center; gap:10px; padding:18px 22px 14px; border-bottom:1px solid var(--line-2); flex:none; }
@@ -233,7 +258,7 @@
   .sy-oldapp-notice button{ flex:none; background:none; border:none; color:inherit; opacity:.7; font-size:18px; line-height:1; cursor:pointer; padding:0 2px; }
   .sy-oldapp-notice button:hover{ opacity:1; }
 
-  @media (max-width:1100px){ .sy-cols{ grid-template-columns:1fr; } .sy-left{ overflow-y:visible; } .panel[data-panel="sync"]{ height:auto; overflow:auto; } .panel[data-panel="sync"] #sy-body{ min-height:0; } .sy-right .sy-review-card{ min-height:400px; } }
+  @media (max-width:1100px){ .sy-cols{ grid-template-columns:1fr; flex:none; } .sy-left{ overflow-y:visible; } .panel[data-panel="sync"]{ height:auto; overflow:auto; } .panel[data-panel="sync"] #sy-body{ min-height:0; } .panel[data-panel="sync"] #sy-body.open{ display:block; } .sy-right .sy-review-card{ min-height:400px; } }
 
   /* watched / watch progress tab */
   .watched-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-top:1px solid var(--line-2); }
@@ -475,7 +500,9 @@
   .cat-cnt{ font-family:ui-monospace,monospace; font-size:12px; color:var(--t45); }
 
   /* targets */
-  .tgt-acct{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--t35); font-weight:700; margin:12px 0 8px; }
+  .tgt-acct{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--t35); font-weight:700; }
+  /* account heading and its select-all sit on one line, not stacked */
+  .tgt-acct-row{ display:flex; align-items:center; gap:12px; margin:16px 0 8px; }
   .tgt-grid{ display:flex; flex-wrap:wrap; gap:10px; }
 
   /* reports — base badge/tag styles (layout overridden in panel-level block) */
@@ -486,7 +513,7 @@
   .tag.rem{ background:rgba(229,57,53,.16); color:#ff8a80; } .tag.keep,.tag.held{ background:var(--surface-2); color:var(--t45); }
   .tag.held[title]{ cursor:help; }
   .tag.warn{ background:rgba(255,152,0,.18); color:#ffb74d; cursor:help; }
-  .confirm{ display:flex; align-items:center; gap:10px; font-size:13px; color:#ff8a80; background:rgba(229,57,53,.08); border:1px dashed var(--accent); border-radius:11px; padding:11px 14px; margin:12px 0; }
+  /* .confirm is defined in the review/change-summary block above. */
   .actbar{ display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; }
 
   /* ===== settings editor ===== */
@@ -526,6 +553,118 @@
     .navbtn{ width:auto; }
     .set-field{ grid-template-columns:1fr; }
     .set-field .sf-c{ justify-content:flex-start; }
+  }
+
+  /* ===== iOS-style select =================================================
+     The native <select> stays in the DOM (it is still the value + change
+     source for every existing call site) but is visually removed; .nsel-btn
+     is the control and .nsel-list the popup, so the open list is themed
+     instead of being the OS's flat grey rectangle. */
+  .nsel{ position:relative; display:block; }
+  /* display:none, not opacity:0 — an opacity:0 select is still rendered, so it
+     duplicated every option into the page's text and into the a11y tree. The
+     element keeps working as the value/change source while hidden. */
+  .nsel-native{ display:none!important; }
+  .nsel-host{ display:block; }
+  .nsel-btn{
+    width:100%; display:flex; align-items:center; gap:10px; text-align:left; cursor:pointer;
+    background:var(--surface-2); color:var(--t); border:1px solid var(--line);
+    border-radius:12px; padding:10px 13px; font-size:13px; font-weight:500; font-family:inherit;
+    transition:border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease), transform var(--mo-press,.12s) var(--mo-ease,ease);
+  }
+  .nsel-btn:hover{ border-color:rgba(255,255,255,.22); background:var(--surface-3); }
+  .nsel-btn:focus-visible{ outline:none; border-color:rgba(255,255,255,.4); }
+  .nsel-btn:active{ transform:scale(.988); }
+  .nsel-btn:disabled{ opacity:.45; cursor:not-allowed; }
+  .nsel-lab{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nsel-car{ flex:none; display:grid; place-items:center; color:var(--t45); transition:transform .22s var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  .nsel-car svg{ width:15px; height:15px; }
+  .nsel-btn[aria-expanded="true"] .nsel-car{ transform:rotate(180deg); }
+
+  .nsel-list{
+    position:fixed; z-index:120; max-height:min(340px,60vh); overflow-y:auto; padding:6px;
+    background:rgba(20,23,34,.94); border:1px solid rgba(255,255,255,.13); border-radius:16px;
+    box-shadow:0 18px 50px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
+    backdrop-filter:blur(20px) saturate(150%); -webkit-backdrop-filter:blur(20px) saturate(150%);
+    opacity:0; transform:scale(.94) translateY(-4px);
+    transition:opacity .16s var(--mo-ease,cubic-bezier(.32,.72,0,1)), transform .2s var(--mo-ease,cubic-bezier(.32,.72,0,1));
+  }
+  .nsel-list.open{ opacity:1; transform:none; }
+  .nsel-list::-webkit-scrollbar{ width:5px; }
+  .nsel-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.16); border-radius:4px; }
+  .nsel-opt{ display:flex; align-items:center; gap:10px; padding:9px 11px; border-radius:11px; cursor:pointer;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .nsel-opt:hover{ background:rgba(255,255,255,.07); }
+  .nsel-opt.on{ background:rgba(229,57,53,.14); }
+  .nsel-tx{ flex:1; min-width:0; }
+  .nsel-t{ font-size:13px; font-weight:600; }
+  .nsel-h{ font-size:11px; color:var(--t45); margin-top:2px; line-height:1.35; }
+  .nsel-ck{ flex:none; width:15px; height:15px; display:grid; place-items:center; color:var(--accent); opacity:0; transform:scale(.7); transition:opacity .16s ease, transform .16s cubic-bezier(.34,1.56,.64,1); }
+  .nsel-ck svg{ width:14px; height:14px; }
+  .nsel-opt.on .nsel-ck{ opacity:1; transform:none; }
+
+  /* ===== disclosure ===== */
+  .disc{ border:1px solid var(--line); border-radius:14px; background:var(--surface); overflow:hidden; margin-top:14px; }
+  .disc-h{ width:100%; display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer;
+    background:none; border:0; color:inherit; font-family:inherit; text-align:left;
+    transition:background var(--mo-micro,.16s) var(--mo-ease,ease); }
+  .disc-h:hover{ background:rgba(255,255,255,.03); }
+  .disc-tx{ flex:1; min-width:0; }
+  .disc-t{ font-size:13px; font-weight:600; }
+  .disc-s{ font-size:11.5px; color:var(--t45); margin-top:2px; }
+  .disc-car{ flex:none; color:var(--t45); display:grid; place-items:center; transition:transform .26s var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  .disc-car svg{ width:16px; height:16px; }
+  .disc.open .disc-car{ transform:rotate(180deg); }
+  .disc-w{ height:0; overflow:hidden; transition:height .28s var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  .disc-b{ padding:0 14px 14px; }
+
+  /* ===== marketplace: repo detail, install-first layout ===== */
+  .mk-sum{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; padding-bottom:12px; border-bottom:1px solid var(--line-2); margin-bottom:14px; }
+  .mk-sum-n{ font-size:14px; font-weight:600; }
+  .mk-lang.warnish{ color:#f0c060; border-color:rgba(240,160,32,.35); }
+  .mk-install{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:14px 15px; }
+  .mk-tgts{ margin-top:8px; display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:2px; }
+  .mk-mode{ margin-top:14px; max-width:420px; }
+  .mk-res:empty{ display:none; }
+  .mk-res{ margin-top:12px; }
+
+  /* ===== select-all pill (Drive backup picker) ===== */
+  .selall-pill{
+    display:inline-flex; align-items:center; gap:7px; cursor:pointer; font-family:inherit;
+    font-size:12px; font-weight:600; letter-spacing:.01em;
+    color:var(--t70); background:var(--surface-2); border:1px solid var(--line);
+    border-radius:999px; padding:6px 14px; margin-bottom:12px;
+    transition:color var(--mo-micro,.16s) var(--mo-ease,ease), border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease), transform var(--mo-press,.12s) var(--mo-ease,ease);
+  }
+  .selall-pill:hover{ color:var(--t); background:var(--surface-3); border-color:rgba(255,255,255,.2); }
+  .selall-pill:active{ transform:scale(.96); }
+  .selall-pill.sm{ margin-bottom:0; padding:4px 11px; font-size:11px; margin-left:auto; }
+  #dr-backup-picker > .selall-pill{ margin-bottom:4px; }
+
+  /* ===== review / change summary =========================================
+     Was a bare stack of text rows; now a defined surface with a clear header,
+     aligned label column and pill counts that read as one component. */
+  .report{
+    background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.012));
+    border:1px solid var(--line); border-radius:14px; padding:6px; margin:10px 0;
+  }
+  .report .rline{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    font-size:12.5px; padding:9px 11px; border-radius:10px;
+  }
+  .report .rline + .rline{ box-shadow:inset 0 1px 0 var(--line-2); }
+  .report .rline .rk{ font-weight:600; color:var(--t70); min-width:96px; flex:none; }
+  .report .rline.muted{ color:var(--t45); }
+  .report .tag{ letter-spacing:.01em; }
+  .modal-details{ margin:10px 0 0; padding-left:18px; font-size:12px; color:#ff8a80; line-height:1.55; }
+  .modal-details li + li{ margin-top:4px; }
+
+  /* confirm strip: keep the warning weight, lose the dashed-box look */
+  .confirm{
+    display:flex; align-items:center; gap:11px; font-size:12.5px; color:#ffb3ad;
+    background:rgba(229,57,53,.09); border:1px solid rgba(229,57,53,.34);
+    border-left:3px solid var(--accent);
+    border-radius:12px; padding:12px 14px; margin:12px 0;
   }
 
   /* ===== marketplace ===== */
@@ -1164,23 +1303,6 @@
               </div>
             </div>
 
-            <div class="sy-card sy-apply-card">
-              <div class="sy-card-h"><h3>Apply settings</h3></div>
-              <div class="sy-mode-row">
-                <label>Mode</label>
-                <select class="sel" id="sy-mode">
-                  <option value="merge">Merge — add and update, keep the rest</option>
-                  <option value="overwrite">Overwrite — make target match source exactly</option>
-                </select>
-              </div>
-              <p class="sy-mode-desc" id="sy-mode-desc">Merge mode adds new items and updates existing ones, but keeps everything else as-is.</p>
-              <div id="sy-confirm-wrap" style="display:none;margin-bottom:12px"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
-              <div class="sy-btns">
-                <button class="btn btn-ghost" id="sy-preview">Preview changes</button>
-                <button class="btn btn-primary" id="sy-apply" disabled>Apply to 0 profiles</button>
-              </div>
-              <div class="inline-status" id="sy-status" style="margin-top:10px"></div>
-            </div>
           </div>
 
           <!-- ============ RIGHT COLUMN ============ -->
@@ -1210,6 +1332,26 @@
                 </div>
               </div>
             </div>
+
+            <div class="sy-card sy-apply-card">
+              <div class="sy-card-h"><h3>Apply settings</h3></div>
+              <div class="sy-apply-main">
+                <div class="sy-mode-row">
+                  <label>Mode</label>
+                  <select class="sel" id="sy-mode">
+                    <option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge — add and update, keep the rest</option>
+                    <option value="overwrite" data-label="Overwrite" data-hint="make target match source exactly">Overwrite — make target match source exactly</option>
+                  </select>
+                </div>
+                <p class="sy-mode-desc" id="sy-mode-desc">Merge mode adds new items and updates existing ones, but keeps everything else as-is.</p>
+              </div>
+              <div id="sy-confirm-wrap" style="display:none;margin-bottom:12px"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
+              <div class="sy-btns">
+                <button class="btn btn-ghost" id="sy-preview">Preview changes</button>
+                <button class="btn btn-primary" id="sy-apply" disabled>Apply to 0 profiles</button>
+              </div>
+              <div class="inline-status" id="sy-status" style="margin-top:10px"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1238,7 +1380,10 @@
         <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
         <div class="actbar"><button class="btn btn-primary" id="dr-backup-btn">Back up to Drive</button><div class="inline-status" id="dr-backup-log"></div></div></div>
       <div class="card"><div class="chead"><h3>Restore</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="dr-restore-refresh">Refresh list</button></div>
-        <div id="dr-restore-list"><p class="empty sm shimmer">Loading backups…</p></div>
+        <!-- Resting state, not a shimmer: nothing is loading until the tab is
+             opened and refreshRestore() runs, and a shimmer that starts at page
+             load reads as a task that never finishes. -->
+        <div id="dr-restore-list"><p class="empty sm">Open this tab to list your backups.</p></div>
         <div id="dr-restore-config" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px"></div></div>
     </section>
 
@@ -1255,7 +1400,7 @@
 
       <div id="mk-pane-addons" class="mk-pane">
         <div class="card">
-          <div class="chead"><h3>Staples</h3><span class="spacer"></span><span class="inline-status" id="mk-inst-status"></span></div>
+          <div class="chead"><h3>Staples</h3><span class="spacer"></span></div>
           <div class="mk-staples" id="mk-staples"></div>
         </div>
         <div class="card">

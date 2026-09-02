@@ -249,6 +249,70 @@
     return value;
   }
 
+  // ----------------------------------------------------------------------
+  // Nuvio's own install transformation
+  // ----------------------------------------------------------------------
+  // Installing a community collection is NOT a straight copy of the payload.
+  // Nuvio rewrites two things, and nothing else — verified 2026-09-02 by
+  // diffing a collection Nuvio itself installed against that same
+  // collection's raw community payload: after applying exactly this, the
+  // reconstruction was byte-identical to Nuvio's own output, `community`
+  // block included.
+  //
+  //   id  -> slugified + '-community'   (collections.genres ->
+  //                                      collections-genres-community)
+  //   community -> { id, version, installMode, installedAt,
+  //                  packCollectionId, originalCollectionId }
+  //
+  // This matters because 93 of the 99 files in community-collections/ are the
+  // RAW pre-install form (no `community` block, no `-community` suffix) while
+  // 6 happen to be the post-install form — they were captured off a profile
+  // that already had them. Writing the raw form produces a collection Nuvio
+  // does not recognise as an installed community collection, which is exactly
+  // the "said it applied but didn't" report. Always transform; the function is
+  // idempotent so the 6 already-transformed ones pass through unchanged.
+  // Suffix decided on the id ALONE. Keying it off the presence of a community
+  // block instead lets a collection that carries the suffix but no block get
+  // suffixed a second time — a real `-community-community` id was found on a
+  // live profile, so this case is not hypothetical.
+  function installedCollectionId(id) {
+    const slug = String(id == null ? '' : id).replace(/[^A-Za-z0-9-]/g, '-');
+    return /-community$/.test(slug) ? slug : slug + '-community';
+  }
+  function isInstalledForm(c) {
+    return !!(c && c.community && /-community$/.test(String(c.id || '')));
+  }
+  // The id a community collection is published under, recovered from an id
+  // that may already carry the suffix, so the community block still records
+  // what it was originally called.
+  function originalCollectionId(c) {
+    if (c && c.community && c.community.originalCollectionId != null) return c.community.originalCollectionId;
+    return String((c && c.id) || '').replace(/-community$/, '');
+  }
+  // packCollectionId equals originalCollectionId in every case observed live,
+  // including the one pack-sourced example, so it is not derived separately.
+  function toInstalledCollection(collection, opts) {
+    const o = opts || {};
+    if (isInstalledForm(collection)) {
+      // Already Nuvio-shaped. Only refresh the install stamp, never re-slug an
+      // id that has already been transformed (that would append twice).
+      return { ...collection, community: { ...collection.community, installedAt: o.installedAt || Date.now() } };
+    }
+    const originalId = originalCollectionId(collection);
+    return {
+      ...collection,
+      id: installedCollectionId(collection && collection.id),
+      community: {
+        id: o.publicId != null ? o.publicId : (collection && collection.community && collection.community.id) || null,
+        version: o.version != null ? o.version : 1,
+        installMode: o.installMode || 'copy',
+        installedAt: o.installedAt || Date.now(),
+        packCollectionId: originalId,
+        originalCollectionId: originalId,
+      },
+    };
+  }
+
   // ======================================================================
   // AIOStreams / AIOMetadata instances
   // ======================================================================
@@ -391,5 +455,6 @@
     PLUGIN_INDEX_SITE, UPTIME_SITE: 'https://uptime.ibbylabs.dev/',
     loadPluginIndex, loadManifest, loadInstances, isConfigurable,
     configureUrl, normalizeManifestUrl, loadCollectionsSnapshot, loadCollectionInstall,
+    toInstalledCollection, installedCollectionId, isInstalledForm,
   };
 })();
