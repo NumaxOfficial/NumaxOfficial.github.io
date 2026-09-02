@@ -190,7 +190,7 @@
   // views + nav
   // ======================================================================
   function showView(id) { document.querySelectorAll('.view').forEach(v => v.classList.toggle('current', v.id === id)); }
-  const TITLES = { accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', activity: 'Activity', settings: 'Settings' };
+  const TITLES = { accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', market: 'Marketplace', activity: 'Activity', settings: 'Settings' };
   function enterApp() {
     showView('view-app');
     nav('accounts');
@@ -207,6 +207,7 @@
     if (panel === 'sync') refreshSyncTab();
     if (panel === 'templates') refreshTemplates();
     if (panel === 'drive') refreshDrive();
+    if (panel === 'market') refreshMarket();
     if (panel === 'activity') renderActivity();
   }
 
@@ -545,6 +546,18 @@
       const tog = el('button', 'tog' + (item.enabled !== false ? ' on' : '')); tog.onclick = () => { item.enabled = !(item.enabled !== false); tog.classList.toggle('on', item.enabled); dirty(kind); };
       row.appendChild(tog);
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', item.name || host(item.url))); b.appendChild(el('div', 'es', host(item.url))); row.appendChild(b);
+      // Configure — same behaviour as Nuvio's own account page: shown only when
+      // the add-on's manifest declares behaviorHints.configurable, and it just
+      // opens <manifest base>/configure in a new tab. Resolved lazily because
+      // the stored row carries no manifest; a manifest we can't read stays
+      // hidden rather than offering a button that might not work.
+      if (kind === 'addons' && window.NumaxMarket) {
+        const cfg = el('button', 'btn btn-ghost btn-xs', 'Configure');
+        cfg.style.display = 'none';
+        cfg.onclick = () => window.open(window.NumaxMarket.configureUrl(item.url), '_blank', 'noopener,noreferrer');
+        row.appendChild(cfg);
+        window.NumaxMarket.isConfigurable(item.url).then(on => { if (on) cfg.style.display = ''; });
+      }
       const del = el('button', 'iconbtn', '✕'); del.onclick = () => { list.splice(i, 1); dirty(kind); renderPfList(kind); }; row.appendChild(del);
       box.appendChild(row);
     });
@@ -1719,6 +1732,424 @@
   }
 
   // ======================================================================
+  // MARKETPLACE
+  // Add-ons are configured on their own sites; Numax only writes back the
+  // manifest URL you return with. Plugins install whole — Nuvio stores one
+  // plugin row per PROVIDER REPO ({url,name,enabled}), not one per scraper
+  // (verified against Nuvio's own Add Plugin dialog), so a repo's scrapers
+  // are shown as contents, never as a picker we couldn't honour.
+  //
+  // Every write below goes through engine.planTarget + api.applyPlan, the
+  // same read-modify-write path Sync Desk, templates and restore use.
+  // ======================================================================
+  const MK = window.NumaxMarket;
+  let mkTab = 'addons';
+  let mkProviders = null;      // cached index rows
+  const mkManifest = {};       // manifestUrl -> {ok,value} | {ok:false,error}
+
+  function refreshMarket() {
+    if (!MK) {
+      const box = $('mk-addon-groups'); if (box) { clr(box); box.appendChild(el('p', 'empty sm err-text', 'market.js did not load — the Marketplace data layer is missing.')); }
+      return;
+    }
+    switchMkTab(mkTab);
+  }
+  function switchMkTab(kind) {
+    mkTab = kind;
+    document.querySelectorAll('.mk-tab').forEach(b => b.classList.toggle('on', b.dataset.mktab === kind));
+    document.querySelectorAll('.mk-pane').forEach(p => p.style.display = (p.id === 'mk-pane-' + kind) ? '' : 'none');
+    if (kind === 'addons') renderMkAddons();
+    if (kind === 'plugins') renderMkPlugins();
+    if (kind === 'collections') renderMkCollections();
+  }
+
+  // ---- popover (own mechanism; deliberately not ui-motion's carry-chooser) ----
+  let mkPop = null;
+  function mkPopKey(e) { if (e.key === 'Escape') closeMkPop(); }
+  function closeMkPop() {
+    if (!mkPop) return;
+    mkPop.bg.remove(); mkPop.box.remove(); mkPop = null;
+    document.removeEventListener('keydown', mkPopKey);
+    window.removeEventListener('resize', closeMkPop);
+  }
+  function openMkPop(anchor, title, sub) {
+    closeMkPop();
+    const bg = el('div', 'mk-pop-bg'), box = el('div', 'mk-pop');
+    const h = el('div', 'mk-pop-h'); h.appendChild(el('b', '', title)); if (sub) h.appendChild(el('span', '', sub));
+    const body = el('div', 'mk-pop-b'), foot = el('div', 'mk-pop-f');
+    box.appendChild(h); box.appendChild(body); box.appendChild(foot);
+    document.body.appendChild(bg); document.body.appendChild(box);
+    bg.onclick = closeMkPop;
+    document.addEventListener('keydown', mkPopKey);
+    window.addEventListener('resize', closeMkPop);
+    // The box is measured, not guessed — and re-measured by place() once async
+    // content has filled it, or a list loaded later would hang off-screen.
+    const place = () => {
+      const r = anchor.getBoundingClientRect(), w = box.offsetWidth, ht = box.offsetHeight;
+      const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
+      let top = r.bottom + 8;
+      if (top + ht > window.innerHeight - 8) top = (r.top - ht - 8 >= 8) ? r.top - ht - 8 : Math.max(8, window.innerHeight - ht - 8);
+      box.style.left = Math.round(left) + 'px';
+      box.style.top = Math.round(top) + 'px';
+    };
+    place();
+    mkPop = { bg, box, body, foot, place };
+    return mkPop;
+  }
+  const openTab = url => window.open(url, '_blank', 'noopener,noreferrer');
+
+  // ---- add-ons ----
+  function renderMkAddons() {
+    const sbox = $('mk-staples'); clr(sbox);
+    MK.STAPLES.forEach(s => {
+      const c = el('div', 'mk-staple');
+      const top = el('div', 'mk-st-top');
+      const ic = el('div', 'mk-ic' + (s.instances ? ' accent' : '')); ic.textContent = s.name[0];
+      const tx = el('div'); tx.style.minWidth = '0';
+      tx.appendChild(el('div', 'mk-nm', s.name));
+      tx.appendChild(el('div', 'mk-sub', s.blurb));
+      top.appendChild(ic); top.appendChild(tx); c.appendChild(top);
+      const acts = el('div', 'mk-acts');
+      if (s.instances) {
+        const b = el('button', 'btn btn-primary btn-xs', 'Choose instance'); b.style.flex = '1';
+        b.onclick = () => openInstancePicker(b, s.instances, s.name);
+        acts.appendChild(b);
+      } else {
+        const b = el('button', 'btn btn-primary btn-xs', 'Open site'); b.style.flex = '1';
+        b.onclick = () => { openTab(s.url); logAct('Opened ' + s.name, 'info'); };
+        acts.appendChild(b);
+      }
+      const add = el('button', 'btn btn-ghost btn-xs', 'Add'); add.title = 'Paste this add-on’s manifest URL into profiles';
+      add.onclick = () => openAddToProfile(add, s.name);
+      acts.appendChild(add);
+      c.appendChild(acts); sbox.appendChild(c);
+    });
+
+    const gbox = $('mk-addon-groups'); clr(gbox);
+    MK.ADDON_GROUPS.forEach(g => {
+      const sec = el('div', 'mk-sec');
+      const h = el('div', 'mk-sec-h');
+      h.appendChild(el('span', 'mk-sec-t ' + (g.tone || 'plain'), g.title));
+      if (g.note) h.appendChild(el('span', 'mk-sec-n', g.note));
+      sec.appendChild(h);
+      const rows = el('div', 'mk-rows');
+      g.items.forEach(it => {
+        const r = el('div', 'mk-row');
+        const ic = el('div', 'mk-ic'); ic.style.cssText = 'width:26px;height:26px;font-size:11px'; ic.textContent = it.name[0];
+        const b = el('div', 'mk-rb');
+        b.appendChild(el('div', 'mk-rn', it.name));
+        b.appendChild(el('div', 'mk-ru', host(it.url)));
+        const open = el('button', 'btn btn-ghost btn-xs', 'Open');
+        open.onclick = () => { openTab(it.url); logAct('Opened ' + it.name, 'info'); };
+        const add = el('button', 'btn btn-ghost btn-xs', 'Add');
+        add.onclick = () => openAddToProfile(add, it.name);
+        r.appendChild(ic); r.appendChild(b); r.appendChild(open); r.appendChild(add);
+        rows.appendChild(r);
+      });
+      sec.appendChild(rows); gbox.appendChild(sec);
+    });
+  }
+
+  async function openInstancePicker(anchor, group, label) {
+    const pop = openMkPop(anchor, label + ' · choose an instance', 'Opens that instance’s own site. Nothing is saved yet.');
+    pop.body.appendChild(el('p', 'muted sm shimmer', 'Reading instance list…'));
+    let list;
+    try { list = await MK.loadInstances(group); }
+    catch (e) { clr(pop.body); pop.body.appendChild(el('p', 'empty sm err-text', 'Could not read the instance list: ' + e.message)); return; }
+    if (!mkPop) return; // closed while loading
+    clr(pop.body);
+    if (!list.length) { pop.body.appendChild(el('p', 'empty sm', 'No instances listed.')); return; }
+    list.forEach(i => {
+      const row = el('div', 'mk-inst');
+      const b = el('div', 'mk-ib');
+      b.appendChild(el('div', 'mk-in', i.name));
+      b.appendChild(el('div', 'mk-iu', host(i.url)));
+      row.appendChild(b);
+      if (i.uptime != null) {
+        const cls = i.uptime >= 99 ? '' : (i.uptime >= 95 ? ' mid' : ' low');
+        row.appendChild(el('span', 'mk-up' + cls, i.uptime + '%'));
+      }
+      const go = el('button', 'btn btn-ghost btn-xs', 'Open');
+      go.onclick = () => { openTab(i.url); logAct('Opened ' + label + ' — ' + i.name, 'info'); closeMkPop(); };
+      row.appendChild(go);
+      pop.body.appendChild(row);
+    });
+    const f = el('div');
+    f.style.cssText = 'font-size:11px;color:var(--t35);font-family:ui-monospace,monospace';
+    f.textContent = list.length + ' instances · uptime via ibbylabs';
+    pop.foot.appendChild(f);
+    pop.place();
+  }
+
+  // Every linked account's profiles, flattened, for the target pickers.
+  async function mkAllProfiles() {
+    const out = [];
+    for (const rec of store.list()) {
+      let profiles;
+      try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
+      profiles.forEach(p => out.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId) }));
+    }
+    return out;
+  }
+  function mkTargetList(box, targets, chosen) {
+    clr(box);
+    targets.forEach(t => {
+      const key = t.aid + ':' + t.idx;
+      const row = el('label', 'mk-tgt');
+      const cb = el('button', 'mk-cb' + (chosen.has(key) ? ' on' : ''));
+      cb.type = 'button';
+      cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+      cb.onclick = e => { e.preventDefault(); if (chosen.has(key)) chosen.delete(key); else chosen.add(key); cb.classList.toggle('on', chosen.has(key)); box.dispatchEvent(new CustomEvent('mkchange')); };
+      const tx = el('div'); tx.style.minWidth = '0';
+      tx.appendChild(el('div', 'mk-tn', t.name));
+      tx.appendChild(el('div', 'mk-tm', t.account + ' · profile ' + t.idx));
+      row.appendChild(cb); row.appendChild(tx);
+      box.appendChild(row);
+    });
+  }
+
+  async function openAddToProfile(anchor, name) {
+    const pop = openMkPop(anchor, 'Add ' + name, 'Paste the manifest URL its site gave you.');
+    const inp = el('input'); inp.type = 'url'; inp.placeholder = 'https://…/manifest.json';
+    inp.style.cssText = 'width:100%;margin-bottom:10px';
+    pop.body.appendChild(inp);
+    const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name in Nuvio'; nm.value = name;
+    nm.style.cssText = 'width:100%;margin-bottom:12px';
+    pop.body.appendChild(nm);
+
+    pop.body.appendChild(el('div', 'mk-sec-t', 'Add to'));
+    const tbox = el('div'); tbox.style.marginTop = '6px'; pop.body.appendChild(tbox);
+    tbox.appendChild(el('p', 'muted sm shimmer', 'Reading profiles…'));
+
+    const modeW = el('label', 'fld'); modeW.style.marginTop = '12px';
+    modeW.appendChild(el('span', '', 'How to write it'));
+    const msel = el('select', 'sel');
+    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all add-ons with just this</option>';
+    modeW.appendChild(msel); pop.body.appendChild(modeW);
+
+    const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
+    const res = el('div'); res.style.marginTop = '8px'; pop.body.appendChild(res);
+
+    const go = el('button', 'btn btn-primary', 'Add'); go.style.width = '100%'; go.disabled = true;
+    pop.foot.appendChild(go);
+
+    let targets = [];
+    try { targets = await mkAllProfiles(); } catch (e) { clr(tbox); tbox.appendChild(el('p', 'empty sm err-text', e.message)); return; }
+    if (!mkPop) return;
+    if (!targets.length) { clr(tbox); tbox.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
+    const chosen = new Set();
+    mkTargetList(tbox, targets, chosen);
+    pop.place();
+    const sync = () => { go.disabled = !(chosen.size && inp.value.trim()); };
+    tbox.addEventListener('mkchange', sync);
+    inp.addEventListener('input', sync);
+
+    go.onclick = () => {
+      const url = inp.value.trim();
+      if (!/^https?:\/\//i.test(url)) { status(st, 'That doesn’t look like a URL.', 'err'); return; }
+      const picked = targets.filter(t => chosen.has(t.aid + ':' + t.idx));
+      mkWrite({
+        kind: 'addons', master: [{ url, name: nm.value.trim() || name, enabled: true }],
+        targets: picked, mode: msel.value, st, res, btn: go, label: name,
+      });
+    };
+  }
+
+  // Shared writer for add-ons and plugins. Reads each target fresh, plans with
+  // the engine, shows exactly what changes, requires a tick before any removal,
+  // then applies per target and reports every failure individually.
+  async function mkWrite(o) {
+    const { kind, master, targets, mode, st, res, btn, label } = o;
+    btn.disabled = true; clr(res); status(st, 'Reading target profiles…');
+    const plans = [];
+    try {
+      for (const t of targets) {
+        const { backup } = await loadAccount(t.aid, true);
+        const state = sliceProfile(backup, t.idx);
+        // Append after whatever is already there rather than jumping to the top —
+        // but if this URL is already on the profile keep its existing position,
+        // so re-adding something reads as "no change" instead of reordering it.
+        const existing = new Map((state[kind] || []).map(x => [x.url, x]));
+        const base = (state[kind] || []).reduce((m, x) => Math.max(m, Number(x.sort_order) || 0), 0);
+        const rows = master.map((m, i) => {
+          const had = existing.get(m.url);
+          return { ...m, sort_order: had ? (had.sort_order ?? 0) : base + 1 + i };
+        });
+        const plan = E.planTarget({ [kind]: rows }, state, {
+          categories: { [kind]: true }, modes: { [kind]: mode },
+          profileId: t.idx, originClientId: 'numax-web',
+        });
+        plans.push({ t, plan });
+      }
+    } catch (e) { status(st, 'Failed: ' + e.message, 'err'); btn.disabled = false; return; }
+
+    const anyChange = plans.some(p => p.plan.hasChanges);
+    const anyRemoval = plans.some(p => p.plan.hasRemovals);
+    const rep = el('div', 'report');
+    plans.forEach(({ t, plan }) => {
+      const r = (plan.report && plan.report[kind]) || {};
+      const bits = [tagHtml('add', '+', r.added), tagHtml('upd', '~', r.updated), tagHtml('rem', '−', r.removed)].filter(Boolean);
+      const line = el('div', 'rline');
+      line.innerHTML = '<span class="rk">' + esc(t.name) + '</span>' + (bits.length ? bits.join(' ') : '<span class="tag keep">no change</span>');
+      rep.appendChild(line);
+    });
+    res.appendChild(rep);
+    status(st, '');
+
+    if (!anyChange) { status(st, 'Already there — nothing to do.', 'ok'); btn.disabled = true; return; }
+
+    let confirmed = !anyRemoval;
+    if (anyRemoval) {
+      const w = el('label', 'confirm'); const cb = el('input'); cb.type = 'checkbox';
+      cb.onchange = () => { confirmed = cb.checked; btn.disabled = !confirmed; };
+      w.appendChild(cb);
+      w.appendChild(el('span', '', 'This removes ' + kind + ' those profiles already have. I understand.'));
+      res.appendChild(w);
+    }
+    btn.disabled = !confirmed;
+    btn.textContent = 'Confirm';
+    btn.onclick = async () => {
+      btn.disabled = true; status(st, 'Writing…');
+      let ok = 0; const fails = [];
+      for (const { t, plan } of plans) {
+        if (!plan.hasChanges) continue;
+        try {
+          const rr = await A.client(store, t.aid).applyPlan(plan, { dryRun: false });
+          const bad = (rr.results || []).filter(x => !x.ok);
+          if (bad.length) fails.push(t.name + ': ' + bad.map(b => b.error).join('; ')); else ok++;
+        } catch (e) { fails.push(t.name + ': ' + e.message); }
+      }
+      invalAll();
+      if (fails.length) {
+        status(st, 'Wrote ' + ok + ', failed ' + fails.length + '.', 'err');
+        const ul = el('ul', 'modal-details'); fails.forEach(f => ul.appendChild(el('li', '', f))); res.appendChild(ul);
+        logAct('Marketplace: ' + label + ' — ' + fails.length + ' error(s)', 'err');
+      } else {
+        status(st, 'Added to ' + ok + ' profile' + (ok === 1 ? '' : 's') + '.', 'ok');
+        logAct('Marketplace: added ' + label + ' to ' + ok + ' profile(s)', 'ok');
+        celebrate(mkPop && mkPop.box);
+      }
+      if (pfA && pfI != null) openProfile(pfA, pfI, true);
+    };
+  }
+
+  // ---- plugins ----
+  async function renderMkPlugins(force) {
+    const box = $('mk-prov-list'), stn = $('mk-prov-status');
+    if (!mkProviders || force) {
+      clr(box); status(stn, 'Reading the community index…'); $('mk-prov-count').textContent = '';
+      try { mkProviders = await MK.loadPluginIndex(force); }
+      catch (e) {
+        status(stn, '');
+        clr(box); box.appendChild(el('p', 'empty sm err-text', 'Could not read the plugin index: ' + e.message));
+        return;
+      }
+    }
+    status(stn, '');
+    $('mk-prov-count').textContent = mkProviders.length + ' repos';
+    clr(box);
+    mkProviders.forEach(p => {
+      const row = el('div', 'mk-prov'); row.dataset.url = p.manifestUrl;
+      const ic = el('div', 'mk-ic'); ic.textContent = p.name[0];
+      const b = el('div', 'mk-pb');
+      b.appendChild(el('div', 'mk-pn', p.name));
+      const meta = el('div', 'mk-pm', 'checking…'); b.appendChild(meta);
+      const lang = el('span', 'mk-lang', p.lang.replace(/ language$/i, ''));
+      const open = el('button', 'btn btn-ghost btn-xs', 'View');
+      open.onclick = () => openProvider(p);
+      row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open);
+      box.appendChild(row);
+      // Reachability is a fact worth showing: the community index currently
+      // lists several dead manifests as though they were healthy.
+      MK.loadManifest(p.manifestUrl).then(m => {
+        meta.textContent = m.scrapers.length + ' scraper' + (m.scrapers.length === 1 ? '' : 's') + (m.version ? ' · v' + m.version : '');
+      }).catch(e => {
+        row.classList.add('dead'); open.disabled = true;
+        meta.textContent = 'unreachable — ' + e.message;
+        meta.style.color = '#ff8a80';
+      });
+    });
+  }
+
+  async function openProvider(p) {
+    const card = $('mk-prov-detail-card'), body = $('mk-prov-detail');
+    card.style.display = ''; $('mk-prov-detail-title').textContent = p.name;
+    clr(body); body.appendChild(el('p', 'muted sm shimmer', 'Reading manifest…'));
+    let m;
+    try { m = await MK.loadManifest(p.manifestUrl); }
+    catch (e) { clr(body); body.appendChild(el('p', 'empty err-text', 'Could not read this repo: ' + e.message)); return; }
+    clr(body);
+
+    body.appendChild(el('p', 'muted sm', m.name + (m.version ? ' · v' + m.version : '') + ' · ' + m.scrapers.length + ' scrapers'));
+
+    const note = el('div', 'mk-note'); note.style.margin = '12px 0';
+    note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
+      + '<div>Nuvio stores a plugin as the whole repo, so this installs all ' + m.scrapers.length + ' of its scrapers. Turning individual ones off is done inside the Nuvio app.</div>';
+    body.appendChild(note);
+
+    const srcW = el('div', 'mk-scroll'); srcW.style.margin = '12px 0';
+    m.scrapers.slice(0, 200).forEach(s => {
+      const r = el('div', 'mk-scr');
+      const t = el('div'); t.style.minWidth = '0';
+      t.appendChild(el('div', 'mk-sn', s.name || s.id || 'scraper'));
+      if (s.description) t.appendChild(el('div', 'mk-sd', s.description));
+      r.appendChild(t);
+      const langs = Array.isArray(s.contentLanguage) ? s.contentLanguage.join(' · ').toUpperCase() : '';
+      if (langs) { const c = el('span', 'mk-lang', langs); c.style.marginLeft = 'auto'; r.appendChild(c); }
+      srcW.appendChild(r);
+    });
+    body.appendChild(srcW);
+
+    const src = el('button', 'btn btn-ghost btn-xs', 'Open source');
+    src.onclick = () => openTab(p.rawUrl);
+    body.appendChild(src);
+
+    body.appendChild(el('div', 'mk-sec-t', 'Install to')).style.marginTop = '16px';
+    const tbox = el('div'); tbox.style.marginTop = '6px'; body.appendChild(tbox);
+    tbox.appendChild(el('p', 'muted sm shimmer', 'Reading profiles…'));
+
+    const modeW = el('label', 'fld'); modeW.style.cssText = 'max-width:440px;margin-top:12px';
+    modeW.appendChild(el('span', '', 'How to write it'));
+    const msel = el('select', 'sel');
+    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all plugins with just this</option>';
+    modeW.appendChild(msel); body.appendChild(modeW);
+
+    const bar = el('div', 'actbar');
+    const go = el('button', 'btn btn-primary', 'Install'); go.disabled = true;
+    const st = el('div', 'inline-status');
+    bar.appendChild(go); bar.appendChild(st); body.appendChild(bar);
+    const res = el('div'); res.style.marginTop = '10px'; body.appendChild(res);
+
+    let targets = [];
+    try { targets = await mkAllProfiles(); } catch (e) { clr(tbox); tbox.appendChild(el('p', 'empty sm err-text', e.message)); return; }
+    if (!targets.length) { clr(tbox); tbox.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
+    const chosen = new Set();
+    mkTargetList(tbox, targets, chosen);
+    tbox.addEventListener('mkchange', () => { go.disabled = !chosen.size; });
+
+    go.onclick = () => mkWrite({
+      kind: 'plugins',
+      master: [{ url: p.manifestUrl, name: m.name || p.name, enabled: true }],
+      targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
+      mode: msel.value, st, res, btn: go, label: p.name,
+    });
+  }
+
+  // ---- collections ----
+  function renderMkCollections() {
+    const box = $('mk-collections'); clr(box);
+    const n = el('div', 'mk-note mk-warn');
+    n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v5"/><circle cx="12" cy="16.6" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20.2h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
+      + '<div><b>Not available in the browser yet.</b><br>' + esc(MK.COLLECTIONS.why) + '</div>';
+    box.appendChild(n);
+    const bar = el('div', 'actbar');
+    const b = el('button', 'btn btn-ghost', 'Browse them on Nuvio');
+    b.onclick = () => openTab(MK.COLLECTIONS.site);
+    bar.appendChild(b); box.appendChild(bar);
+    box.appendChild(el('p', 'muted sm', 'Collections you already have show up on the Profile tab, and copy between profiles from Sync Desk.'));
+  }
+
+  // ======================================================================
   // wiring + boot
   // ======================================================================
   function togWire(id, fn) { const b = $(id); b.setAttribute('role', 'switch'); b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); fn(on); }; }
@@ -1735,6 +2166,9 @@
     document.querySelectorAll('.pf-stat').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     $('pf-save-btn').onclick = saveAllDirty;
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
+    document.querySelectorAll('.mk-tab').forEach(b => b.onclick = () => switchMkTab(b.dataset.mktab));
+    $('mk-prov-refresh').onclick = () => renderMkPlugins(true);
+    $('mk-prov-close').onclick = () => { $('mk-prov-detail-card').style.display = 'none'; };
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
     $('sy-oldapp-dismiss').onclick = () => { $('sy-oldapp-notice').style.display = 'none'; };
     $('sy-select-all').onclick = sySelectAll;
