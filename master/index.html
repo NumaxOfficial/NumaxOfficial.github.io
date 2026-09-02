@@ -388,6 +388,7 @@
   .crumb{ font-size:13px; color:var(--t45); }
   .crumb b{ color:var(--t); font-weight:600; }
   .panel{ padding:clamp(20px,3vw,38px); max-width:1120px; }
+  .panel[data-panel="market"]{ max-width:none; }
   .phead{ margin-bottom:22px; }
   .phead .eyebrow{ font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:var(--accent); font-weight:700; }
   .phead h1{ font-size:clamp(26px,3.2vw,34px); font-weight:800; letter-spacing:-.02em; margin-top:8px; }
@@ -600,10 +601,22 @@
   .mk-tgt .mk-tn{ font-size:12.5px; }
   .mk-tgt .mk-tm{ font-size:10.5px; color:var(--t35); font-family:ui-monospace,monospace; }
 
-  .mk-note{ display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--t45); background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:12px 14px; line-height:1.5; }
+  .mk-note{ display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--t45); background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:12px 14px; line-height:1.5; margin-bottom:14px; }
   .mk-note svg{ width:16px; height:16px; flex:none; margin-top:1px; color:var(--t35); }
   .mk-warn{ border-color:rgba(240,160,32,.35); background:rgba(240,160,32,.06); color:#f0c060; }
   .mk-warn svg{ color:#f0c060; }
+
+  /* community collections grid */
+  .mk-coll-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-top:14px; }
+  .mk-coll-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; }
+  .mk-coll-img{ width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:var(--surface-2); }
+  .mk-coll-body{ padding:12px 13px 13px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .mk-coll-title{ font-size:13.5px; font-weight:600; }
+  .mk-coll-desc{ font-size:11.5px; color:var(--t45); line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .mk-coll-tags{ display:flex; flex-wrap:wrap; gap:5px; }
+  .mk-coll-stats{ font-size:11px; color:var(--t35); font-family:ui-monospace,monospace; }
+  .mk-coll-req{ font-size:11px; color:var(--t35); line-height:1.4; }
+  .mk-coll-foot{ margin-top:auto; padding-top:8px; display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; }
 
   /* ==================================================================
      MOTION LAYER

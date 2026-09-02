@@ -2064,41 +2064,57 @@
       MK.loadManifest(p.manifestUrl).then(m => {
         meta.textContent = m.scrapers.length + ' scraper' + (m.scrapers.length === 1 ? '' : 's') + (m.version ? ' · v' + m.version : '');
       }).catch(e => {
-        row.classList.add('dead'); open.disabled = true;
-        meta.textContent = 'unreachable — ' + e.message;
+        // Unreachable from Numax's own browser tab is still worth flagging —
+        // but it isn't proof the repo is dead (Nuvio's own client fetches
+        // scrapers on-device, not through this tab, and its Add Plugin dialog
+        // never validates a URL before storing it either). Leave View enabled
+        // so installing by URL alone is still possible.
+        row.classList.add('dead');
+        meta.textContent = 'could not preview — ' + e.message;
         meta.style.color = '#ff8a80';
       });
     });
   }
 
+  // Nuvio's own Add Plugin dialog never validates a manifest URL before
+  // storing it (confirmed: it's exactly url/name/enabled, nothing else) — a
+  // manifest Numax's own tab can't preview cross-origin isn't proof the repo
+  // is dead, just proof Numax can't see it from here. So install stays
+  // available either way; only the scraper list needs a working preview.
   async function openProvider(p) {
     const card = $('mk-prov-detail-card'), body = $('mk-prov-detail');
     card.style.display = ''; $('mk-prov-detail-title').textContent = p.name;
     clr(body); body.appendChild(el('p', 'muted sm shimmer', 'Reading manifest…'));
-    let m;
+    let m = null, previewError = null;
     try { m = await MK.loadManifest(p.manifestUrl); }
-    catch (e) { clr(body); body.appendChild(el('p', 'empty err-text', 'Could not read this repo: ' + e.message)); return; }
+    catch (e) { previewError = e; }
     clr(body);
 
-    body.appendChild(el('p', 'muted sm', m.name + (m.version ? ' · v' + m.version : '') + ' · ' + m.scrapers.length + ' scrapers'));
+    if (m) {
+      body.appendChild(el('p', 'muted sm', m.name + (m.version ? ' · v' + m.version : '') + ' · ' + m.scrapers.length + ' scrapers'));
+      const note = el('div', 'mk-note'); note.style.margin = '12px 0';
+      note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
+        + '<div>Nuvio stores a plugin as the whole repo, so this installs all ' + m.scrapers.length + ' of its scrapers. Turning individual ones off is done inside the Nuvio app.</div>';
+      body.appendChild(note);
 
-    const note = el('div', 'mk-note'); note.style.margin = '12px 0';
-    note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
-      + '<div>Nuvio stores a plugin as the whole repo, so this installs all ' + m.scrapers.length + ' of its scrapers. Turning individual ones off is done inside the Nuvio app.</div>';
-    body.appendChild(note);
-
-    const srcW = el('div', 'mk-scroll'); srcW.style.margin = '12px 0';
-    m.scrapers.slice(0, 200).forEach(s => {
-      const r = el('div', 'mk-scr');
-      const t = el('div'); t.style.minWidth = '0';
-      t.appendChild(el('div', 'mk-sn', s.name || s.id || 'scraper'));
-      if (s.description) t.appendChild(el('div', 'mk-sd', s.description));
-      r.appendChild(t);
-      const langs = Array.isArray(s.contentLanguage) ? s.contentLanguage.join(' · ').toUpperCase() : '';
-      if (langs) { const c = el('span', 'mk-lang', langs); c.style.marginLeft = 'auto'; r.appendChild(c); }
-      srcW.appendChild(r);
-    });
-    body.appendChild(srcW);
+      const srcW = el('div', 'mk-scroll'); srcW.style.margin = '12px 0';
+      m.scrapers.slice(0, 200).forEach(s => {
+        const r = el('div', 'mk-scr');
+        const t = el('div'); t.style.minWidth = '0';
+        t.appendChild(el('div', 'mk-sn', s.name || s.id || 'scraper'));
+        if (s.description) t.appendChild(el('div', 'mk-sd', s.description));
+        r.appendChild(t);
+        const langs = Array.isArray(s.contentLanguage) ? s.contentLanguage.join(' · ').toUpperCase() : '';
+        if (langs) { const c = el('span', 'mk-lang', langs); c.style.marginLeft = 'auto'; r.appendChild(c); }
+        srcW.appendChild(r);
+      });
+      body.appendChild(srcW);
+    } else {
+      const note = el('div', 'mk-note mk-warn'); note.style.margin = '12px 0';
+      note.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v5"/><circle cx="12" cy="16.6" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20.2h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
+        + '<div><b>Could not preview this repo</b> — ' + esc(previewError.message) + '. Scrapers can\'t be listed, but you can still install it by URL; Nuvio\'s own Add Plugin dialog doesn\'t check a manifest before storing it either.</div>';
+      body.appendChild(note);
+    }
 
     const src = el('button', 'btn btn-ghost btn-xs', 'Open source');
     src.onclick = () => openTab(p.rawUrl);
@@ -2129,24 +2145,171 @@
 
     go.onclick = () => mkWrite({
       kind: 'plugins',
-      master: [{ url: p.manifestUrl, name: m.name || p.name, enabled: true }],
+      master: [{ url: p.manifestUrl, name: (m && m.name) || p.name, enabled: true }],
       targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
       mode: msel.value, st, res, btn: go, label: p.name,
     });
   }
 
   // ---- collections ----
-  function renderMkCollections() {
-    const box = $('mk-collections'); clr(box);
-    const n = el('div', 'mk-note mk-warn');
-    n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v5"/><circle cx="12" cy="16.6" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20.2h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
-      + '<div><b>Not available in the browser yet.</b><br>' + esc(MK.COLLECTIONS.why) + '</div>';
+  // Browse from the manually-refreshed light snapshot (market.js
+  // loadCollectionsSnapshot); install by reading that same collection's full
+  // payload (market.js loadCollectionInstall) and writing it through the same
+  // engine.planTarget + api.applyPlan path as everything else — see market.js
+  // for why a once-captured snapshot is as good as a live read here.
+  let mkCollectionsCache = null;
+  async function renderMkCollections(force) {
+    const box = $('mk-collections');
+    if (!mkCollectionsCache || force) {
+      clr(box); box.appendChild(el('p', 'muted sm shimmer', 'Reading the collections snapshot…'));
+      try { mkCollectionsCache = await MK.loadCollectionsSnapshot(force); }
+      catch (e) {
+        clr(box); box.appendChild(el('p', 'empty sm err-text', 'Could not read the collections snapshot: ' + e.message));
+        return;
+      }
+    }
+    clr(box);
+
+    const when = mkCollectionsCache.capturedAt ? new Date(mkCollectionsCache.capturedAt).toLocaleString() : 'unknown time';
+    const n = el('div', 'mk-note');
+    n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
+      + '<div><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.<br>' + esc(MK.COLLECTIONS.why) + '</div>';
     box.appendChild(n);
+
     const bar = el('div', 'actbar');
-    const b = el('button', 'btn btn-ghost', 'Browse them on Nuvio');
-    b.onclick = () => openTab(MK.COLLECTIONS.site);
-    bar.appendChild(b); box.appendChild(bar);
-    box.appendChild(el('p', 'muted sm', 'Collections you already have show up on the Profile tab, and copy between profiles from Sync Desk.'));
+    const b = el('button', 'btn btn-ghost btn-xs', 'Browse on Nuvio');
+    b.onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
+    bar.appendChild(b);
+    box.appendChild(bar);
+
+    const grid = el('div', 'mk-coll-grid');
+    const items = (mkCollectionsCache.items || []).slice().sort((a, b) => (b.installs_count || 0) - (a.installs_count || 0));
+    items.forEach(c => grid.appendChild(renderMkCollCard(c)));
+    box.appendChild(grid);
+  }
+
+  // Descriptions come from creators as raw markdown; there's no renderer here,
+  // so strip the syntax rather than show literal ### and ** on a plain card.
+  function mdStrip(s) {
+    return String(s || '')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^#{1,6}\s*/gm, '')
+      .replace(/(\*\*|__)(.*?)\1/g, '$2')
+      .replace(/(\*|_)(.*?)\1/g, '$2')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function renderMkCollCard(c) {
+    const card = el('div', 'mk-coll-card');
+    if (c.image_url) {
+      const img = el('img', 'mk-coll-img'); img.src = c.image_url; img.alt = ''; img.loading = 'lazy';
+      img.onerror = () => { img.remove(); };
+      card.appendChild(img);
+    }
+    const body = el('div', 'mk-coll-body');
+    body.appendChild(el('div', 'mk-coll-title', c.title));
+    if (c.description) body.appendChild(el('div', 'mk-coll-desc', mdStrip(c.description)));
+    if (Array.isArray(c.tags) && c.tags.length) {
+      const tg = el('div', 'mk-coll-tags');
+      c.tags.forEach(t => tg.appendChild(el('span', 'mk-lang', t)));
+      body.appendChild(tg);
+    }
+    const s = c.stats || {};
+    const statsText = [
+      s.folderCount != null ? s.folderCount + ' folders' : null,
+      s.sourceCount != null ? s.sourceCount + ' sources' : null,
+      s.addonCount != null ? s.addonCount + ' add-ons' : null,
+    ].filter(Boolean).join(' · ');
+    if (statsText) body.appendChild(el('div', 'mk-coll-stats', statsText));
+    if (Array.isArray(c.requiredAddons) && c.requiredAddons.length) {
+      body.appendChild(el('div', 'mk-coll-req', 'Needs: ' + c.requiredAddons.map(a => a.addonName || a.addonId).join(', ')));
+    }
+    const foot = el('div', 'mk-coll-foot');
+    foot.appendChild(el('span', 'muted sm', (c.likes_count || 0) + ' likes · ' + (c.installs_count || 0) + ' installs'));
+    const acts = el('div'); acts.style.cssText = 'display:flex;gap:6px';
+    const install = el('button', 'btn btn-primary btn-xs', 'Install to profile');
+    install.onclick = () => openMkCollectionInstall(install, c);
+    const open = el('button', 'btn btn-ghost btn-xs', 'View on Nuvio');
+    open.onclick = () => { openTab(MK.COLLECTIONS.detailUrl(c.public_id)); logAct('Opened community collection ' + c.title, 'info'); };
+    acts.appendChild(install); acts.appendChild(open);
+    foot.appendChild(acts);
+    body.appendChild(foot);
+    card.appendChild(body);
+    return card;
+  }
+
+  // Reads this collection's full payload (folders/sources + required
+  // add-ons) from the per-collection snapshot file, then plans+writes it
+  // through engine.planTarget/api.applyPlan exactly like a template apply —
+  // same merge/overwrite choice, same removal-confirm tick, same per-item
+  // failure reporting (renderApplyPlan, shared with Templates/Sync Desk).
+  async function openMkCollectionInstall(anchor, c) {
+    const pop = openMkPop(anchor, 'Install ' + c.title, 'Adds this collection to one profile.');
+    pop.body.appendChild(el('p', 'muted sm shimmer', 'Reading collection…'));
+    let doc;
+    try { doc = await MK.loadCollectionInstall(c.public_id); }
+    catch (e) { clr(pop.body); pop.body.appendChild(el('p', 'empty sm err-text', 'Could not read this collection: ' + e.message)); return; }
+    if (!mkPop) return; // closed while loading
+    clr(pop.body);
+
+    if (doc.collections.length > 1) {
+      pop.body.appendChild(el('p', 'muted sm', 'This is a pack of ' + doc.collections.length + ' collections — all install together.'));
+    }
+    if (doc.requiredAddons.length) {
+      pop.body.appendChild(el('p', 'muted sm', 'Needs: ' + doc.requiredAddons.map(a => a.addonName || a.addonId).join(', ')));
+    }
+    if (doc.resources.length) {
+      const rn = el('div', 'mk-note mk-warn');
+      rn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8.5v5"/><circle cx="12" cy="16.6" r=".9" fill="currentColor" stroke="none"/><path d="M10.3 3.9 2.6 17.2A2 2 0 0 0 4.3 20.2h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>'
+        + '<div>Also includes ' + doc.resources.length + ' extra file' + (doc.resources.length === 1 ? '' : 's') + ' this install won\'t apply (' + doc.resources.map(r => esc(r.fileName || r.id)).join(', ') + ') — get ' + (doc.resources.length === 1 ? 'it' : 'them') + ' from Nuvio\'s own page.</div>';
+      pop.body.appendChild(rn);
+    }
+
+    const tw = el('label', 'fld'); tw.appendChild(el('span', '', 'Install to profile'));
+    const tsel = el('select', 'sel'); tw.appendChild(tsel); pop.body.appendChild(tw);
+    let targets = [];
+    try { targets = await mkAllProfiles(); } catch (e) { pop.body.appendChild(el('p', 'empty sm err-text', e.message)); return; }
+    if (!mkPop) return;
+    if (!targets.length) { pop.body.appendChild(el('p', 'empty sm', 'No linked accounts yet — link one on the Nuvio accounts tab.')); return; }
+    targets.forEach(t => { const o = document.createElement('option'); o.value = t.aid + ':' + t.idx; o.textContent = t.name + ' · ' + t.account; tsel.appendChild(o); });
+
+    const modeW = el('label', 'fld'); modeW.style.marginTop = '12px';
+    modeW.appendChild(el('span', '', 'How to add the collection'));
+    const msel = el('select', 'sel');
+    msel.innerHTML = '<option value="merge">Merge — add it, keep everything else</option><option value="mirror">Overwrite — replace all collections with just this</option>';
+    modeW.appendChild(msel); pop.body.appendChild(modeW);
+
+    const bar = el('div', 'actbar'); bar.style.marginTop = '12px';
+    const btn = el('button', 'btn btn-primary', 'Preview'); const st = el('div', 'inline-status');
+    bar.appendChild(btn); bar.appendChild(st); pop.body.appendChild(bar);
+    const res = el('div'); res.style.marginTop = '10px'; pop.body.appendChild(res);
+    pop.place();
+
+    btn.onclick = async () => {
+      const [aid, iStr] = tsel.value.split(':'); const idx = parseInt(iStr, 10);
+      const mode = msel.value;
+      status(st, 'Reading target profile…'); clr(res);
+      try {
+        const { backup } = await loadAccount(aid, true);
+        const state = sliceProfile(backup, idx);
+        const master = { collections: doc.collections };
+        const cats = { collections: true };
+        if (doc.requiredAddons.length) {
+          const existing = new Map((state.addons || []).map(x => [x.url, x]));
+          const base = (state.addons || []).reduce((m, x) => Math.max(m, Number(x.sort_order) || 0), 0);
+          master.addons = doc.requiredAddons.map((a, i) => {
+            const had = existing.get(a.manifestUrl);
+            return { url: a.manifestUrl, name: a.addonName, enabled: true, sort_order: had ? (had.sort_order ?? 0) : base + 1 + i };
+          });
+          cats.addons = true;
+        }
+        const plan = E.planTarget(master, state, { categories: cats, modes: { collections: mode, addons: 'merge' }, profileId: idx, originClientId: 'numax-web' });
+        status(st, '');
+        renderApplyPlan(res, st, plan, aid, 'Collection installed', {});
+        pop.place();
+      } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
+    };
   }
 
   // ======================================================================

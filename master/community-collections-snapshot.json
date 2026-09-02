@@ -1,0 +1,4377 @@
+{
+  "capturedAt": "2026-09-02T14:43:41.189324Z",
+  "source": "nuvio.tv/api/community-collections",
+  "total": 99,
+  "items": [
+    {
+      "id": 167,
+      "public_id": "sport-ita",
+      "title": "Sport-ITA",
+      "description": "Italian Only - Original One went down, so this is a reupload. I did not create this, i am just sharing it.",
+      "tags": [
+        "sports",
+        "calcio"
+      ],
+      "image_url": "https://i.postimg.cc/5NWKB7zf/Calcio-Ita.png",
+      "likes_count": 3,
+      "installs_count": 102,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-29 15:35:21",
+      "approved_at": "2026-08-29 15:35:21",
+      "updated_at": "2026-08-29 15:35:21",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 10,
+        "sourceCount": 20,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "sport-ita",
+        "version": 1,
+        "submittedAt": "2026-08-27T22:03:02.301Z",
+        "coverImageUrl": "https://i.postimg.cc/5NWKB7zf/Calcio-Ita.png"
+      },
+      "collectionMeta": {
+        "id": "collection-553cb375-community",
+        "title": "Live Sport",
+        "viewMode": "ROWS",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "org.prisonmike.streamvix",
+          "addonName": "StreamViX | ElfHosted ⚡ 📺",
+          "manifestUrl": "https://streamvix.hayd.uk/eyJtZWRpYWZsb3dNYXN0ZXIiOnRydWUsIm1lZGlhRmxvd1Byb3h5VXJsIjoiIiwibWVkaWFGbG93UHJveHlQYXNzd29yZCI6IiIsInVzZU1lZGlhRmxvdyI6ZmFsc2UsImR2ckVuYWJsZWQiOmZhbHNlLCJkaXNhYmxlTGl2ZVR2IjpmYWxzZSwidmF2b29Ob01mcEVuYWJsZWQiOmZhbHNlLCJ0cmFpbGVyRW5hYmxlZCI6dHJ1ZSwiZGlzYWJsZVZpeHNyYyI6ZmFsc2UsInZpeERpcmVjdCI6ZmFsc2UsInZpeERpcmVjdEZoZCI6ZmFsc2UsInZpeFByb3h5IjpmYWxzZSwiY2IwMUVuYWJsZWQiOmZhbHNlLCJndWFyZGFoZEVuYWJsZWQiOnRydWUsImFkbkVuYWJsZWQiOnRydWUsInZpZHhnb0VuYWJsZWQiOmZhbHNlLCJndWFyZG9zZXJpZUVuYWJsZWQiOmZhbHNlLCJndWFyZGFmbGl4RW5hYmxlZCI6ZmFsc2UsImV1cm9zdHJlYW1pbmdFbmFibGVkIjpmYWxzZSwidG9vbml0YWxpYUVuYWJsZWQiOmZhbHNlLCJ0b29uRW5hYmxlZCI6dHJ1ZSwiYW5pbWVzYXR1cm5FbmFibGVkIjpmYWxzZSwiYW5pbWV3b3JsZEVuYWJsZWQiOnRydWUsImFuaW1ldW5pdHlFbmFibGVkIjp0cnVlLCJhbmltZXVuaXR5RGlyZWN0IjpmYWxzZSwiYW5pbWV1bml0eURpcmVjdEZoZCI6ZmFsc2UsImFuaW1ldW5pdHlQcm94eSI6ZmFsc2UsImZhc3RNb2RlIjp0cnVlfQ==/manifest.json"
+        },
+        {
+          "addonId": "org.stremio.vavoo.clean",
+          "addonName": "TvVoo | ElfHosted",
+          "manifestUrl": "https://tvvoo.hayd.uk/cfg-it/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 166,
+      "public_id": "by-year",
+      "title": "By Year",
+      "description": "Movies and series organized by year from 1980-2010",
+      "tags": [],
+      "image_url": "https://image.tmdb.org/t/p/w780/AdKA2F1SzYPhSZdEbjH1Zh75UVQ.jpg",
+      "likes_count": 5,
+      "installs_count": 111,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-29 15:26:40",
+      "approved_at": "2026-08-29 15:26:40",
+      "updated_at": "2026-08-29 15:26:40",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 31,
+        "sourceCount": 1178,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "by-year",
+        "version": 1,
+        "submittedAt": "2026-08-27T21:06:00.900Z",
+        "coverImageUrl": "https://image.tmdb.org/t/p/w780/AdKA2F1SzYPhSZdEbjH1Zh75UVQ.jpg"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 165,
+      "public_id": "mexican-romantic-comedies",
+      "title": "🇲🇽 Mexican Romantic Comedies",
+      "description": "Mexican Romantic Comedies",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/J0TXpf57/mexican-romantic.png",
+      "likes_count": 2,
+      "installs_count": 33,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-27 18:08:21",
+      "approved_at": "2026-08-27 18:08:21",
+      "updated_at": "2026-08-27 18:08:21",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 1,
+        "sourceCount": 1,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "mexican-romantic-comedies",
+        "version": 1,
+        "submittedAt": "2026-08-26T22:05:52.160Z",
+        "coverImageUrl": "https://i.postimg.cc/J0TXpf57/mexican-romantic.png"
+      },
+      "collectionMeta": {
+        "id": "collection-fb95ff01",
+        "title": "🇲🇽 Mexican Romantic Comedies",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 164,
+      "public_id": "arabcinemeta-v2",
+      "title": "ArabCinemeta V2",
+      "description": "A collection made using the Arabcinemeta Addon, in this version I added the new catalogs from Arabcinemeta configuration, but made the included addon posters and titles in english perhaps for a better Debrid search. I also fixed the arrangement of the catalogs and folders for a better aesthetic and order.",
+      "tags": [
+        "arab",
+        "family",
+        "movie",
+        "shows",
+        "(watchit",
+        "tod",
+        "shahid",
+        "osn+…etc.)"
+      ],
+      "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5vaITnvhLTHg3Dchh0uKiNgDd_HcyF7BeRvSsxUBO2uHlqliI1vqIHb4d&s=10",
+      "likes_count": 7,
+      "installs_count": 188,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-27 18:08:14",
+      "approved_at": "2026-08-27 18:08:14",
+      "updated_at": "2026-08-29 15:26:06",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 70,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "arabcinemeta-v2",
+        "version": 2,
+        "submittedAt": "2026-08-26T23:37:35.072Z",
+        "coverImageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5vaITnvhLTHg3Dchh0uKiNgDd_HcyF7BeRvSsxUBO2uHlqliI1vqIHb4d&s=10"
+      },
+      "collectionMeta": {
+        "id": "collection-22ad69b6-community",
+        "title": "ArabCinemeta",
+        "viewMode": "ROWS",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.elcinema.metadata",
+          "addonName": "ArabCinemeta",
+          "manifestUrl": "https://arabcinemeta.osamayousry.com/c/rAEL3___-X_ZLv-P_599AA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "public_id": "custom-nuvio-collection",
+      "title": "Custom Nuvio collection",
+      "description": "This is pack is for everyone specially from India and Pakistan and Bangladesh this will help them most. More I am make it valuable.",
+      "tags": [
+        "movies",
+        "series"
+      ],
+      "image_url": "https://cdn.xperience-app.com/covers/dynamic_wall/streaming_services.netflix.backdrop.webp?v=20260819",
+      "likes_count": 7,
+      "installs_count": 288,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-26 21:58:51",
+      "approved_at": "2026-08-26 21:58:51",
+      "updated_at": "2026-08-26 21:58:51",
+      "stats": {
+        "collectionCount": 39,
+        "folderCount": 557,
+        "sourceCount": 1293,
+        "addonCount": 4
+      },
+      "community": {
+        "id": "custom-nuvio-collection",
+        "version": 1,
+        "submittedAt": "2026-08-19T18:26:46.240Z",
+        "coverImageUrl": "https://cdn.xperience-app.com/covers/dynamic_wall/streaming_services.netflix.backdrop.webp?v=20260819"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "app.xperience.343f9868-5505-445d-b811-a3090b5b19b2",
+          "addonName": "Xperience",
+          "manifestUrl": ""
+        },
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadatafortheweebs.midnightignite.me/stremio/904cb38e-2624-4be0-b1c1-82b30ebcec4c/manifest.json"
+        },
+        {
+          "addonId": "com.aicat.464cfc5f-1086-42ed-841b-218d842253b2.nuvio",
+          "addonName": "com.aicat.464cfc5f-1086-42ed-841b-218d842253b2.nuvio",
+          "manifestUrl": ""
+        },
+        {
+          "addonId": "app.xperience.cdb5422c-c0a5-4159-9501-65f36244300d",
+          "addonName": "Xperience",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 162,
+      "public_id": "colecci-n-en-espa-ol-completa-creada-por-donpuercotroll",
+      "title": "Colección en Español Completa creada por DonPuercoTroll",
+      "description": "Colección para Nuvio completamente en español, esta es una actualización de las versiones anteriores que se eliminaron por fallas de AIOMetadata y cambio de gráficas en todos los catálogos.",
+      "tags": [
+        "colección",
+        "español",
+        "latino",
+        "nuvio"
+      ],
+      "image_url": "https://i.postimg.cc/kM8xPtyq/Perfil-Terceario.png",
+      "likes_count": 12,
+      "installs_count": 198,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-26 21:57:12",
+      "approved_at": "2026-08-26 21:57:12",
+      "updated_at": "2026-08-26 21:57:12",
+      "stats": {
+        "collectionCount": 8,
+        "folderCount": 69,
+        "sourceCount": 198,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "colecci-n-en-espa-ol-completa-creada-por-donpuercotroll",
+        "version": 1,
+        "submittedAt": "2026-08-20T23:15:14.345Z",
+        "coverImageUrl": "https://i.postimg.cc/kM8xPtyq/Perfil-Terceario.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/bce49881-174f-4b31-bc73-d736242ec6eb/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 161,
+      "public_id": "streaming-services-9",
+      "title": "Streaming Services",
+      "description": "All Popular platforms from India, Bangladesh, US & UK. Top 10, Trending, Popular Genre regular updated lists available in this collection",
+      "tags": [],
+      "image_url": "https://bingecat.com/collections/artwork-cache/2718/.eJwdzUEOwjAMBMC_5Ixo7DhxwmdQHDvQA6UKlTgg_k6LtKeVdvbj6utl23VWd0GGfHJr3e7u4oYtamPaYBowvU3Wqfs9XmJPEREpxRqYPRdPVZL4JhJS7SSZihInTh7Ox9CdXJ-Xm411zMu209ZDINGAYKEAKnbwrUcpnCloqtFYTRAyN8iw9yBoxStR1tSaHuBzPOph_Q--P5U2Ock.tJtvyb8RsT3cBbpugBDR_BpVnCA/f00b5f65222465a37707904ab6b0cbb36af4b849d4767601.webp",
+      "likes_count": 8,
+      "installs_count": 314,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-26 21:54:59",
+      "approved_at": "2026-08-26 21:54:59",
+      "updated_at": "2026-08-26 21:54:59",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 18,
+        "sourceCount": 256,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "streaming-services-9",
+        "version": 1,
+        "submittedAt": "2026-08-25T06:33:47.958Z",
+        "coverImageUrl": "https://bingecat.com/collections/artwork-cache/2718/.eJwdzUEOwjAMBMC_5Ixo7DhxwmdQHDvQA6UKlTgg_k6LtKeVdvbj6utl23VWd0GGfHJr3e7u4oYtamPaYBowvU3Wqfs9XmJPEREpxRqYPRdPVZL4JhJS7SSZihInTh7Ox9CdXJ-Xm411zMu209ZDINGAYKEAKnbwrUcpnCloqtFYTRAyN8iw9yBoxStR1tSaHuBzPOph_Q--P5U2Ock.tJtvyb8RsT3cBbpugBDR_BpVnCA/f00b5f65222465a37707904ab6b0cbb36af4b849d4767601.webp"
+      },
+      "collectionMeta": {
+        "id": "collection-bc-eb0c279acc4c4aba",
+        "title": "Streaming Services",
+        "viewMode": "ROWS",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata | Elfhosted",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/2832a9bd-259b-4075-86d0-391782060294/manifest.json"
+        },
+        {
+          "addonId": "com.aicat.28c5e38e-48a6-4783-a619-e29c78803022.nuvio",
+          "addonName": "Bingecat",
+          "manifestUrl": "https://bingecat.com/stremio/28c5e38e-48a6-4783-a619-e29c78803022/nuvio/manifest.json?bcv=54"
+        }
+      ]
+    },
+    {
+      "id": 160,
+      "public_id": "arabcinemeta-arabic-streaming-services",
+      "title": "ArabCinemeta - Arabic Streaming Services",
+      "description": "A collection of all big streaming services in the Middle East. Shahid, Watch It, Yango Play, Tod that gets updated daily with latest originals and Top 10 etc.\n\nGo to https://arabcinemeta.osamayousry.com for more provider catalogs and actor/director/writer catalogs and collections",
+      "tags": [
+        "movies",
+        "shows",
+        "arabic",
+        "shahid",
+        "yango",
+        "watchit",
+        "tod"
+      ],
+      "image_url": "https://artwork.osamayousry.com/platform/shahid/hero.webp",
+      "likes_count": 2,
+      "installs_count": 62,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-26 21:54:39",
+      "approved_at": "2026-08-26 21:54:39",
+      "updated_at": "2026-08-26 21:54:39",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 38,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "arabcinemeta-arabic-streaming-services",
+        "version": 1,
+        "submittedAt": "2026-08-25T13:45:39.580Z",
+        "coverImageUrl": "https://artwork.osamayousry.com/platform/shahid/hero.webp"
+      },
+      "collectionMeta": {
+        "id": "e0defe98-b9f5-5917-9192-e4a80fc6f069",
+        "title": "Streaming Services",
+        "viewMode": "ROWS",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.elcinema.metadata",
+          "addonName": "ArabCinemeta",
+          "manifestUrl": "https://arabcinemeta.osamayousry.com/c/rAEL3_8HhjBJAocKpwI9YA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 159,
+      "public_id": "arabcinemeta-collection",
+      "title": "ArabCinemeta Collection",
+      "description": "A Catalog made from the full index collections found on the Arabcinemeta Addon",
+      "tags": [],
+      "image_url": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5vaITnvhLTHg3Dchh0uKiNgDd_HcyF7BeRvSsxUBO2uHlqliI1vqIHb4d&s=10",
+      "likes_count": 1,
+      "installs_count": 26,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-26 21:54:21",
+      "approved_at": "2026-08-26 21:54:21",
+      "updated_at": "2026-08-26 21:54:21",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 65,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "arabcinemeta-collection",
+        "version": 1,
+        "submittedAt": "2026-08-25T16:57:37.485Z",
+        "coverImageUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQ5vaITnvhLTHg3Dchh0uKiNgDd_HcyF7BeRvSsxUBO2uHlqliI1vqIHb4d&s=10"
+      },
+      "collectionMeta": {
+        "id": "collection-22ad69b6",
+        "title": "ArabCinemeta",
+        "viewMode": "ROWS",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.elcinema.metadata",
+          "addonName": "Arabcinemeta",
+          "manifestUrl": "https://arabcinemeta.osamayousry.com/c/rAEL3___-f9NDv-P_wM9YA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "public_id": "kids",
+      "title": "Kids",
+      "description": "Movies and series for kids",
+      "tags": [],
+      "image_url": "https://wallpaper.forfun.com/fetch/aa/aa09cea6c91cdc3119ead529c7adada9.jpeg?w=1470&r=0.5625&f=webp",
+      "likes_count": 6,
+      "installs_count": 469,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-18 20:59:38",
+      "approved_at": "2026-08-18 20:59:38",
+      "updated_at": "2026-08-18 20:59:38",
+      "stats": {
+        "collectionCount": 3,
+        "folderCount": 19,
+        "sourceCount": 20,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "kids",
+        "version": 1,
+        "submittedAt": "2026-08-17T12:28:05.254Z",
+        "coverImageUrl": "https://wallpaper.forfun.com/fetch/aa/aa09cea6c91cdc3119ead529c7adada9.jpeg?w=1470&r=0.5625&f=webp"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "aio-metadata",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/529ce23c-c439-41c8-b73d-c05f69966be9/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "public_id": "haunted-horror-collection",
+      "title": "Haunted Horror Collection",
+      "description": "This is a horror only collection made for android tv *****THIS WILL CRASH MOBILE. DONT EVEN TRY IT******.  Some images are NOT for young eyes so parental discretion is advised. What makes it haunted? Almost every image comes to life. Most images are taken directly from popular horror movies and brought to life in the most wonderfully horrific ways.  34 Horror Genres. Horror Franchises by Genres/Over 100 Horror Franchises in all! Directors/International/Discovery Sections all included.",
+      "tags": [
+        "horror movies/shows"
+      ],
+      "image_url": "https://cdn.phototourl.com/pro/2026-08-11-ba4a84a5-9180-4963-a3f9-9b5de17c4a20.png",
+      "likes_count": 20,
+      "installs_count": 658,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-11 13:33:43",
+      "approved_at": "2026-08-11 13:33:43",
+      "updated_at": "2026-08-11 13:33:43",
+      "stats": {
+        "collectionCount": 10,
+        "folderCount": 128,
+        "sourceCount": 303,
+        "addonCount": 3
+      },
+      "community": {
+        "id": "haunted-horror-collection",
+        "version": 1,
+        "submittedAt": "2026-08-11T07:21:00.110Z",
+        "coverImageUrl": "https://cdn.phototourl.com/pro/2026-08-11-ba4a84a5-9180-4963-a3f9-9b5de17c4a20.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.scaryonly",
+          "addonName": "Scary Only — Horror by Subgenre",
+          "manifestUrl": "https://addon.scary.network/c/eyJtIjp0cnVlLCJzIjp0cnVlLCJzdWJzIjpbInNsYXNoZXIiLCJzdXBlcm5hdHVyYWwiLCJ6b21iaWUiLCJ2YW1waXJlIiwid2VyZXdvbGYiLCJmb3VuZC1mb290YWdlIiwicHN5Y2hvbG9naWNhbCIsImJvZHktaG9ycm9yIiwiZm9say1ob3Jyb3IiLCJjb3NtaWMiLCJoYXVudGVkLWhvdXNlIiwicG9zc2Vzc2lvbiIsIndpdGNoY3JhZnQiLCJjcmVhdHVyZSIsImdvdGhpYyIsImhvbWUtaW52YXNpb24iLCJjYW5uaWJhbCIsInNlcmlhbC1raWxsZXIiLCJ3aG9kdW5pdCJdLCJkZWNhZGVzIjpbIjYwcyIsIjcwcyIsIjgwcyIsIjkwcyIsIjIwMDBzIiwiMjAxMHMiLCIyMDIwcyJdLCJjb2xscyI6W10sInNwZWNpYWwiOlsiY2luZW1hcyIsInRyZW5kaW5nIiwiYWNjbGFpbWVkIiwiZ2VtcyIsInVwY29taW5nIiwicmVjb21tZW5kZWQiLCJhc2lhbiIsImpob3Jyb3IiLCJraG9ycm9yIiwiYW5pbWUiLCJnaWFsbG8iLCJzY2FyaWVzdCIsImluZGllIiwiaGlkZGVuIiwiYTI0IiwiYmx1bWhvdXNlIiwiYXV0ZXVyIiwiZmVzdGl2YWwiLCJ5ZWFyMjAyNiIsInNlcmllc190b3AiXSwicHJvdmlkZXJzIjpbIm5ldGZsaXgiLCJwcmltZSIsImh1bHUiLCJzaHVkZGVyIiwiaGJvIiwiYW1jIiwiYXBwbGV0diIsImRpc25leSIsInBlYWNvY2siLCJtdWJpIiwiY3J1bmNoeXJvbGwiXSwicmVnaW9uIjoiVVMifQ/manifest.json"
+        },
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.forthewizards.uk/stremio/29e95bbe-549e-4c82-aa81-8b462a79ee9f/manifest.json"
+        },
+        {
+          "addonId": "com.ultramax",
+          "addonName": "ultramax.vip",
+          "manifestUrl": "https://ultramax.vip/c/0DAEF09E/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 156,
+      "public_id": "brazuka-otaku-cole-es-de-anime-no-nuvio-em-pt-br",
+      "title": "Brazuka Otaku - Coleções de Anime no Nuvio em  PT-BR",
+      "description": "Iae pessoal, decidi compartilhar essa coleção para ajudar outros usuários brasileiros que desejam utilizar o Nuvio em português (pt-BR) ou que procuram uma base para criar sua própria organização, podendo modificá-la conforme suas preferências. Organizei da forma que considero mais prática e agradável para navegar no Nuvio.\n\n⚙️ COMO CONFIGURAR\n\nSE VOCÊ JÁ POSSUI UMA CONFIGURAÇÃO NO AIOMETADATA:\n\nBaixe o arquivo \"Apenas Catálogos - AIOMetadata.json\" disponível na aba Resources.\nAcesse: https://aiometadata.elfhosted.com/configure/\nFaça o acesso utilizando o UUID e a senha da sua configuração existente.\nVá até a seção Catalogs.\nClique em Import Setup → Upload File e selecione o arquivo \"Apenas Catálogos - AIOMetadata.json\".\nClique em Save para aplicar as alterações. Os novos catálogos serão adicionados à sua configuração existente.\n\nSE ESTA É SUA PRIMEIRA CONFIGURAÇÃO NO AIOMETADATA:\n\nBaixe o arquivo \"Configuração Completa - AIOMetadata.json\" disponível na aba Resources.\nAcesse: https://aiometadata.elfhosted.com/configure/\nVá até a seção Configuration, clique em Import Configuration e selecione o arquivo \"Configuração Completa - AIOMetadata.json\".\nCadastre as chaves de API obrigatórias: MDBList, TMDB e TVDB.\nAjuste as demais opções do AIOMetadata conforme suas preferências.\nClique em Save.\nAo finalizar a configuração, crie uma senha e guarde o código UUID gerado. Esse UUID, junto com a senha criada, será utilizado como seu acesso para futuras alterações na configuração.\nCopie a URL do manifest gerada pelo AIOMetadata e instale o addon no Nuvio através da aba Addons.\n\n🎨 PERSONALIZAÇÃO\n\nA configuração compartilhada aqui segue uma proposta minimalista, priorizando uma navegação mais limpa, organizada e objetiva. Essa escolha reflete apenas uma preferência pessoal de uso, mas a ideia é que ela sirva como uma base inicial para que cada usuário possa construir sua própria experiência.\n\nVocê pode adicionar novos catálogos, remover os que não forem do seu interesse ou expandir a coleção conforme seu gosto.\n\nSe quiser expandir a coleção com facilidade, uma excelente opção que recomendo é o addon Xperience, que surgiu recentemente. Ele permite editar coleções existentes de forma simples e intuitiva, oferecendo mais liberdade para personalizar e organizar sua biblioteca.\n\nPara começar:\n\nAcesse: https://xperience-app.com/\nFaça login no Xperience e cadastre as chaves de API obrigatórias: MDBList e TMDB.\nBaixe o arquivo Coleções - Nuvio PT-BR.json disponível na aba Resources.\nVá até a aba Coleções.\nClique em Importar → Enviar arquivos e selecione o arquivo Coleções Brazuka Otaku - Nuvio PT-BR.json.\nApós a importação, faça as alterações que desejar e personalize suas coleções conforme seu gosto.\nAo optar pelo Xperience, você não precisa obrigatoriamente continuar utilizando o AIOMetadata. Existem diferentes formas de combinar as duas ferramentas:\n\nUtilizar somente o Xperience para gerenciar tanto as coleções quanto as linhas de catálogos da página inicial.\nUtilizar o Xperience para coleções e o AIOMetadata para gerenciar as linhas de catálogos na Home.\nO Xperience também permite importar catálogos diretamente para as linhas da página inicial. Para isso, basta acessar a aba Linhas da Home, clicar nos três pontos (...), selecionar Import Add-ons e colar a URL de instalação do AIOMetadata. O Xperience fará a importação automática dos catálogos disponíveis, permitindo que você organize tudo diretamente por ele.\n\n🎭 PADRÃO VISUAL DAS CAPAS\n\nPara quem tiver interesse em manter o mesmo padrão visual, todas as capas 16:9 foram desenvolvidas em resolução 1280×720, 150 PPI no Adobe Photoshop 2026, utilizando a fonte Inter Bold 28pt (Google Fonts). As capas dos estúdios foram feitas em 1080x1080.\n\nA maior parte dos fundos foi criada utilizando um degradê de duas cores na horizontal, da borda esquerda para a borda inferior direita.\n\nLink das Capas: https://postimg.cc/gallery/nC9fQTy\nVocê pode baixar alguma capa, colocar no photoshop e usar pra se guiar ao fazer suas próprias capas.\n\nArrivederci",
+      "tags": [
+        "anime",
+        "brasil",
+        "brazil",
+        "brazilian",
+        "otaku",
+        "series"
+      ],
+      "image_url": "https://i.postimg.cc/bwTJGHyk/Post-Nuvio.gif",
+      "likes_count": 59,
+      "installs_count": 920,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-09 14:44:26",
+      "approved_at": "2026-08-09 14:44:26",
+      "updated_at": "2026-08-11 13:36:04",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 56,
+        "sourceCount": 99,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "brazuka-otaku-cole-es-de-anime-no-nuvio-em-pt-br",
+        "version": 2,
+        "submittedAt": "2026-08-08T03:37:09.949Z",
+        "coverImageUrl": "https://i.postimg.cc/bwTJGHyk/Post-Nuvio.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata  | ElfHosted",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/e5278909-a850-4362-8d94-9684ac505c11/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 154,
+      "public_id": "t-rk-oyuncular-created-by-orkun",
+      "title": "Türk Oyuncular- Created by Orkun",
+      "description": "Yeşilçamın Dev Oyuncuları Ve Filmleri",
+      "tags": [
+        "movies",
+        "türk",
+        "türksineması",
+        "yeşilçam",
+        "sinema",
+        "film"
+      ],
+      "image_url": "https://yilmazhomecollection.com/wp-content/uploads/2024/11/DA995.jpg",
+      "likes_count": 3,
+      "installs_count": 97,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-08 01:04:36",
+      "approved_at": "2026-08-08 01:04:36",
+      "updated_at": "2026-08-08 01:04:36",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 24,
+        "sourceCount": 24,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "t-rk-oyuncular-created-by-orkun",
+        "version": 1,
+        "submittedAt": "2026-08-03T22:35:21.095Z",
+        "coverImageUrl": "https://yilmazhomecollection.com/wp-content/uploads/2024/11/DA995.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-7ff0ce44",
+        "title": "Türk Oyuncular- Created by Orkun",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 153,
+      "public_id": "asian-regional-collection-pack",
+      "title": "Asian Regional Collection Pack",
+      "description": "This collection pack includes contents from Bangladesh, India, Korea, Japan and China.\nNo addons are required.\n\n***Please check the Description of Resources***",
+      "tags": [
+        "movies",
+        "series",
+        "anime"
+      ],
+      "image_url": "https://files.catbox.moe/sgd0pq.png",
+      "likes_count": 13,
+      "installs_count": 470,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-03 15:21:12",
+      "approved_at": "2026-08-03 15:21:12",
+      "updated_at": "2026-08-03 15:21:12",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 30,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "asian-regional-collection-pack",
+        "version": 1,
+        "submittedAt": "2026-08-03T08:32:10.198Z",
+        "coverImageUrl": "https://files.catbox.moe/sgd0pq.png"
+      },
+      "collectionMeta": {
+        "id": "collection-066f57fc",
+        "title": "Region",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 152,
+      "public_id": "modern-indian-collections",
+      "title": "Modern Indian Collections",
+      "description": "Browse from over 170+ folders organized into 7 different collections inside Nuvio.\n\n⚙️ HOW TO SET UP\n   -After clicking Add pack\n 1. Go to: any Aio instance \n 2. Fill in your API keys — MDBList(compulsory) , TMDB.\n 3. Under the Catalogs tab, import the catalog file from the Resources section below.\n 4. Hit Save, then copy your addon URL and add it to Nuvio \n        — and you're good to go!\n\n📂 WHAT'S INCLUDED\n * Indian OTT: 7 folders\n * Indian Languages: 5 folders\n * Indian Genres: 8 folders\n * Indian Actors: 94 folders\n * Indian Directors: 28 folders\n * Movie Collections: 18 folders (custom art)\n * Indian Studio Collections:  11 folders",
+      "tags": [],
+      "image_url": "https://github.com/funnywafer/Nuvio-indian-imgs/blob/main/nuvio%20setup.gif?raw=true",
+      "likes_count": 36,
+      "installs_count": 897,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-03 15:21:07",
+      "approved_at": "2026-08-03 15:21:07",
+      "updated_at": "2026-08-26 21:55:54",
+      "stats": {
+        "collectionCount": 7,
+        "folderCount": 171,
+        "sourceCount": 345,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "modern-indian-collections",
+        "version": 3,
+        "submittedAt": "2026-08-03T10:49:31.513Z",
+        "coverImageUrl": "https://github.com/funnywafer/Nuvio-indian-imgs/blob/main/nuvio%20setup.gif?raw=true"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "aio-metadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 149,
+      "public_id": "spacetoon-planets",
+      "title": "SpaceToon Planets",
+      "description": "Rediscover classic Arabic-dubbed shows through the planets you remember from SpaceToon. One catalogue, two metadata modes, and no streaming sources.",
+      "tags": [
+        "anime",
+        "family",
+        "cartoons",
+        "spacetoon"
+      ],
+      "image_url": "https://spacetoon.osamayousry.com/og-image.png",
+      "likes_count": 5,
+      "installs_count": 153,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-02 19:58:38",
+      "approved_at": "2026-08-02 19:58:38",
+      "updated_at": "2026-08-02 19:58:38",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 9,
+        "sourceCount": 9,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "spacetoon-planets",
+        "version": 1,
+        "submittedAt": "2026-07-28T21:45:22.782Z",
+        "coverImageUrl": "https://spacetoon.osamayousry.com/og-image.png"
+      },
+      "collectionMeta": {
+        "id": "collection-spacetoon-planets-imdb",
+        "title": "كواكب سبيستون",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.osamayousry.spacetoonunofficial",
+          "addonName": "Classic Spacetoon Planets (Unofficial)",
+          "manifestUrl": "https://spacetoon.osamayousry.com/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 148,
+      "public_id": "streaming-services-8",
+      "title": "Streaming Services",
+      "description": "The most popular streaming services. No add on",
+      "tags": [],
+      "image_url": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/streaming/backdrop/netflix.webp",
+      "likes_count": 55,
+      "installs_count": 2802,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-08-02 19:55:04",
+      "approved_at": "2026-08-02 19:55:04",
+      "updated_at": "2026-08-02 19:55:04",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 18,
+        "sourceCount": 682,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "streaming-services-8",
+        "version": 1,
+        "submittedAt": "2026-08-02T03:08:29.411Z",
+        "coverImageUrl": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/streaming/backdrop/netflix.webp"
+      },
+      "collectionMeta": {
+        "id": "collection-ERFS5GWK",
+        "title": "Streaming Services",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 147,
+      "public_id": "discover-3",
+      "title": "Discover",
+      "description": "Discover collection focusing on Indian contents",
+      "tags": [],
+      "image_url": "https://s6.imgcdn.dev/YmDRUh.jpg",
+      "likes_count": 14,
+      "installs_count": 435,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-25 02:14:03",
+      "approved_at": "2026-07-25 02:14:03",
+      "updated_at": "2026-07-25 02:14:03",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 6,
+        "sourceCount": 6,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "discover-3",
+        "version": 1,
+        "submittedAt": "2026-07-23T16:09:41.664Z",
+        "coverImageUrl": "https://s6.imgcdn.dev/YmDRUh.jpg"
+      },
+      "collectionMeta": {
+        "id": "30b722e7-df27-47c4-a896-4a17a848a8c3-community",
+        "title": "Discover",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.linvo.cinemeta",
+          "addonName": "Cinemeta",
+          "manifestUrl": "https://v3-cinemeta.strem.io/manifest.json"
+        },
+        {
+          "addonId": "com.stremio.indianStreamCatalog",
+          "addonName": "Indian Regional Catalog",
+          "manifestUrl": "https://83e20802dcf1-indian-streams.baby-beamup.club/eyJjYXRhbG9ncyI6WyJoaSIsInRlIiwidGEiLCJtbCIsImtuIiwidGVfc2VyaWVzIiwiaGlfc2VyaWVzIiwidGFfc2VyaWVzIiwibWxfc2VyaWVzIiwib3R0X3JlbGVhc2VzIl0sImluY2x1ZGVUaGVhdHJpY2FsIjp0cnVlfQ==/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "public_id": "sherlock-holmes-jeremy-brett",
+      "title": "Sherlock Holmes - Jeremy Brett",
+      "description": "Due to how nuvio parses this list , all 7 season episodes are stored under first Adventures of from 1984",
+      "tags": [],
+      "image_url": "https://media.themoviedb.org/t/p/w710_and_h400_face/eds1txhawj52RXj0XkHFoMe2CYl.jpg",
+      "likes_count": 10,
+      "installs_count": 144,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-21 02:54:35",
+      "approved_at": "2026-07-21 02:54:35",
+      "updated_at": "2026-07-21 02:54:35",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 2,
+        "sourceCount": 2,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "sherlock-holmes-jeremy-brett",
+        "version": 1,
+        "submittedAt": "2026-07-20T17:41:05.282Z",
+        "coverImageUrl": "https://media.themoviedb.org/t/p/w710_and_h400_face/eds1txhawj52RXj0XkHFoMe2CYl.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-c55a849d",
+        "title": "Sherlock Holmes",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 145,
+      "public_id": "tv-francophone",
+      "title": "TV FRANCOPHONE",
+      "description": "### 🇫🇷 **TV FRANCOPHONE : Le meilleur de la télé en français**\n\nDécouvrez une sélection soigneusement organisée pour les amoureux de la culture francophone. Cette collection regroupe vos favoris en français, facilitant l'accès aux meilleures productions télévisuelles de **France** et de **Belgique**.\n\n**Ce que vous trouverez dans cette collection :**\n\n* 🎬 **Cinéma :** Une sélection variée de films francophones, des grands classiques aux nouveautés.\n* 📺 **Séries :** Le meilleur de la fiction télévisuelle francophone.\n* 🎭 **Émissions & Variétés :** Retrouvez vos programmes cultes et divertissements incontournables, tels que :\n    * *Zone Interdite*\n    * *Koh-Lanta*\n    * ... et bien d'autres rendez-vous immanquables !\n\nQue vous soyez à la recherche d'une fiction captivante ou de votre émission de variété préférée, tout le contenu est ici, 100% en français pour les  français",
+      "tags": [
+        "series",
+        "films",
+        "francophone",
+        "france",
+        "belgique",
+        "divertissement",
+        "tv-ff"
+      ],
+      "image_url": "https://i.ibb.co/SqnKqj7/gpt-image-2-HD-french-tv-promo-background-for-jellyfin-library-with-the-word-FRENCH-TV-fil-0.jpg",
+      "likes_count": 15,
+      "installs_count": 389,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-19 16:38:56",
+      "approved_at": "2026-07-19 16:38:56",
+      "updated_at": "2026-07-19 16:38:56",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 4,
+        "sourceCount": 64,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "tv-francophone",
+        "version": 1,
+        "submittedAt": "2026-07-16T14:10:38.776Z",
+        "coverImageUrl": "https://i.ibb.co/SqnKqj7/gpt-image-2-HD-french-tv-promo-background-for-jellyfin-library-with-the-word-FRENCH-TV-fil-0.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-7dd3d697",
+        "title": "TV FRANCOPHONE",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "french catalogues",
+          "manifestUrl": "https://aiometadata.viren070.me/stremio/ec2f0c8b-ead5-4ed3-8865-21579e24e81f/manifest.json"
+        },
+        {
+          "addonId": "org.stremio.aiolists",
+          "addonName": "aiolist france",
+          "manifestUrl": "https://aiolists.elfhosted.com/H4sIAAAAAAAAA61V23LiOBD9lZSedqrslC8YiN9ICCxswJNgwiVFTclW21bwhZFsbim-Z2u_Y35sS7ZhCPHeavNmnW6rzzlSt94QXtHfYIdMlPJM3Th1GjJ3v1H0jGsA3DO-UyQhtiJO65SoyB4DkAWIJJRGxLkFzIDZyRJiZCLY9QOn61KL9nvjfU8d0v7NtQDJ5FGAwbw73g6jx5o1GeuDqKcP7JkxbIevM_spsuz7zUybB7PX28Aa9XgvMuic9uoD21WGbX9vtR93w1HNGNjLzaDd2j7c9fdk0qMW7WlWu7UZTGZby_b3s_08HNozfbYnS8t-Xg6791TkzrSbzXw6oFbI6Wx6u5rq_XA2eaTT0YaS6HnnauHaEfWmyvW205ftgbuO7PqD15sqXacdG9PO3Wv4XbP2wfxX20s86HZGwbg0YgSc0yTuEWQiV9ebDVA1z1HUum7UNFXTDfemqamaqtccXcPGjeY6UP7act0ki1Pxq6ZqhqppShEYc2AxjgCZyFfjXYYkFEGKCU7xKMmYKwIir9znAcd-hn2BekxgDC_TlusC58cDOqJP4DHgwSV8v11RBryVIjPOwrBEz2ggCYWUpxYjwJD5gjBNxJrLG5y6gfiUJyWbbyfoCHh4nTCaAhc6iCNCGQu_1Y1aU3sPGY2mUn8P6UrzpvkBahhoIaEQ83S8IjgF4b6maHVZachq3VZ1U9VMVb3W67V5yZ0PSguR-XbJy3xDAeaDZE3FwsMhB0kgoyDZ_AREubsA3GVFOaVhas3rpm7M0eGDD5-3fSPfvtL9_1_kzLLDQUIBJQTiB1EImS8LCTGIkjWQI1JNYyEhN-NpEom0IY5ydw_iAjP_9K8AiqwBEIrt3QrOUmm0SlgKpEVIEueH8-HWmG-ICgEV16m8sQ84BZ5edRjEboCkc29SllVZQ_mgfSsIjlnYyykcU8sqeY9f3NqzHllRYAxIxhj7GR-FmY9MFOZsxBQt2KS7FeQeRoITWhwq2qBC47E_qjReFfKuXsr8azeJFp8o_KI3z4TvfJ8kaZD5yd_rlnOxXC5T3CT6RyeK7q9w4jgWSgodhuMfv2PKr34Z_fiDCR_s5y_v1X9oiULjv1N_MYbO1L9mS3CSbbPRrH-Qz0FQkdO17DEcu5hy4PIJPFdfgBXyG8ZfyG8YlfI7NIz4l08892Op_6bcEzROquV8WXXaBwnxhKVfGXggLslxBhDKsRNCF2IGHRqm4tkpaUMsIk84JsWQ6QBOMwanOMsjR2kl3cLkINmkNIKaKgj7mO1chjdewojv5q9EjPkqYzSmgmtA8ukmJhoHzNygeHvznVwag3iSRbCYbKPLlPyBXkgIxzSCInqfMyeFy4c_AXkJ9KiKCQAA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "public_id": "cartoons-collection",
+      "title": "CARTOONS COLLECTION",
+      "description": "### 🪀📺 **All your favourite cartoons**\n\nExplore an unlimited universe of animation, carefully curated for cartoon enthusiasts. This borderless collection brings together the best of global animation, offering easy access to iconic productions. From timeless classics to contemporary creations.\n\n**What you will find in this collection:**\n\nClassics like  courage the cowardly dog and tom & jerry.\n* 🌟 **Family & Kids' Animation:** The major hits that have marked generations and new adventures for the youngest viewers.\n* 🎨 **Adult & Indie Animation:** Auteur series and films, more mature and experimental, for a discerning audience.\n* 🇯🇵 **Japanese Anime:** A diverse selection, from Studio Ghibli films to popular TV series.\n* 🏰 **Major Studios:** The best of Disney, Pixar, DreamWorks, and other industry giants.\n* 🌐 **International Animation:** Animated treasures from Europe, Canada, and around the world.\n\nWhether you are searching for a classic saturday morning cartoon, a slapstick comedy, or a niche cartoon, all the content is here!",
+      "tags": [
+        "animation",
+        "cartoons",
+        "anime",
+        "family",
+        "adult-animation",
+        "studio-ghibli",
+        "disney",
+        "global"
+      ],
+      "image_url": "https://i.ibb.co/7NrFmTf9/Green-Black-and-White-Modern-Minimalist-Motivational-Desktop-Wallpaper.png",
+      "likes_count": 40,
+      "installs_count": 1342,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-19 16:38:49",
+      "approved_at": "2026-07-19 16:38:49",
+      "updated_at": "2026-07-19 16:38:49",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 11,
+        "sourceCount": 11,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "cartoons-collection",
+        "version": 1,
+        "submittedAt": "2026-07-16T15:36:07.697Z",
+        "coverImageUrl": "https://i.ibb.co/7NrFmTf9/Green-Black-and-White-Modern-Minimalist-Motivational-Desktop-Wallpaper.png"
+      },
+      "collectionMeta": {
+        "id": "collection-e111cd3b-community",
+        "title": "CARTOONS",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 143,
+      "public_id": "fall-and-rise-of-ancient-empires",
+      "title": "Fall and Rise of Ancient Empires",
+      "description": "Fall and Rise of Ancient Empires\n50 TOP movies/shows",
+      "tags": [],
+      "image_url": "https://media.themoviedb.org/t/p/w710_and_h400_face/b2fhZk0xB2TgMsDXT6goR28PoHX.jpg",
+      "likes_count": 10,
+      "installs_count": 234,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-19 16:38:40",
+      "approved_at": "2026-07-19 16:38:40",
+      "updated_at": "2026-07-19 16:38:40",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 1,
+        "sourceCount": 1,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "fall-and-rise-of-ancient-empires",
+        "version": 1,
+        "submittedAt": "2026-07-16T16:18:11.094Z",
+        "coverImageUrl": "https://media.themoviedb.org/t/p/w710_and_h400_face/b2fhZk0xB2TgMsDXT6goR28PoHX.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-184a2a23",
+        "title": "Fall and Rise of Ancient Empires",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 142,
+      "public_id": "ginyu-s-french-collection",
+      "title": "ginyu's french collection",
+      "description": "# 🎬 Ginyu's Streaming & French Collection\n\nBienvenue dans une expérience de streaming centralisée, conçue pour regrouper vos plateformes favorites, vos contenus internationaux et une sélection exclusive de programmes francophones au sein d'une interface élégante et intuitive.\n\n---\n\n### 🚀 Hub de Streaming Centralisé\nAccédez instantanément à vos services préférés grâce à une organisation optimisée :\n* **Plateformes Majeures :** Netflix, Canal+, Prime Video, Apple TV+, Max, Crunchyroll et bien d'autres.\n* **À la une :** Retrouvez les dernières nouveautés et tendances grâce aux métadonnées intégrées (Trakt & TMDB).\n* **Navigation Fluide :** Un accès rapide par genre, studio ou franchise (Marvel, DC, Star Wars, etc.).\n\n---\n\n### 🇫🇷 Focus : Chaînes & Programmes Français\nUne section dédiée pour ne rien manquer de la production francophone :\n* **Chaînes en Direct :** Accès aux groupes **TF1** (TF1, TMC, TFX, LCI) et **M6** (M6, W9, 6ter).\n* **Service Public :** Intégration complète des contenus **France.tv** (France 2, 3, 4, 5, France Info).\n* **Culture & Info :** Dossier spécial regroupant **Arte** et **BFM TV**.\n* **Séries & Animation :** Une sélection curatée des meilleures séries françaises (*Pax Massilia*, *Furies*, *Un village français*) et des pépites de l'animation (*Wakfu*, *Ewilan*).\n\n---\n\n### 🛠️ Installation & Usage\nCette collection est pensée pour offrir une expérience riche en métadonnées et une navigation sans friction.\n\n1. **Installation :** Installez le pack communautaire pour peupler instantanément votre tableau de bord.\n2. **Personnalisation :** Profitez d'affiches haute résolution, d'arrière-plans immersifs et d'une organisation dossier par dossier.\n3. **Mise à jour :** Votre bibliothèque se synchronise automatiquement pour rester à jour avec les dernières sorties.\n\n---",
+      "tags": [
+        "movies",
+        "series",
+        "variety",
+        "reality tv",
+        "anime",
+        "kdrama"
+      ],
+      "image_url": "https://i.ibb.co/4g1zT0XM/Green-Black-and-White-Modern-Minimalist-Motivational-Desktop-Wallpaper-1.png",
+      "likes_count": 19,
+      "installs_count": 420,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-19 16:37:48",
+      "approved_at": "2026-07-19 16:37:48",
+      "updated_at": "2026-07-19 16:37:48",
+      "stats": {
+        "collectionCount": 14,
+        "folderCount": 307,
+        "sourceCount": 1002,
+        "addonCount": 3
+      },
+      "community": {
+        "id": "ginyu-s-french-collection",
+        "version": 1,
+        "submittedAt": "2026-07-16T16:42:51.971Z",
+        "coverImageUrl": "https://i.ibb.co/4g1zT0XM/Green-Black-and-White-Modern-Minimalist-Motivational-Desktop-Wallpaper-1.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadatafortheweebs.midnightignite.me/stremio/f9b0d560-d666-4b1e-998a-5270bdb9be82/manifest.json"
+        },
+        {
+          "addonId": "com.aicat.7bf93c36-3827-4aad-959f-3ae274b48eb8",
+          "addonName": "com.aicat.7bf93c36-3827-4aad-959f-3ae274b48eb8",
+          "manifestUrl": ""
+        },
+        {
+          "addonId": "org.stremio.aiolists",
+          "addonName": "AIOLists",
+          "manifestUrl": "https://aiolists.elfhosted.com/H4sIAAAAAAAAA61V23LiOBD9lZSedqrslC8YiN9ICCxswJNgwiVFTclW21bwhZFsbim-Z2u_Y35sS7ZhCPHeavNmnW6rzzlSt94QXtHfYIdMlPJM3Th1GjJ3v1H0jGsA3DO-UyQhtiJO65SoyB4DkAWIJJRGxLkFzIDZyRJiZCLY9QOn61KL9nvjfU8d0v7NtQDJ5FGAwbw73g6jx5o1GeuDqKcP7JkxbIevM_spsuz7zUybB7PX28Aa9XgvMuic9uoD21WGbX9vtR93w1HNGNjLzaDd2j7c9fdk0qMW7WlWu7UZTGZby_b3s_08HNozfbYnS8t-Xg6791TkzrSbzXw6oFbI6Wx6u5rq_XA2eaTT0YaS6HnnauHaEfWmyvW205ftgbuO7PqD15sqXacdG9PO3Wv4XbP2wfxX20s86HZGwbg0YgSc0yTuEWQiV9ebDVA1z1HUum7UNFXTDfemqamaqtccXcPGjeY6UP7act0ki1Pxq6ZqhqppShEYc2AxjgCZyFfjXYYkFEGKCU7xKMmYKwIir9znAcd-hn2BekxgDC_TlusC58cDOqJP4DHgwSV8v11RBryVIjPOwrBEz2ggCYWUpxYjwJD5gjBNxJrLG5y6gfiUJyWbbyfoCHh4nTCaAhc6iCNCGQu_1Y1aU3sPGY2mUn8P6UrzpvkBahhoIaEQ83S8IjgF4b6maHVZachq3VZ1U9VMVb3W67V5yZ0PSguR-XbJy3xDAeaDZE3FwsMhB0kgoyDZ_AREubsA3GVFOaVhas3rpm7M0eGDD5-3fSPfvtL9_1_kzLLDQUIBJQTiB1EImS8LCTGIkjWQI1JNYyEhN-NpEom0IY5ydw_iAjP_9K8AiqwBEIrt3QrOUmm0SlgKpEVIEueH8-HWmG-ICgEV16m8sQ84BZ5edRjEboCkc29SllVZQ_mgfSsIjlnYyykcU8sqeY9f3NqzHllRYAxIxhj7GR-FmY9MFOZsxBQt2KS7FeQeRoITWhwq2qBC47E_qjReFfKuXsr8azeJFp8o_KI3z4TvfJ8kaZD5yd_rlnOxXC5T3CT6RyeK7q9w4jgWSgodhuMfv2PKr34Z_fiDCR_s5y_v1X9oiULjv1N_MYbO1L9mS3CSbbPRrH-Qz0FQkdO17DEcu5hy4PIJPFdfgBXyG8ZfyG8YlfI7NIz4l08892Op_6bcEzROquV8WXXaBwnxhKVfGXggLslxBhDKsRNCF2IGHRqm4tkpaUMsIk84JsWQ6QBOMwanOMsjR2kl3cLkINmkNIKaKgj7mO1chjdewojv5q9EjPkqYzSmgmtA8ukmJhoHzNygeHvznVwag3iSRbCYbKPLlPyBXkgIxzSCInqfMyeFy4c_AXkJ9KiKCQAA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "public_id": "cole-es-nuvio-em-pt-br",
+      "title": "Coleções Nuvio em PT-BR",
+      "description": "Esta coleção foi criada originalmente para meu uso pessoal, organizada da forma que considero mais prática e agradável para navegar no Nuvio. Não é um projeto oficial e também não tem a pretensão de ser a melhor ou a mais completa coleção disponível. Decidi compartilhá-la para ajudar outros usuários brasileiros que desejam utilizar o Nuvio em português (pt-BR) ou que procuram uma base para criar sua própria organização, podendo modificá-la, adaptá-la e aprimorá-la conforme suas preferências.\n\n⚙️ COMO CONFIGURAR\n\nSE VOCÊ JÁ POSSUI UMA CONFIGURAÇÃO NO AIOMETADATA:\n\n- Baixe o arquivo \"Apenas Catálogos - AIOMetadata.json\" disponível na aba Resources.\n- Acesse: https://aiometadata.elfhosted.com/configure/\n- Faça o acesso utilizando o UUID e a senha da sua configuração existente.\n- Vá até a seção Catalogs.\n- Clique em Import Setup → Upload File e selecione o arquivo \"Apenas Catálogos - AIOMetadata.json\".\n- Clique em Save para aplicar as alterações. Os novos catálogos serão adicionados à sua configuração existente.\n\nSE ESTA É SUA PRIMEIRA CONFIGURAÇÃO NO AIOMETADATA:\n\n- Baixe o arquivo \"Configuração Completa - AIOMetadata.json\" disponível na aba Resources.\n- Acesse: https://aiometadata.elfhosted.com/configure/\n- Vá até a seção Configuration, clique em Import Configuration e selecione o arquivo \"Configuração Completa - AIOMetadata.json\".\n- Cadastre as chaves de API obrigatórias: MDBList, TMDB e TVDB.\n- Ajuste as demais opções do AIOMetadata conforme suas preferências.\n- Clique em Save Configuration.\n- Ao finalizar a configuração, crie uma senha e guarde o código UUID gerado. Esse UUID, junto com a senha criada, será utilizado como seu acesso para futuras alterações na configuração.\n- Copie a URL do manifest gerada pelo AIOMetadata e instale o addon no Nuvio através da aba Addons.\n\n🎨 PERSONALIZAÇÃO\n\nA configuração compartilhada aqui segue uma proposta minimalista, priorizando uma navegação mais limpa, organizada e objetiva. Essa escolha reflete apenas uma preferência pessoal de uso, mas a ideia é que ela sirva como uma base inicial para que cada usuário possa construir sua própria experiência.\n\nVocê pode adicionar novos catálogos, remover os que não forem do seu interesse ou expandir a coleção conforme seu gosto.\n\nSe quiser expandir a coleção com facilidade, uma excelente opção que recomendo é o addon Xperience, que surgiu recentemente. Ele permite editar coleções existentes de forma simples e intuitiva, oferecendo mais liberdade para personalizar e organizar sua biblioteca.\n\nPara começar:\n\n- Acesse: https://xperience-app.com/\n- Faça login no Xperience e cadastre as chaves de API obrigatórias: MDBList e TMDB.\n- Baixe o arquivo Coleções - Nuvio PT-BR.json disponível na aba Resources.\n- Vá até a aba Coleções.\n- Clique em Importar → Enviar arquivos e selecione o arquivo Coleções - Nuvio PT-BR.json.\n- Após a importação, faça as alterações que desejar e personalize suas coleções conforme seu gosto.\n\nAo optar pelo Xperience, você não precisa obrigatoriamente continuar utilizando o AIOMetadata. Existem diferentes formas de combinar as duas ferramentas:\n\n- Utilizar somente o Xperience para gerenciar tanto as coleções quanto as linhas de catálogos da página inicial.\n- Utilizar o Xperience  para coleções e o AIOMetadata para gerenciar as linhas de catálogos na Home.\n\nO Xperience também permite importar catálogos diretamente para as linhas da página inicial. Para isso, basta acessar a aba Linhas da Home, clicar nos três pontos (...), selecionar Import Add-ons e colar a URL de instalação do AIOMetadata. O Xperience fará a importação automática dos catálogos disponíveis, permitindo que você organize tudo diretamente por ele.\n\n🎭 PADRÃO VISUAL DAS CAPAS\n\nPara quem tiver interesse em manter o mesmo padrão visual, todas as capas foram desenvolvidas em resolução 1280×720 no Adobe Photoshop CS6, utilizando a fonte Inter Bold 28pt (Google Fonts).\n\nA tipografia principal foi utilizada de forma centralizada e em tamanho 200 pt na maioria dos casos. Nos gêneros, a cor utilizada foi #F5F5F5, enquanto as demais coleções possuem cores variadas de acordo com o tema.\n\nA maior parte dos fundos foi criada utilizando um degradê de duas cores na diagonal, do canto superior esquerdo para o canto inferior direito.\n\nASSETS UTILIZADOS:\n\n- Coleção Décadas: https://imgur.com/a/decades-collection-nuvio-bvokqxm\n- Capas de Gêneros e outras coleções: https://imgur.com/a/capas-nuvio-ePSmrl3\n- Coleção Países / Cinema Internacional: https://imgur.com/a/pa-ses-collection-nuvio-7bZlJn0\n\nObs.: As coleções \"Watchlist\" e \"Assistir novamente\" são fornecidas apenas com suas respectivas capas, sem catálogos vinculados, pois cada usuário possui sua própria organização. Após importar a coleção, basta vinculá-las aos seus próprios catálogos, caso deseje utilizá-las.",
+      "tags": [
+        "brasil",
+        "pt-br",
+        "br",
+        "português",
+        "brasileiros",
+        "brasileiras"
+      ],
+      "image_url": "https://i.imgur.com/8SOFOGo.png",
+      "likes_count": 70,
+      "installs_count": 1396,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-19 16:36:56",
+      "approved_at": "2026-07-19 16:36:56",
+      "updated_at": "2026-07-21 19:54:09",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 47,
+        "sourceCount": 46,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "cole-es-nuvio-em-pt-br",
+        "version": 3,
+        "submittedAt": "2026-07-18T18:07:50.371Z",
+        "coverImageUrl": "https://i.imgur.com/8SOFOGo.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 140,
+      "public_id": "animation-station",
+      "title": "Animation Station",
+      "description": "****Parents, this collection of animation is for kids and adults. Parental Supervision is advised****\nThis is a massive animation collection. \nSections include: Animated Studios/Streaming Services\n80+ animated movies/shows, 30+ adult animation\nAnimation from 1930-2020s\nBeloved specials from Rankin & Bass, Peanuts, etc\n55+ Franchises\nAnimation from around the world.",
+      "tags": [
+        "movies/shows/anime"
+      ],
+      "image_url": "https://cdn.phototourl.com/pro/2026-07-11-aa1084e4-b5fb-485d-ab20-c245e3f48562.jpg",
+      "likes_count": 17,
+      "installs_count": 948,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-13 00:22:01",
+      "approved_at": "2026-07-13 00:22:01",
+      "updated_at": "2026-07-13 00:22:01",
+      "stats": {
+        "collectionCount": 7,
+        "folderCount": 215,
+        "sourceCount": 236,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "animation-station",
+        "version": 1,
+        "submittedAt": "2026-07-11T17:29:29.884Z",
+        "coverImageUrl": "https://cdn.phototourl.com/pro/2026-07-11-aa1084e4-b5fb-485d-ab20-c245e3f48562.jpg"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOanimated",
+          "manifestUrl": "https://aiometadata.forthewizards.uk/stremio/85ed2efb-f2e1-4fd3-8b16-1d7599f6f0c6/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "public_id": "actors-4",
+      "title": "Actors",
+      "description": "Bollywood Actors",
+      "tags": [],
+      "image_url": "https://wallpaperaccess.com/full/1146273.jpg",
+      "likes_count": 8,
+      "installs_count": 241,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-13 00:19:39",
+      "approved_at": "2026-07-13 00:19:39",
+      "updated_at": "2026-07-13 00:19:39",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 18,
+        "sourceCount": 18,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "actors-4",
+        "version": 1,
+        "submittedAt": "2026-07-12T05:18:08.718Z",
+        "coverImageUrl": "https://wallpaperaccess.com/full/1146273.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-11937d8b",
+        "title": "Actors",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 137,
+      "public_id": "sport",
+      "title": "Sport",
+      "description": "This is a collection fro Sports Streams addon. May need some changes depending on the available and selected. This collection include:\n- Basketball\n- Football\n- American Football\n- Baseball\n- MotorSport\n- Tennis\n- Golf\n- Others",
+      "tags": [],
+      "image_url": "https://i.pinimg.com/originals/23/2c/be/232cbe8ad80d693e7cf37577509c91a0.gif",
+      "likes_count": 30,
+      "installs_count": 1374,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-11 03:57:11",
+      "approved_at": "2026-07-11 03:57:11",
+      "updated_at": "2026-07-11 03:57:11",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 11,
+        "sourceCount": 11,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "sport",
+        "version": 1,
+        "submittedAt": "2026-07-06T06:33:15.370Z",
+        "coverImageUrl": "https://i.pinimg.com/originals/23/2c/be/232cbe8ad80d693e7cf37577509c91a0.gif"
+      },
+      "collectionMeta": {
+        "id": "collection-dd03380f",
+        "title": "Sport",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.sports.streamed.premium",
+          "addonName": "Sports Streams",
+          "manifestUrl": "https://sportsfree-us2.highfly.dev/configure/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 136,
+      "public_id": "the-ultimate-horror-collection-2",
+      "title": "The Ultimate Horror Collection",
+      "description": "This is a large strictly HORROR collection. Dark and scary images with deep catalogs. Sections include; Discovery (New/Best/Popular), Horror by subgenre, Prolific horror directors, scream queens, holiday themed horror movies, franchises (over 90), and international horror.",
+      "tags": [
+        "horror movies/shows"
+      ],
+      "image_url": "https://cdn.phototourl.com/pro/2026-07-05-3ab66708-23f4-4ee4-88c5-37c64f972290.webp",
+      "likes_count": 37,
+      "installs_count": 1361,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-06 05:26:22",
+      "approved_at": "2026-07-06 05:26:22",
+      "updated_at": "2026-07-06 05:26:22",
+      "stats": {
+        "collectionCount": 11,
+        "folderCount": 112,
+        "sourceCount": 258,
+        "addonCount": 3
+      },
+      "community": {
+        "id": "the-ultimate-horror-collection-2",
+        "version": 1,
+        "submittedAt": "2026-07-05T18:11:45.538Z",
+        "coverImageUrl": "https://cdn.phototourl.com/pro/2026-07-05-3ab66708-23f4-4ee4-88c5-37c64f972290.webp"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "horror2",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/25994ab2-0b1b-44fe-9d45-5e8dbf9bde57/manifest.json"
+        },
+        {
+          "addonId": "community.scaryonly",
+          "addonName": "Scary Only — Horror by Subgenre",
+          "manifestUrl": "https://addon.scary.network/c/eyJtIjp0cnVlLCJzIjp0cnVlLCJzdWJzIjpbInNsYXNoZXIiLCJzdXBlcm5hdHVyYWwiLCJ6b21iaWUiLCJ2YW1waXJlIiwid2VyZXdvbGYiLCJmb3VuZC1mb290YWdlIiwicHN5Y2hvbG9naWNhbCIsImJvZHktaG9ycm9yIiwiZm9say1ob3Jyb3IiLCJjb3NtaWMiLCJoYXVudGVkLWhvdXNlIiwicG9zc2Vzc2lvbiIsIndpdGNoY3JhZnQiLCJjcmVhdHVyZSIsImdvdGhpYyIsImhvbWUtaW52YXNpb24iLCJjYW5uaWJhbCIsInNlcmlhbC1raWxsZXIiLCJ3aG9kdW5pdCJdLCJkZWNhZGVzIjpbIjYwcyIsIjcwcyIsIjgwcyIsIjkwcyIsIjIwMDBzIiwiMjAxMHMiLCIyMDIwcyJdLCJjb2xscyI6W10sInNwZWNpYWwiOlsiY2luZW1hcyIsInRyZW5kaW5nIiwiYWNjbGFpbWVkIiwiZ2VtcyIsInVwY29taW5nIiwicmVjb21tZW5kZWQiLCJhc2lhbiIsImpob3Jyb3IiLCJraG9ycm9yIiwiYW5pbWUiLCJnaWFsbG8iLCJzY2FyaWVzdCIsImluZGllIiwiaGlkZGVuIiwiYTI0IiwiYmx1bWhvdXNlIiwiYXV0ZXVyIiwiZmVzdGl2YWwiLCJ5ZWFyMjAyNiIsInNlcmllc190b3AiXSwicHJvdmlkZXJzIjpbIm5ldGZsaXgiLCJwcmltZSIsImh1bHUiLCJzaHVkZGVyIiwiaGJvIiwiYW1jIiwiYXBwbGV0diIsImRpc25leSIsInBlYWNvY2siLCJtdWJpIiwiY3J1bmNoeXJvbGwiXSwicmVnaW9uIjoiVVMifQ/manifest.json"
+        },
+        {
+          "addonId": "com.ultramax",
+          "addonName": "Ultra MAX",
+          "manifestUrl": "https://ultramax.vip/c/6EBE36E5/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 134,
+      "public_id": "genres-animated",
+      "title": "Genres (Animated)",
+      "description": "Includes Genres\nAction (movies/series)\nAnimation\nComedy\nCrime\nDocumentary\nFantasy\nFood\nGameshow\nHistory\nHome and Garden\nHorror\nMystery\nMini-Series\nReality TV\nRomance\nSci-Fi\nThriller\nTravel\nWar \nWestern",
+      "tags": [],
+      "image_url": "https://raw.github.com/blry12/Badges/main/collections/genres/coverart.jpg",
+      "likes_count": 19,
+      "installs_count": 1220,
+      "reports_count": 4,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-04 15:53:47",
+      "approved_at": "2026-07-04 15:53:47",
+      "updated_at": "2026-07-05 03:49:44",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 20,
+        "sourceCount": 34,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-animated",
+        "version": 2,
+        "submittedAt": "2026-07-04T03:00:41.102Z",
+        "coverImageUrl": "https://raw.github.com/blry12/Badges/main/collections/genres/coverart.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-9dbb3314-community",
+        "title": "Genre",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "genres",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/60307632-2644-4651-b49f-6feb61f19302/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 132,
+      "public_id": "sports-2",
+      "title": "Sports",
+      "description": "Used for Sports Live addon.",
+      "tags": [
+        "sports",
+        "live"
+      ],
+      "image_url": "https://drive.google.com/thumbnail?id=1G0hAFiSDq6uj4dSq_rJybFEL9tBZBF47",
+      "likes_count": 38,
+      "installs_count": 1750,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-03 14:39:26",
+      "approved_at": "2026-07-03 14:39:26",
+      "updated_at": "2026-07-03 14:39:26",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 7,
+        "sourceCount": 9,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "sports-2",
+        "version": 1,
+        "submittedAt": "2026-07-02T04:40:09.252Z",
+        "coverImageUrl": "https://drive.google.com/thumbnail?id=1G0hAFiSDq6uj4dSq_rJybFEL9tBZBF47"
+      },
+      "collectionMeta": {
+        "id": "collection-2a7025d6",
+        "title": "Sports",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.sports.fly",
+          "addonName": "Sports Streams",
+          "manifestUrl": "https://sports.highfly.dev/eyJpbmNsdWRlU3BvcnRzIjpbImJhc2tldGJhbGwiLCJhbWVyaWNhbi1mb290YmFsbCIsImZvb3RiYWxsIiwiZmlnaHQiLCJob2NrZXkiLCJiYXNlYmFsbCIsIm1vdG9yLXNwb3J0cyJdfQ/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 131,
+      "public_id": "kaoxt-collection",
+      "title": "The Kollection",
+      "description": "⚙️ How to Set Up\n\nGo to:  https://aiometadatafortheweebs.midnightignite.me/configure/\n\n- Fill in your API keys —  MDBList, TMDB, and TVDB\n- Under the Configuration tab, import the AIOmetadata catalog file from the Resources section below. (Note you only need one of the AIOmetadata files below) The first one is for a new AIOmetadata configuration. The second file is to add it to existing AIOmetadata)\n- Hit Save, then copy your addon URL and add it to Nuvio — and you're good to go!\n\n*Optional - You will need Bingecat (https://bingecat.com/) add-on setup and add your desired catalogs to the \"For You\" folder under the Discover section if you wish to have Recommended Movies / Series. The Recommendations are excellent and this add-on allows you to customize how you want the Catalogs to recommend content for you. If you do not wish to setup, you can ignore the folder or delete it from the collection. Feel free to ask questions for help!\n\nOn TV app - To add the Bingecat catalogs to \"For You\" section -> Go to Settings -> Content & Discovery -> Addons -> Collections -> click the edit button next to Discover -> scroll down to For You folder -> scroll down to Catalogs section and add catalogs from Bingecat. (I recommend to have your Bingecat add-on above AIOmetadata add-on so you do not need to scroll all the way down to find your Bingecat Catalogs)\n\n\nThere are 324 catalogs. Custom backdrops and logos to go with each catalog. \n\n[Discover] - 4 Folders\n\n[Streaming Platforms] - 12 Folders\n\n[Genres] - 14 Folders\n\n[Studios] - 13 Folders\n\n[Franchises] - 23 Folders\n\n[Actors] - 40 Folders\n\n[Directors] - 12 Folders\n\n[Decades] - 7 Folders\n\n[Awards & Festivals] - 5 Folders\n\n[Holidays] - 5 Folders\n\n[Anime] - 12 Folders\n\n[Based On] - 5 Folders\n\n----------------------------------\n\nRequirements\n\nAIOMetadata needs to be installed before adding this pack. You can install the included pre-configured AIOMetadata addon directly for a quick setup. Make sure you have required accounts for it. TVDB, TMDB, etc.\n\n*Optional - You will need [Bingecat](https://bingecat.com/) add-on setup and and add your desired catalogs to the \"For You\" folder under the Discover section if you wish to have Recommended Movies / Series. The Recommendations are excellent and this add-on allows you to customize how you want the Catalogs to recommend content for you. If you do not wish to setup, you can ignore the folder or delete it from the collection. Feel free to ask questions for help!",
+      "tags": [
+        "streaming",
+        "anime",
+        "discover",
+        "awards",
+        "directors",
+        "actors",
+        "studios",
+        "genres"
+      ],
+      "image_url": "https://kao-xt.com/ezgif.com-animated-gif-maker.gif",
+      "likes_count": 302,
+      "installs_count": 6536,
+      "reports_count": 6,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-03 14:36:58",
+      "approved_at": "2026-07-03 14:36:58",
+      "updated_at": "2026-08-27 18:08:09",
+      "stats": {
+        "collectionCount": 12,
+        "folderCount": 154,
+        "sourceCount": 347,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "kaoxt-collection",
+        "version": 12,
+        "submittedAt": "2026-07-03T08:56:05.953Z",
+        "coverImageUrl": "https://kao-xt.com/ezgif.com-animated-gif-maker.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        },
+        {
+          "addonId": "com.aicat.464cfc5f-1086-42ed-841b-218d842253b2.nuvio",
+          "addonName": "Bingecat",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 130,
+      "public_id": "cinemeta",
+      "title": "Cinemeta",
+      "description": "The main Cinemeta homepage catalogs grouped by media type, to declutter the homepage",
+      "tags": [
+        "movie",
+        "series",
+        "cinemeta"
+      ],
+      "image_url": "https://s6.imgcdn.dev/YmDRUh.jpg",
+      "likes_count": 38,
+      "installs_count": 1896,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-07-01 01:27:15",
+      "approved_at": "2026-07-01 01:27:15",
+      "updated_at": "2026-07-01 01:27:15",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 2,
+        "sourceCount": 4,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "cinemeta",
+        "version": 1,
+        "submittedAt": "2026-06-30T16:46:25.529Z",
+        "coverImageUrl": "https://s6.imgcdn.dev/YmDRUh.jpg"
+      },
+      "collectionMeta": {
+        "id": "30b722e7-df27-47c4-a896-4a17a848a8c3",
+        "title": "Cinemeta",
+        "viewMode": "ROWS",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.linvo.cinemeta",
+          "addonName": "Cinemeta",
+          "manifestUrl": "https://v3-cinemeta.strem.io/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 129,
+      "public_id": "tamil-malayalam-collection",
+      "title": "Tamil & Malayalam Collection",
+      "description": "This collection has the latest Tamil & Malayalam language releases. The list is dynamic and gets updated on a daily basis.",
+      "tags": [
+        "tamil",
+        "malayalam",
+        "movies",
+        "shows"
+      ],
+      "image_url": "https://i.postimg.cc/qRtvBTRm/fdb06ee5-2a6a-4c2a-8392-875e52321f7c.png",
+      "likes_count": 19,
+      "installs_count": 626,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-30 01:17:39",
+      "approved_at": "2026-06-30 01:17:39",
+      "updated_at": "2026-06-30 01:17:39",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 2,
+        "sourceCount": 4,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "tamil-malayalam-collection",
+        "version": 1,
+        "submittedAt": "2026-06-27T16:03:36.809Z",
+        "coverImageUrl": "https://i.postimg.cc/qRtvBTRm/fdb06ee5-2a6a-4c2a-8392-875e52321f7c.png"
+      },
+      "collectionMeta": {
+        "id": "collection-a0b0ddde",
+        "title": "Tamil & Malayalam Collection",
+        "viewMode": "ROWS",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 128,
+      "public_id": "tokusatsu-universe",
+      "title": "Tokusatsu Universe",
+      "description": "350+ series & movies across 7 franchises: Kamen Rider, Super Sentai, Ultraman, Garo, Metal Heroes.\n• Direct download streams + torrent streamsx\n• Subtitles (English,Indonesian, Portuguese, and more)\n• Full episode lists with metadata from Cinemeta",
+      "tags": [
+        "kamen rider",
+        "super sentai",
+        "ultraman",
+        "garo",
+        "metal heroes"
+      ],
+      "image_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEilFoXxegc6dl4wtvlAUG8k-0hZAgQxsqlRLEGG_IhCXjOHJ-nVMtPoHEgTs09I0ZvQ64yU1aTHsYBehbN6YNNDHWG8TB9bfo6__20kXYPtntE3VZXCvCmyiaxSgFh38k7LaYd3GHplNeg/s1600/tumblr_my66m9QzHe1qha092o1_r2_1280.jpg",
+      "likes_count": 10,
+      "installs_count": 289,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-30 01:15:27",
+      "approved_at": "2026-06-30 01:15:27",
+      "updated_at": "2026-06-30 01:15:27",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 6,
+        "sourceCount": 11,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "tokusatsu-universe",
+        "version": 1,
+        "submittedAt": "2026-06-30T00:07:38.793Z",
+        "coverImageUrl": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEilFoXxegc6dl4wtvlAUG8k-0hZAgQxsqlRLEGG_IhCXjOHJ-nVMtPoHEgTs09I0ZvQ64yU1aTHsYBehbN6YNNDHWG8TB9bfo6__20kXYPtntE3VZXCvCmyiaxSgFh38k7LaYd3GHplNeg/s1600/tumblr_my66m9QzHe1qha092o1_r2_1280.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-2ed8389c",
+        "title": "Tokusatsu Universe",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "id.tokuaddon",
+          "addonName": "Tokusatsu",
+          "manifestUrl": "https://tokusatsu.roxxy-tech.com/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 125,
+      "public_id": "popular-movie-franchise-collections",
+      "title": "Popular Movie Franchise Collections",
+      "description": "A collection of some of the most popular film franchises, with covers, hero backgrounds, and movie title logos",
+      "tags": [
+        "franchise",
+        "collections",
+        "series"
+      ],
+      "image_url": "https://i.postimg.cc/1zxmCTyH/Clean-Shot-2026-06-22-at-12-28-41-2x.png",
+      "likes_count": 36,
+      "installs_count": 1626,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-25 12:36:17",
+      "approved_at": "2026-06-25 12:36:17",
+      "updated_at": "2026-06-25 12:36:17",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 22,
+        "sourceCount": 24,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "popular-movie-franchise-collections",
+        "version": 1,
+        "submittedAt": "2026-06-22T17:30:15.830Z",
+        "coverImageUrl": "https://i.postimg.cc/1zxmCTyH/Clean-Shot-2026-06-22-at-12-28-41-2x.png"
+      },
+      "collectionMeta": {
+        "id": "collection-dbe3fc41",
+        "title": "📚 Franchises",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 124,
+      "public_id": "uluslararas-sinema",
+      "title": "Uluslararası Sinema",
+      "description": "TMDB kullanır. Ek bir eklentiye gerek yoktur. Direkt kullanılabilir.",
+      "tags": [
+        "world",
+        "languages",
+        "international"
+      ],
+      "image_url": "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      "likes_count": 8,
+      "installs_count": 240,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-21 15:56:23",
+      "approved_at": "2026-06-21 15:56:23",
+      "updated_at": "2026-06-21 15:56:23",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 7,
+        "sourceCount": 266,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "uluslararas-sinema",
+        "version": 1,
+        "submittedAt": "2026-06-19T22:01:49.670Z",
+        "coverImageUrl": "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?q=80&w=1074&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+      },
+      "collectionMeta": {
+        "id": "collection-3e9bdfb1",
+        "title": "Uluslararası Sinema",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 123,
+      "public_id": "fusion",
+      "title": "Fusion",
+      "description": "هذا الكتلوجات مخوذه من Fusion يحتوي على \nGenres\nDirectors\nAwards\nDecades\nStreaming",
+      "tags": [
+        "genres",
+        "directors",
+        "awards",
+        "decades",
+        "streaming"
+      ],
+      "image_url": "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/action-wide.png",
+      "likes_count": 16,
+      "installs_count": 723,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-21 15:55:11",
+      "approved_at": "2026-06-21 15:55:11",
+      "updated_at": "2026-06-21 15:55:11",
+      "stats": {
+        "collectionCount": 5,
+        "folderCount": 91,
+        "sourceCount": 128,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "fusion",
+        "version": 1,
+        "submittedAt": "2026-06-20T14:57:59.545Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/action-wide.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 121,
+      "public_id": "star-trek-tv-and-movies-tmdb",
+      "title": "Star Trek TV and Movies TMDB",
+      "description": "Re-made into one.",
+      "tags": [
+        "star trek"
+      ],
+      "image_url": "https://media.themoviedb.org/t/p/w710_and_h400_face/q7GPKu6v8u6VGX3vrwmaBrI36Ia.jpg",
+      "likes_count": 9,
+      "installs_count": 242,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-21 15:51:16",
+      "approved_at": "2026-06-21 15:51:16",
+      "updated_at": "2026-06-21 15:51:16",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 13,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "star-trek-tv-and-movies-tmdb",
+        "version": 1,
+        "submittedAt": "2026-06-19T03:08:40.128Z",
+        "coverImageUrl": "https://media.themoviedb.org/t/p/w710_and_h400_face/q7GPKu6v8u6VGX3vrwmaBrI36Ia.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-0e74759b",
+        "title": "Star Trek TV and Movies",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 120,
+      "public_id": "t-rkiye-sinema-ve-dizi",
+      "title": "🇹🇷 Türkiye Sinema ve Dizi 🇹🇷",
+      "description": "Ek bir eklentiye gerek yoktur. TMDB kullanır. Direkt yüklenebilir.",
+      "tags": [
+        "türkiye",
+        "türkçe",
+        "turkey",
+        "turkish",
+        "türk filmleri",
+        "türk dizileri"
+      ],
+      "image_url": "https://bingecat.com/static/uploads/nuvio_collections/5157-ChatGPT_Image_7_Tem_2026_01_14_41-9e71203abe815d34.png",
+      "likes_count": 14,
+      "installs_count": 441,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-21 15:50:47",
+      "approved_at": "2026-06-21 15:50:47",
+      "updated_at": "2026-07-11 03:56:29",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 9,
+        "sourceCount": 115,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "t-rkiye-sinema-ve-dizi",
+        "version": 2,
+        "submittedAt": "2026-06-18T23:44:45.898Z",
+        "coverImageUrl": "https://bingecat.com/static/uploads/nuvio_collections/5157-ChatGPT_Image_7_Tem_2026_01_14_41-9e71203abe815d34.png"
+      },
+      "collectionMeta": {
+        "id": "collection-korean-cinema-native-community",
+        "title": "Türkiye Sineması ve Dizileri",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 119,
+      "public_id": "genre",
+      "title": "Genres (Animated)",
+      "description": "Genres Collction of Movies and Series (Most are sorted by latest)",
+      "tags": [
+        "genres"
+      ],
+      "image_url": "https://raw.github.com/blry12/Badges/main/collections/genres/coverart.jpg",
+      "likes_count": 26,
+      "installs_count": 1503,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-16 22:33:53",
+      "approved_at": "2026-06-16 22:33:53",
+      "updated_at": "2026-07-03 14:39:16",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 20,
+        "sourceCount": 34,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genre",
+        "version": 2,
+        "submittedAt": "2026-06-16T22:15:33.366Z",
+        "coverImageUrl": "https://raw.github.com/blry12/Badges/main/collections/genres/coverart.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-9dbb3314",
+        "title": "Genre",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "Streaming Apps AIOmetadata",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/60307632-2644-4651-b49f-6feb61f19302/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 118,
+      "public_id": "sports",
+      "title": "Sports",
+      "description": "Collection for Live Sports. \nDependancy on Sportsfree add-on",
+      "tags": [
+        "sports"
+      ],
+      "image_url": "https://i.postimg.cc/fWvpBq9V/Polotno-Studio-Design-(8).png",
+      "likes_count": 60,
+      "installs_count": 2789,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-16 22:33:10",
+      "approved_at": "2026-06-16 22:33:10",
+      "updated_at": "2026-06-16 22:33:10",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 5,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "sports",
+        "version": 1,
+        "submittedAt": "2026-06-16T07:09:01.211Z",
+        "coverImageUrl": "https://i.postimg.cc/fWvpBq9V/Polotno-Studio-Design-(8).png"
+      },
+      "collectionMeta": {
+        "id": "collection-e4f3144a",
+        "title": "Sports",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.sports.fly",
+          "addonName": "Sports Streams",
+          "manifestUrl": "https://sportsfree-us2.highfly.dev/eyJpbmNsdWRlU3BvcnRzIjpbImZvb3RiYWxsIiwiY3JpY2tldCIsInRlbm5pcyIsIm90aGVyIl19/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 117,
+      "public_id": "korean-cinema-series",
+      "title": "Korean Cinema & Series",
+      "description": "A curated collection dedicated to the best of South Korean cinema and television. \n\n### What's Inside:\n* **Popular Right Now & Recent Releases:** Stay up-to-date with the latest trending K-Dramas and box office hits.\n* **Top Rated & All-Time Classics:** Revisit cinematic masterpieces and legendary award-winning series.\n\nPerfect for fans of K-content looking for automated, real-time rows powered by TMDB feeds.",
+      "tags": [
+        "k-drama",
+        "korean",
+        "tv",
+        "kmovie",
+        "hallyu",
+        "k-content"
+      ],
+      "image_url": "https://raw.githubusercontent.com/sandeepshres/nuvio-assets/refs/heads/main/jorick-jing-FeSYbjVQEN4-unsplash.jpg",
+      "likes_count": 37,
+      "installs_count": 1716,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-16 22:31:17",
+      "approved_at": "2026-06-16 22:31:17",
+      "updated_at": "2026-06-16 22:31:17",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 3,
+        "sourceCount": 6,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "korean-cinema-series",
+        "version": 1,
+        "submittedAt": "2026-06-14T23:19:44.540Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/sandeepshres/nuvio-assets/refs/heads/main/jorick-jing-FeSYbjVQEN4-unsplash.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-korean-cinema-native",
+        "title": "Korean Cinema & Series",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 116,
+      "public_id": "watch-tracker",
+      "title": "Watch Tracker",
+      "description": "Used to track your current plan to watch, watching and completed series from SimKL or Trakt. All under one, gorgeous collection with no usage of AI. Everything is edited manually.",
+      "tags": [
+        "movies",
+        "series",
+        "anime",
+        "tv show"
+      ],
+      "image_url": "https://raw.githubusercontent.com/justlixian/Nuvio-Collection/main/Series%20Cover.png",
+      "likes_count": 29,
+      "installs_count": 1076,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-14 20:30:07",
+      "approved_at": "2026-06-14 20:30:07",
+      "updated_at": "2026-06-14 20:30:07",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 3,
+        "sourceCount": 8,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "watch-tracker",
+        "version": 1,
+        "submittedAt": "2026-06-14T10:16:16.091Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/justlixian/Nuvio-Collection/main/Series%20Cover.png"
+      },
+      "collectionMeta": {
+        "id": "4015071e-163a-43ed-b858-ea1d4d2eaab7",
+        "title": "Watchlist",
+        "viewMode": "ROWS",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "Library",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 115,
+      "public_id": "turkish",
+      "title": "🇹🇷 Turkish",
+      "description": "Turkish Film&Series",
+      "tags": [
+        "movie",
+        "series"
+      ],
+      "image_url": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/world/backdrop/turkish.webp",
+      "likes_count": 7,
+      "installs_count": 296,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-14 20:29:44",
+      "approved_at": "2026-06-14 20:29:44",
+      "updated_at": "2026-06-14 20:29:44",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 1,
+        "sourceCount": 2,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "turkish",
+        "version": 1,
+        "submittedAt": "2026-06-13T13:00:28.045Z",
+        "coverImageUrl": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/world/backdrop/turkish.webp"
+      },
+      "collectionMeta": {
+        "id": "collections.world",
+        "title": "🇹🇷 Turkish",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 114,
+      "public_id": "actors-collection",
+      "title": "Actors Collection",
+      "description": "# 🎬 Actor Catalog Collection for Nuvio\n\nBrowse the filmographies of **60 iconic actors** inside Nuvio — from legends like De Niro, Pacino & Hanks to modern stars like Chalamet, Zendaya & Florence Pugh.\n\n---\n\n## ⚙️ How to Set Up\n\n1. Go to 👉 [aiometadata.viren070.me](https://aiometadata.viren070.me/) and fill in your API keys — **MDBList**, **TMDB**, and **TVDB**\n2. Under the **Configuration** tab, import the catalog file from the **Resources** section below\n3. Under the **Catalogs** section, connect your **Trakt account**\n4. Hit **Save**, then copy your addon URL and add it to Nuvio — and you're good to go!\n\n---\n\n## 💡 Tips\n\n- Enable or disable individual actor catalogs inside AIOMetadata after importing\n- Sources: MDBList, Trakt & Letterboxd",
+      "tags": [],
+      "image_url": "https://raw.githubusercontent.com/Nilayan8513/Assignment_Collage/main/actor.png",
+      "likes_count": 16,
+      "installs_count": 359,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-14 20:29:27",
+      "approved_at": "2026-06-14 20:29:27",
+      "updated_at": "2026-06-14 20:29:27",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 60,
+        "sourceCount": 62,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "actors-collection",
+        "version": 1,
+        "submittedAt": "2026-06-13T07:36:16.422Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/Nilayan8513/Assignment_Collage/main/actor.png"
+      },
+      "collectionMeta": {
+        "id": "collection-e86f710a-2-2",
+        "title": "Actors",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "No Nonsense Metadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 113,
+      "public_id": "world-collection",
+      "title": "🌍 World Collection",
+      "description": "Collection movie and series worldwide",
+      "tags": [
+        "movie",
+        "series",
+        "world"
+      ],
+      "image_url": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/world/backdrop/brazilian.webp",
+      "likes_count": 14,
+      "installs_count": 627,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-14 20:28:40",
+      "approved_at": "2026-06-14 20:28:40",
+      "updated_at": "2026-06-14 20:28:40",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 13,
+        "sourceCount": 26,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "world-collection",
+        "version": 1,
+        "submittedAt": "2026-06-14T00:12:01.630Z",
+        "coverImageUrl": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/world/backdrop/brazilian.webp"
+      },
+      "collectionMeta": {
+        "id": "collections.world",
+        "title": "🌍 World",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 111,
+      "public_id": "indian-cinema-series",
+      "title": "Indian Cinema & Series",
+      "description": "A dedicated hub for Indian cinema and television. This collection dynamically brings together the best of Bollywood, Tollywood, Kollywood, Mollywood, Sandalwood, and popular streaming series.\n\n### Features\n* **Popular Right Now:** Trending movies and shows making waves right now.\n* **Recent Releases:** The latest theatrical and streaming drops.\n* **Top Rated All-Time:** Highly acclaimed masterpieces and fan-favorite classics.\n\n*Powered by automated TMDB discover feeds to keep your setup fresh.*",
+      "tags": [
+        "indian",
+        "bollywood",
+        "cinema",
+        "series",
+        "tollywood",
+        "kollywood",
+        "mollywood",
+        "sandalwood"
+      ],
+      "image_url": "https://raw.githubusercontent.com/sandeepshres/nuvio-assets/refs/heads/main/jovyn-chamb-iWMfiInivp4-unsplash.jpg",
+      "likes_count": 21,
+      "installs_count": 1103,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-13 04:24:58",
+      "approved_at": "2026-06-13 04:24:58",
+      "updated_at": "2026-06-14 20:27:23",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 3,
+        "sourceCount": 6,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "indian-cinema-series",
+        "version": 2,
+        "submittedAt": "2026-06-13T00:58:04.864Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/sandeepshres/nuvio-assets/refs/heads/main/jovyn-chamb-iWMfiInivp4-unsplash.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-indian-cinema-native",
+        "title": "Indian Cinema & Series",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 110,
+      "public_id": "diretta-tv",
+      "title": "Diretta TV",
+      "description": "Questa collezione permette di avere a portata di mano i canali suddivisi per varie categorie come Mediaset, Rai ecc..",
+      "tags": [
+        "live tv",
+        "mediaset",
+        "sky",
+        "diretta",
+        "tv",
+        "televisone"
+      ],
+      "image_url": "https://i.postimg.cc/3RDbV5mW/31Fk-Ci-Ly-UYL.png",
+      "likes_count": 10,
+      "installs_count": 542,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-13 04:24:10",
+      "approved_at": "2026-06-13 04:24:10",
+      "updated_at": "2026-06-13 04:24:10",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 9,
+        "sourceCount": 9,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "diretta-tv",
+        "version": 1,
+        "submittedAt": "2026-06-11T20:15:10.912Z",
+        "coverImageUrl": "https://i.postimg.cc/3RDbV5mW/31Fk-Ci-Ly-UYL.png"
+      },
+      "collectionMeta": {
+        "id": "collection-43411f68",
+        "title": "Diretta TV",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "org.stremio.vavoo.clean",
+          "addonName": "TvVoo | ElfHosted",
+          "manifestUrl": "https://tvvoo.hayd.uk/cfg-it/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 109,
+      "public_id": "cartoons",
+      "title": "Cartoons",
+      "description": "Includes Saturday Morning Cartoons, Disney Animated series, Nickolodeon, Cartoon Network and Adult Animation.\n\nRequires TMDB.",
+      "tags": [],
+      "image_url": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjAatSQdz1ngdvr9_bCp-lv4DAEynlGbnAPLZg4S1QijF0V8j_X04JWsZjqS-_L6H7GxePxfn3tYrX4fuP0H9GuxFQpx0WiVvDSd717FLT0c-V0TX1ceTq_rlvsNzSsE9MERgHs/s640/b405c38c-dcfd-47f3-84f7-c1c85cf2f488.jpg",
+      "likes_count": 41,
+      "installs_count": 1529,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-13 04:23:51",
+      "approved_at": "2026-06-13 04:23:51",
+      "updated_at": "2026-06-13 04:23:51",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 5,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "cartoons",
+        "version": 1,
+        "submittedAt": "2026-06-12T05:27:42.862Z",
+        "coverImageUrl": "https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEjAatSQdz1ngdvr9_bCp-lv4DAEynlGbnAPLZg4S1QijF0V8j_X04JWsZjqS-_L6H7GxePxfn3tYrX4fuP0H9GuxFQpx0WiVvDSd717FLT0c-V0TX1ceTq_rlvsNzSsE9MERgHs/s640/b405c38c-dcfd-47f3-84f7-c1c85cf2f488.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-e111cd3b",
+        "title": "Cartoons",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 108,
+      "public_id": "anime-studios",
+      "title": "Anime Studios + streaming",
+      "description": "my collection for anime studios + streaming",
+      "tags": [
+        "anime",
+        "streaming"
+      ],
+      "image_url": "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fweebwire.com%2F_next%2Fimage%3Furl%3D%252Fimages%252Fweebwire_bg.webp%26w%3D3840%26q%3D100&f=1&nofb=1&ipt=fb8328c9819aaac88d75f5463495ea56a3397046ff91023d8d3cfa4d49997989",
+      "likes_count": 39,
+      "installs_count": 1379,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-13 04:22:50",
+      "approved_at": "2026-06-13 04:22:50",
+      "updated_at": "2026-08-02 19:55:12",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 13,
+        "sourceCount": 96,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "anime-studios",
+        "version": 2,
+        "submittedAt": "2026-06-11T15:09:20.740Z",
+        "coverImageUrl": "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fweebwire.com%2F_next%2Fimage%3Furl%3D%252Fimages%252Fweebwire_bg.webp%26w%3D3840%26q%3D100&f=1&nofb=1&ipt=fb8328c9819aaac88d75f5463495ea56a3397046ff91023d8d3cfa4d49997989"
+      },
+      "collectionMeta": {
+        "id": "ff9ad98e-f11e-411a-91db-33972fc6ce8b",
+        "title": "New collection",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "app.xperience.5004e0f2-93f4-4825-9149-3c2935f2da07",
+          "addonName": "Xperience",
+          "manifestUrl": "https://xperience-app.com/manifest/5004e0f2-93f4-4825-9149-3c2935f2da07/eyJhbGciOiJIUzI1NiJ9.eyJwaWQiOiI1MDA0ZTBmMi05M2Y0LTQ4MjUtOTE0OS0zYzI5MzVmMmRhMDciLCJraWQiOiI5NjU3YTUwYi0yMmYyLTQ3NzktOGU4MS1iMjdiMmVjMDlkYzgiLCJzY29wZSI6Im1hbmlmZXN0Iiwic3ViIjoiZDRmN2FiYjMtMzNlYS00MTFiLTkzYjItNmE3ZWViZjFiNzc4IiwiaWF0IjoxNzg1NjM4Njk5fQ.FGec-K9aUQLfLMzyWHUeWkWGEGKggjGzzPmoUjtX4nA/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 107,
+      "public_id": "ultimate-horror-collection",
+      "title": "Ultimate Horror Collection",
+      "description": "Strictly horror only",
+      "tags": [
+        "horror"
+      ],
+      "image_url": "https://files.catbox.moe/prngyo.png",
+      "likes_count": 51,
+      "installs_count": 1431,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-07 14:19:48",
+      "approved_at": "2026-06-07 14:19:48",
+      "updated_at": "2026-06-07 14:19:48",
+      "stats": {
+        "collectionCount": 7,
+        "folderCount": 63,
+        "sourceCount": 135,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "ultimate-horror-collection",
+        "version": 1,
+        "submittedAt": "2026-06-07T00:42:24.020Z",
+        "coverImageUrl": "https://files.catbox.moe/prngyo.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata  | ElfHosted",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 106,
+      "public_id": "production-studios-2",
+      "title": "Production Studios",
+      "description": "Collection of production studios",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/4x5rTgvb/spiral-abstract-3840x2977-10201.jpg",
+      "likes_count": 12,
+      "installs_count": 423,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-05 16:55:23",
+      "approved_at": "2026-06-05 16:55:23",
+      "updated_at": "2026-06-05 16:55:23",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 25,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "production-studios-2",
+        "version": 1,
+        "submittedAt": "2026-06-04T23:56:19.872Z",
+        "coverImageUrl": "https://i.postimg.cc/4x5rTgvb/spiral-abstract-3840x2977-10201.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-09ca5279-draft",
+        "title": "Production Studios",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 105,
+      "public_id": "no-nonsense-classic-tv-collection",
+      "title": "No Nonsense Classic TV Collection",
+      "description": "This is designed for the **Classic TV** layout for those of us that just want to quickly and easily find what we want to watch. \n\nBig, bold, clean, no fuss, ***no nonsense.*** \n\nOne-click installation, no faffing around with extra files and configuration tools.\n\nIncludes: \n\n- Discovery\n- Streaming \n- Genres\n- Decades\n- Directors \n\n\n**Torbox Referral link**\nhttps://torbox.app/subscription?referral=de40af80-863e-4384-aa47-7699c11a286c\n\n***When you use someone's referral code:***\n\nYou (the referred user) receive an extra 7 days times the number of months purchased added to the plan you purchased.\n\nThe other person (the referrer) receives an extra 7 days times the number of months purchased added to their current plan.",
+      "tags": [
+        "one-click",
+        "easy",
+        "no fuss",
+        "no nonsense",
+        "classic tv"
+      ],
+      "image_url": "https://i.postimg.cc/ZRr38zqw/Nonsense2.gif",
+      "likes_count": 64,
+      "installs_count": 2108,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-06-04 18:52:53",
+      "approved_at": "2026-06-04 18:52:53",
+      "updated_at": "2026-06-07 14:19:29",
+      "stats": {
+        "collectionCount": 5,
+        "folderCount": 46,
+        "sourceCount": 124,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "no-nonsense-classic-tv-collection",
+        "version": 4,
+        "submittedAt": "2026-06-04T14:58:40.835Z",
+        "coverImageUrl": "https://i.postimg.cc/ZRr38zqw/Nonsense2.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "No Nonsense Metadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/a8c81bb1-5f74-40d1-982a-842ff33b105a/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 102,
+      "public_id": "kaptain-s-actor-collection-easy-install",
+      "title": "Kaptain's Actor Collection (Easy Install)",
+      "description": "Official Actors Collection Maintained by Kaptain.\nUpdated (8/7/26)\n\nOne Click Install. Elegant actor-focused spotlight folders.\n\nActors Collection including:\n\n    100+ Actors\n    474 Sources\n    Dedicated Premium Portrait Art\n\nFeaturing stars like:\n    Leonardo DiCaprio · Johnny Depp · Tom Cruise · Sandra Bullock · Jenna Ortega · Zendaya · Brad Pitt · Margot Robbie\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "actors",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/actors.png",
+      "likes_count": 48,
+      "installs_count": 1676,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:07",
+      "approved_at": "2026-05-31 02:02:07",
+      "updated_at": "2026-08-09 22:50:54",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 125,
+        "sourceCount": 521,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-actor-collection-easy-install",
+        "version": 4,
+        "submittedAt": "2026-05-31T00:06:23.239Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/actors.png"
+      },
+      "collectionMeta": {
+        "id": "collection-1IPJJWUO",
+        "title": "Actors",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 101,
+      "public_id": "kaptain-s-anime-collection-easy-install",
+      "title": "Kaptain's Anime Collection (Easy Install)",
+      "description": "Official Anime Collection Maintained by Kaptain.\nUpdated (8/7/26)\n\nOne Click Install. Dedicated anime worlds & premium curation.\n\nAnime Collection including:\n\n    6 Folders\n    Vibrant High-Contrast Visual Framing\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "anime",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/anime.png",
+      "likes_count": 86,
+      "installs_count": 2721,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:05",
+      "approved_at": "2026-05-31 02:02:05",
+      "updated_at": "2026-08-08 00:58:54",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 6,
+        "sourceCount": 36,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-anime-collection-easy-install",
+        "version": 3,
+        "submittedAt": "2026-05-31T00:08:47.745Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/anime.png"
+      },
+      "collectionMeta": {
+        "id": "collection-b530d60c",
+        "title": "Anime",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 100,
+      "public_id": "kaptain-s-awards-collection-easy-install",
+      "title": "Kaptain's Awards Collection (Easy Install)",
+      "description": "Official Awards Collection Maintained by Kaptain.\n\nOne Click Install. Prestigious, critically acclaimed film directories.\n\nAwards Collection including:\n\n    3 Folders\n    55 Sources\n    3 Academy, Cannes, and Golden Globe Showcases\n\nFeaturing ceremonies like:\n    Academy Awards (Oscars) · Golden Globes · Festival de Cannes\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "awards",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/awards.png",
+      "likes_count": 54,
+      "installs_count": 1579,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:04",
+      "approved_at": "2026-05-31 02:02:04",
+      "updated_at": "2026-05-31 02:02:04",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 3,
+        "sourceCount": 55,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-awards-collection-easy-install",
+        "version": 1,
+        "submittedAt": "2026-05-31T00:10:44.809Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/awards.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 99,
+      "public_id": "kaptain-s-decade-collection-easy-install",
+      "title": "Kaptain's Decade Collection (Easy Install)",
+      "description": "Official By Decade Collection Maintained by Kaptain.\n\nOne Click Install. Retro time-capsule folders spanning 70 years.\n\nBy Decade Collection including:\n\n    8 Folders\n    96 Sources\n    8 Decades of Film & Television History\n    Nostalgic Vintage Artwork Layouts\n\nFeaturing eras like:\n    2020s Movies · 10s Movies · 00s Movies · 90s Movies · 80s Movies · 70s Movies · 60s Movies · 50s Movies\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "decades",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/by_decade.png",
+      "likes_count": 45,
+      "installs_count": 1569,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:03",
+      "approved_at": "2026-05-31 02:02:03",
+      "updated_at": "2026-05-31 02:02:03",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 8,
+        "sourceCount": 96,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-decade-collection-easy-install",
+        "version": 1,
+        "submittedAt": "2026-05-31T00:12:26.895Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/by_decade.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 98,
+      "public_id": "kaptain-s-genre-collection-easy-install",
+      "title": "Kaptain's Genre Collection (Easy Install)",
+      "description": "Official Genres Collection Maintained by Kaptain.\n(Last Update 8.9.26)\n\nOne Click Install. Seamless thematic browsing and categories.\n\nGenres Collection including:\n\n    25 Fully Curated Film & TV Genres\n    Cinematic High-Fidelity Cover Designs\n\nFeaturing genres like:\n    Action · Sci-Fi · Horror · Adventure · Romance · Thriller · Comedy · Documentaries · War · Western\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "genres",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/genres.png",
+      "likes_count": 67,
+      "installs_count": 2750,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:01",
+      "approved_at": "2026-05-31 02:02:01",
+      "updated_at": "2026-08-09 22:50:50",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 25,
+        "sourceCount": 202,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-genre-collection-easy-install",
+        "version": 3,
+        "submittedAt": "2026-05-31T00:16:16.233Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/genres.png"
+      },
+      "collectionMeta": {
+        "id": "collection-HFTCV0TA",
+        "title": "Genres",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 97,
+      "public_id": "kaptain-s-directors-collection-easy-install",
+      "title": "Kaptain's Directors Collection (Easy Install)",
+      "description": "Official Legendary Directors Collection Maintained by Kaptain.\nUpdated (8/7/26)\n\nOne Click Install. Complete retrospectives of master filmmakers.\n\nLegendary Directors Collection including:\n\n    50 Iconic Film Directors\n    Signature Visual Style Accents & Backdrops\n\nFeaturing master filmmakers like:\n    Christopher Nolan · Quentin Tarantino · Martin Scorsese · Alfred Hitchcock · Steven Spielberg · Stanley Kubrick · Wes Anderson\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "directors",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/legendary_directors.png",
+      "likes_count": 28,
+      "installs_count": 874,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:02:00",
+      "approved_at": "2026-05-31 02:02:00",
+      "updated_at": "2026-08-08 00:58:47",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 62,
+        "sourceCount": 124,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-directors-collection-easy-install",
+        "version": 4,
+        "submittedAt": "2026-05-31T00:18:03.268Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/legendary_directors.png"
+      },
+      "collectionMeta": {
+        "id": "collection-13LJW3A6",
+        "title": "Legendary Directors",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 96,
+      "public_id": "kaptain-s-networks-collection-easy-install",
+      "title": "Kaptain's Networks Collection (Easy Install)",
+      "description": "Official Networks Collection Maintained by Kaptain.\n\nOne Click Install. Comprehensive TV network and channel catalog.\n\nNetworks Collection including:\n\n    30 Folders\n    60 Sources\n    30 Television Networks & Channels\n    Custom Vector Title Logos & Vignettes\n\nFeaturing networks like:\n    HBO · AMC · FX · Showtime · BBC · PBS · Starz · Cartoon Network · Discovery · National Geographic\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "networks",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/networks.png",
+      "likes_count": 34,
+      "installs_count": 1243,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:01:59",
+      "approved_at": "2026-05-31 02:01:59",
+      "updated_at": "2026-05-31 02:01:59",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 30,
+        "sourceCount": 60,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-networks-collection-easy-install",
+        "version": 1,
+        "submittedAt": "2026-05-31T00:19:56.395Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/networks.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 95,
+      "public_id": "kaptain-s-streaming-service-collection-easy-install",
+      "title": "Kaptain's Streaming Service Collection (Easy Install)",
+      "description": "Official Streaming Services Collection Maintained by Kaptain.\nLast Update (8/9/26)\n\nOne Click Install. Complete custom-styled platform directories.\n\nStreaming Services Collection including:\n\n    19 Folders\n    601 Sources\n    16 Major Streaming Platforms\n    Matching Custom Base & Hover Artwork\n\nFeaturing platforms like:\n    Netflix · Disney+ · Prime Video · HBO Max · Apple TV+ · Hulu · Paramount+ · Peacock · Crunchyroll\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "streaming",
+        "services",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/streaming_services.png",
+      "likes_count": 127,
+      "installs_count": 6513,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:01:57",
+      "approved_at": "2026-05-31 02:01:57",
+      "updated_at": "2026-08-09 22:50:47",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 22,
+        "sourceCount": 760,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-streaming-service-collection-easy-install",
+        "version": 4,
+        "submittedAt": "2026-05-31T00:21:34.805Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/streaming_services.png"
+      },
+      "collectionMeta": {
+        "id": "collection-ERFS5GWK",
+        "title": "Streaming Services",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 94,
+      "public_id": "kaptain-s-studios-collection-easy-install",
+      "title": "Kaptain's Studios Collection (Easy Install)",
+      "description": "Official Studios Collection Maintained by Kaptain.\n\nOne Click Install. Iconic production house spotlights.\n\nStudios Collection including:\n\n    20 Major Production Houses & Animation Hubs\n    Studio Logo Overlays & Glassmorphism Details\n\nFeaturing studios like:\n    A24 · Marvel Studios · Studio Ghibli · Pixar · Warner Bros. · Universal Pictures · Lucasfilm · DC\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "studios",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/studios.png",
+      "likes_count": 33,
+      "installs_count": 1230,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:01:56",
+      "approved_at": "2026-05-31 02:01:56",
+      "updated_at": "2026-06-30 01:18:34",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 20,
+        "sourceCount": 120,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-studios-collection-easy-install",
+        "version": 3,
+        "submittedAt": "2026-05-31T00:23:00.033Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/studios.png"
+      },
+      "collectionMeta": {
+        "id": "collection-XB14SDA2",
+        "title": "Studios",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 93,
+      "public_id": "kaptain-s-trending-new-collection-easy-install",
+      "title": "Kaptain's Trending/New Collection (Easy Install)",
+      "description": "Official Trending & New Collection Maintained by Kaptain.\n(Last Update 8/9/26)\n\nTrending & New Collection including:\n\n    6 Folders\n    104 Sources\n    Custom Animated Hover Art\n\nFeaturing selections like:\n    New Movies · New Series · Trending Movies · Trending TV\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "trending",
+        "new",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/trending_new.png",
+      "likes_count": 49,
+      "installs_count": 2001,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:01:54",
+      "approved_at": "2026-05-31 02:01:54",
+      "updated_at": "2026-08-09 22:50:44",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 6,
+        "sourceCount": 108,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-trending-new-collection-easy-install",
+        "version": 3,
+        "submittedAt": "2026-05-31T00:24:47.981Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/trending_new.png"
+      },
+      "collectionMeta": {
+        "id": "collection-UGED6TEZ",
+        "title": "Discover",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 92,
+      "public_id": "kaptain-s-collection-of-film-collections-easy-install",
+      "title": "Kaptain's Collection of Film Collections (Easy Install)",
+      "description": "Official Film Collections Maintained by Kaptain.\n\nOne Click Install. Massive library of movie sagas and universes.\n\nFilm Collections including:\n\n    200 Movie Sagas & Franchise Collections\n    Pre-Curated Chronological & Release Order Playlists\n\nFeaturing universes like:\n    Star Wars · Harry Potter · Marvel Cinematic Universe · Lord of the Rings · Indiana Jones · Jurassic Park · Mission: Impossible\n\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "movies",
+        "series",
+        "film collections",
+        "kaptain"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/film_collections.png",
+      "likes_count": 57,
+      "installs_count": 1822,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-31 02:01:52",
+      "approved_at": "2026-05-31 02:01:52",
+      "updated_at": "2026-06-30 01:18:45",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 200,
+        "sourceCount": 351,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-collection-of-film-collections-easy-install",
+        "version": 2,
+        "submittedAt": "2026-05-31T02:00:30.823Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/film_collections.png"
+      },
+      "collectionMeta": {
+        "id": "collection-8EYK6R4X",
+        "title": "Film Collections",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 88,
+      "public_id": "catalogs",
+      "title": "Catalogs",
+      "description": "Collection for catalog tracking. Includes Trakt, Letterboxd, TMDB, AniList,  and SIMKL.\nIncludes focus GIF for each.\nYou'll want to modify your own catalog items for each one.",
+      "tags": [
+        "catalogs",
+        "integrations",
+        "tracking",
+        "lists",
+        "trakt",
+        "letterboxd",
+        "tmdb",
+        "anilist"
+      ],
+      "image_url": "https://github.com/tolbertsol/nuvio/raw/main/images/catalogs-video-gif.gif",
+      "likes_count": 46,
+      "installs_count": 1051,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 18:26:45",
+      "approved_at": "2026-05-28 18:26:45",
+      "updated_at": "2026-05-28 18:26:45",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 11,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "catalogs",
+        "version": 1,
+        "submittedAt": "2026-05-28T15:24:06.333Z",
+        "coverImageUrl": "https://github.com/tolbertsol/nuvio/raw/main/images/catalogs-video-gif.gif"
+      },
+      "collectionMeta": {
+        "id": "collections.discover",
+        "title": "Catalogs",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 86,
+      "public_id": "streaming-collection-snoak-lists",
+      "title": "Complete Streaming & Franchises Collection",
+      "description": "Mix of other user added Collections and a personal collection. Mostly made of Trakt and Snoak catalogs with TMDB backdrops, etc.\n\nSTREAMING ONLY / COMPLETE - Choose depending on what you want. Remove from Home for all. Catalog Import Only. Recommend Catalog Only Mode\n\nEXTRA - My personal catalogs on top if you want a ready to go complete setup. Recommend two AIOMetadata addons, I use the others for collections only and this as my own personal homepage catalogs.",
+      "tags": [
+        "streaming",
+        "netflix",
+        "movies",
+        "series"
+      ],
+      "image_url": "https://image.tmdb.org/t/p/original/jci0IkGpJRwpTx62jDxIFXAt2Sr.jpg",
+      "likes_count": 22,
+      "installs_count": 633,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 02:30:38",
+      "approved_at": "2026-05-28 02:30:38",
+      "updated_at": "2026-06-05 16:52:08",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 56,
+        "sourceCount": 178,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "streaming-collection-snoak-lists",
+        "version": 2,
+        "submittedAt": "2026-05-25T10:59:11.966Z",
+        "coverImageUrl": "https://image.tmdb.org/t/p/original/jci0IkGpJRwpTx62jDxIFXAt2Sr.jpg"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata 2",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "public_id": "streaming-services-no-animated-cards",
+      "title": "Streaming Services - No Animated Cards",
+      "description": "No Animated Gif Cards Version\n\nFor most popular streaming services.",
+      "tags": [
+        "movie",
+        "show",
+        "streaming",
+        "netflix",
+        "prime",
+        "shudder"
+      ],
+      "image_url": "https://wallpapersok.com/images/high/almost-famous-hollywood-movies-collection-42y41gqc28t2mijg.jpg",
+      "likes_count": 12,
+      "installs_count": 552,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 01:37:00",
+      "approved_at": "2026-05-28 01:37:00",
+      "updated_at": "2026-05-28 01:37:00",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 29,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "streaming-services-no-animated-cards",
+        "version": 1,
+        "submittedAt": "2026-05-22T21:08:45.771Z",
+        "coverImageUrl": "https://wallpapersok.com/images/high/almost-famous-hollywood-movies-collection-42y41gqc28t2mijg.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-a33b28eb",
+        "title": "Streaming",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "pw.ers.netflix-catalog",
+          "addonName": "Streaming Catalogs",
+          "manifestUrl": "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHosZHBlLHNoZCxiYm86dDAtZnJlZS1ycGRiOlVTOjE3NzcxODI3NjI5Njc6MDowOkNB/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 83,
+      "public_id": "nuvio-setup-dynamic-lists-json-files-included-diligent-dream-4667",
+      "title": "Nuvio Setup (Dynamic Lists + JSON Files Included \"Diligent_Dream_4667\"",
+      "description": "Je viens de sortir une grosse mise à jour de ma configuration Nuvio 🚀\n\nJ’ai réimporté tous les fichiers JSON, donc vous pouvez les utiliser, les modifier ou simplement vous en inspirer 📂✨\n\nJ’utilise AIOMetadata, et toutes les listes proviennent de TMDB, MDBList et Trakt — elles sont entièrement dynamiques, donc tout se met à jour automatiquement 🔄\nAssurez-vous simplement d’ajouter vos propres clés API dans AIOMetadata pour que tout fonctionne correctement 🔑\n\nComment installer :\nImportez d’abord les fichiers JSON AIOMetadata et configurez-les dans Nuvio, puis importez les collections JSON 📥\n\nTous les titres sont actuellement en français 🇫🇷\nSi vous voulez une autre langue, vous devrez modifier les titres dans AIOMetadata et mettre à jour les couvertures sur le site Nuvio Media Hub 🎬\n\nSi vous voyez des numéros au lieu des vrais titres de listes, vous devrez les lier manuellement sur le Nuvio Media Hub ⚙️\n\nSi vous avez des idées ou des suggestions, n’hésitez pas à les partager — je suis toujours ouvert aux améliorations 🙌",
+      "tags": [
+        "movies"
+      ],
+      "image_url": "https://i.postimg.cc/YqSRBDLH/Capture-d-ecran-2026-05-22-175912.png",
+      "likes_count": 33,
+      "installs_count": 571,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 01:36:08",
+      "approved_at": "2026-05-28 01:36:08",
+      "updated_at": "2026-05-28 01:36:08",
+      "stats": {
+        "collectionCount": 8,
+        "folderCount": 137,
+        "sourceCount": 257,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "nuvio-setup-dynamic-lists-json-files-included-diligent-dream-4667",
+        "version": 1,
+        "submittedAt": "2026-05-22T16:01:55.174Z",
+        "coverImageUrl": "https://i.postimg.cc/YqSRBDLH/Capture-d-ecran-2026-05-22-175912.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/ed6825fb-3595-42ab-9b12-0a0232539249/manifest.json"
+        },
+        {
+          "addonId": "com.aicat.7bf93c36-3827-4aad-959f-3ae274b48eb8",
+          "addonName": "Bingecat",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "public_id": "nuvio-horror-thriller-build-diligent-dream-4667",
+      "title": "🎬 Nuvio Horror + Thriller Build \"Diligent_Dream_4667\"",
+      "description": "I’ve been working on a Nuvio setup built for the community entirely around Horror + Thriller, using MDBList and TMDB\n\nAll the list are dynamic\n\nThe idea wasn’t just to stack lists, but to build something that actually feels immersive when you browse it — something closer to a curated experience than a library.\n\nEverything is organized into clear thematic folders, so you naturally move between different moods and sub-genres without it feeling messy or random.\n\nThis is only movies build (no tv shows)\n☠️ Horror\n\nFrom psychological horror, found footage, cult stories, body horror, cosmic dread, slashers, and more — grouped to explore different shades of fear and atmosphere.\n🔪 Thriller\n\nCrime stories, psychological tension, mysteries, neo-noir worlds, conspiracy plots, and anxiety-driven narratives.\n💡 Overall vibe\n\nThe goal was to make browsing feel like moving through different moods rather than just scrolling a catalog.\n\nDiligent_Dream_4667",
+      "tags": [
+        "horror"
+      ],
+      "image_url": "https://i.postimg.cc/pd51bG7M/Capture-d-ecran-2026-05-22-175706.png",
+      "likes_count": 20,
+      "installs_count": 407,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 01:35:50",
+      "approved_at": "2026-05-28 01:35:50",
+      "updated_at": "2026-05-28 01:35:50",
+      "stats": {
+        "collectionCount": 2,
+        "folderCount": 12,
+        "sourceCount": 23,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "nuvio-horror-thriller-build-diligent-dream-4667",
+        "version": 1,
+        "submittedAt": "2026-05-22T15:57:39.477Z",
+        "coverImageUrl": "https://i.postimg.cc/pd51bG7M/Capture-d-ecran-2026-05-22-175706.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/ed6825fb-3595-42ab-9b12-0a0232539249/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 81,
+      "public_id": "tr-film-dizi",
+      "title": "TR/Film&Dizi",
+      "description": "Turkish Movie&Series",
+      "tags": [
+        "movies"
+      ],
+      "image_url": "https://i.hizliresim.com/3s00c6w.png",
+      "likes_count": 22,
+      "installs_count": 347,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 01:25:51",
+      "approved_at": "2026-05-28 01:25:51",
+      "updated_at": "2026-05-28 01:25:51",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 2,
+        "sourceCount": 2,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "tr-film-dizi",
+        "version": 1,
+        "submittedAt": "2026-05-11T16:11:33.944Z",
+        "coverImageUrl": "https://i.hizliresim.com/3s00c6w.png"
+      },
+      "collectionMeta": {
+        "id": "1c9404b9-0930-4db6-9e7d-c25f01563be2",
+        "title": "TR/Film&Dizi",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata  | ElfHosted",
+          "manifestUrl": "https://aiometadata.elfhosted.com/stremio/b9e23058-7200-43e5-9578-5e11e38e4e87/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 79,
+      "public_id": "genres-10",
+      "title": "🎭 Genres",
+      "description": "Tv",
+      "tags": [],
+      "image_url": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/genres/backdrop/action.webp",
+      "likes_count": 13,
+      "installs_count": 397,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-28 01:01:54",
+      "approved_at": "2026-05-28 01:01:54",
+      "updated_at": "2026-05-28 01:01:54",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 19,
+        "sourceCount": 50,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-10",
+        "version": 1,
+        "submittedAt": "2026-05-16T04:10:04.515Z",
+        "coverImageUrl": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/collections/genres/backdrop/action.webp"
+      },
+      "collectionMeta": {
+        "id": "collections-genres-community",
+        "title": "🎭 Genres",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "aio-metadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 78,
+      "public_id": "u-n-e-ultimate-nuvio-experience",
+      "title": "U.N.E (Ultimate Nuvio Experience)",
+      "description": "This is **The** Ultimate Nuvio Experience Setup.\n\nIncludes:\n- Recommendations (via trakt)\n- Streaming Platforms\n- Genres\n- Actors\n- Franchises\n- Directors\n- and many more\n\n⚠️ Manually import the nuvio_collection.json provided below in resources section instead of adding 'pack'. On **Mobile**:  **Settings > Content & Discovery > Collections** (will automatically work for TV too), if not imported manually then some of the GIF sources might not work, so you would manually have to search for them.\n\n# Requirements for best experience:\n- **API Keys URL's**\n  - [TMDB API](https://www.themoviedb.org/settings/api)\n  - [Mdblist API (**REQUIRED**)](https://mdblist.com/preferences/#dashboard)\n  - [Gemini API](https://aistudio.google.com/app/apikey)\n  - [Trakt Account](https://trakt.tv/)\n  - Etc in [AIOMetadata](https://aiometadata.viren070.me/) if you want\n\n- **AIOMetadata setup**:\n  - Chose your fav [AIOMetadata](https://aiometadata.viren070.me/) provider\n  - Go to **Configuration** and import aiometadata part 1 file provided in resources below \n  - Go to **Integrations** section and add all the API keys\n  - Go to **Search** and enable AI Search\n  - Go to **Catalogs** section and select Trakt icon and get your trakt code and connect it (save it somewhere, will be used for later)\n  - Go to **Configuration**, click save configuration, set a password, install the add-on with the provided URL\n - Go to **General**, scroll down and disable trakt checkin cause **Nuvio** tracking with **Trakt** is better\n- Now close all tabs or go in incognito (basically logout of the current saved account) and repeat everything with aiometadata part 2 file, No need for AI search this time and use Trakt code you have saved.\n\n- **Nuvio Settings**\n  - Connect your Trakt account to see comments on shows/movies\n  - Go to Settings > Integrations and enable tmdb and mdblist with created API keys for better experience\n - Go to Settings > Streams (on TV its in layout) and add badges for more eye candy!, I personally use [this](https://gist.githubusercontent.com/nosvasedis/7abd79424bb8981b511838524c52f097/raw/76c519d05f6518f0ed186ba802847c625ba730fa/nosvasedis-badges-nuvio) config, You can find more configs on [r/nuvio](https://reddit.com/r/nuvio)\n\n## TIps\nWith so many collections, Nuvio becomes slow and cluttered, i would recommend you to go to **Settings > Content & Discovery > Home layout** (on TV you can manage settings through your phone) and disable collections that you would not like to see, I personally enable only:\n- Now on Nuvio\n- Streaming Platforms\n- Genres\n- Actors\n- Franchises\n- Directors\n- International Cinema\n\n### Credits\nSpecial thanks to [particularcatch](https://ko-fi.com/particularcatch) for creating https://nuvio.tvflix.co.uk/",
+      "tags": [
+        "movies",
+        "series"
+      ],
+      "image_url": "https://tvflix.co.uk/Assets/Now-On/backdrops/For%20You.jpg",
+      "likes_count": 52,
+      "installs_count": 1324,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-27 21:33:12",
+      "approved_at": "2026-05-27 21:33:12",
+      "updated_at": "2026-09-02 13:37:03",
+      "stats": {
+        "collectionCount": 14,
+        "folderCount": 176,
+        "sourceCount": 322,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "u-n-e-ultimate-nuvio-experience",
+        "version": 6,
+        "submittedAt": "2026-05-26T08:17:31.573Z",
+        "coverImageUrl": "https://tvflix.co.uk/Assets/Now-On/backdrops/For%20You.jpg"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "aio-metadata",
+          "manifestUrl": "https://aiometadata.viren070.me/configure/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 77,
+      "public_id": "de-slopped-genre-cards",
+      "title": "De-Slopped Genre Cards",
+      "description": "OLED friendly. Genres have been streamlined for common categories since many categories overlap - Horror and Thriller for example are basically the same thing. \n\nSilhouettes were taken from actual movie logos/screencaps. If a category is missing, I'm sure you can upload a card into GPT and have it create one for you so it follows the same theme.",
+      "tags": [
+        "genre"
+      ],
+      "image_url": "https://tolbertsol.github.io/nuvio/images/genres/silhouettes/action-base-focus.png",
+      "likes_count": 14,
+      "installs_count": 207,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-27 21:21:41",
+      "approved_at": "2026-05-27 21:21:41",
+      "updated_at": "2026-05-27 21:21:41",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 10,
+        "sourceCount": 19,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "de-slopped-genre-cards",
+        "version": 1,
+        "submittedAt": "2026-05-27T18:58:15.685Z",
+        "coverImageUrl": "https://tolbertsol.github.io/nuvio/images/genres/silhouettes/action-base-focus.png"
+      },
+      "collectionMeta": {
+        "id": "collections.genres",
+        "title": "Genres",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 76,
+      "public_id": "nuvio-kids-collectio-build-pg-filter-clean-catalog-dynamic-lists-diligent-dream-4667",
+      "title": "Nuvio Kids Collectio build – PG Filter + Clean Catalog + Dynamic Lists \"Diligent_Dream_4667\"",
+      "description": "Just added a new Kids exclusive build to my Nuvio setup for my kids\n\nI set up a filter in AIOMetadata using a PG rating, so it only shows kid-friendly content. You can adjust the restriction level depending on the age of your children 🔧\n\nI also added some inappropriate keyword filters to help block unwanted content automatically 🚫\n\nThis filter applies to search as well, keeping the catalog clean across collections and MDBList dynamic lists, which update automatically 🔄\n\nEverything is currently in French , so if you want to use another language you’ll need to manually update the titles and covers or ask ai to translate de json files to ur own language🔁\n\nAlso, if you already use a normal profile for movies and series, and you want your kids to use the same setup, I’d recommend creating a separate profile for them\nThat way you keep everything clean and separated (addons, catalogs, collections, etc.)\n\nTook me like 6 hours lol but i tourned out looking nice and clean,tell what u think\n\nFigured I’d share it in case it helps anyone 🙌\n\nFeel free to adapt it to your own needs 👍",
+      "tags": [
+        "kids"
+      ],
+      "image_url": "https://i.postimg.cc/1zR5vFY8/Capture-d-ecran-2026-05-22-175241.png",
+      "likes_count": 35,
+      "installs_count": 995,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-27 11:19:59",
+      "approved_at": "2026-05-27 11:19:59",
+      "updated_at": "2026-05-27 11:19:59",
+      "stats": {
+        "collectionCount": 3,
+        "folderCount": 19,
+        "sourceCount": 20,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "nuvio-kids-collectio-build-pg-filter-clean-catalog-dynamic-lists-diligent-dream-4667",
+        "version": 1,
+        "submittedAt": "2026-05-22T15:53:23.841Z",
+        "coverImageUrl": "https://i.postimg.cc/1zR5vFY8/Capture-d-ecran-2026-05-22-175241.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/ed6825fb-3595-42ab-9b12-0a0232539249/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 74,
+      "public_id": "b-e-s-t-better-enhanced-simple-tv",
+      "title": "B.E.S.T - Better Enhanced Simple TV",
+      "description": "# 🎣 Introducing the *B.E.S.T* Collection 😉 \n\n**One-click installation. 👌**\n\n- **B**etter Posters (now with **Better Covers**)\n- **E**nhanced with AIOMetadata\n - **S**imple, not complicated\n- **T**V 📺\n\nIncludes:\n- Discover (Dynamic Cover images)\n- Franchises \n- Streaming (**Shows & Movies**) (Dynamic Cover images)\n- UK TV (Dynamic Cover images)\n- Genres (Dynamic Cover images)\n- Decades (Dynamic Cover images)\n- Directors\n\n\nDiscussion / Support :- https://www.reddit.com/r/Nuvio/s/9WvAf63JDp\n\n**Torbox Referral link**\nhttps://torbox.app/subscription?referral=de40af80-863e-4384-aa47-7699c11a286c\n\n**When you use someone's referral code:**\n\n*You* (the referred user) receive an extra 7 days times the number of months purchased added to the plan you purchased.\n\nThe other person (the referrer) receives an extra 7 days times the number of months purchased added to their current plan.",
+      "tags": [
+        "better",
+        "best",
+        "b.e.s.t",
+        "enhanced",
+        "modern",
+        "tv",
+        "better posters",
+        "better covers"
+      ],
+      "image_url": "https://i.postimg.cc/Qxv78sng/New-Better2.gif",
+      "likes_count": 109,
+      "installs_count": 5179,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-20 17:48:04",
+      "approved_at": "2026-05-20 17:48:04",
+      "updated_at": "2026-07-21 02:53:53",
+      "stats": {
+        "collectionCount": 7,
+        "folderCount": 82,
+        "sourceCount": 177,
+        "addonCount": 2
+      },
+      "community": {
+        "id": "b-e-s-t-better-enhanced-simple-tv",
+        "version": 5,
+        "submittedAt": "2026-05-20T17:19:40.390Z",
+        "coverImageUrl": "https://i.postimg.cc/Qxv78sng/New-Better2.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "community.betterposters",
+          "addonName": "BetterPosters",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/0385413c-5588-46ef-a3f9-01866c96304d/manifest.json"
+        },
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/0385413c-5588-46ef-a3f9-01866c96304d/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 73,
+      "public_id": "discover-2",
+      "title": "‎Discover",
+      "description": "discover",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/QxfXgbgT/latest-movies-1920x1080(1).png",
+      "likes_count": 25,
+      "installs_count": 884,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-20 10:10:33",
+      "approved_at": "2026-05-20 10:10:33",
+      "updated_at": "2026-05-20 10:10:33",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 4,
+        "sourceCount": 20,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "discover-2",
+        "version": 1,
+        "submittedAt": "2026-05-19T10:12:46.086Z",
+        "coverImageUrl": "https://i.postimg.cc/QxfXgbgT/latest-movies-1920x1080(1).png"
+      },
+      "collectionMeta": {
+        "id": "d978a585-bb1a-43fe-9c7d-05d45d74111b-community",
+        "title": "‎Discover",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.linvo.cinemeta",
+          "addonName": "Cinemeta",
+          "manifestUrl": "https://v3-cinemeta.strem.io/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 72,
+      "public_id": "my-setup",
+      "title": "HomelessBrians Setup",
+      "description": "A few people have asked me to share my full setup, It utilizes Bingecat lists, search, & recommendations.\n\n- Trending Movies\n- Trending  Series\n- Recommended Movies (Based on what you have watched)\n- By Genre\n     - Popular\n     - By Decade (1960s - 2020s)\n- By Franchise\n     - Some of my favorite franchises.\n- By Network\n     - Popular Movies\n     - Popular Series",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/0jhQbb5d/My-Setup.gif",
+      "likes_count": 34,
+      "installs_count": 808,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-20 10:10:19",
+      "approved_at": "2026-05-20 10:10:19",
+      "updated_at": "2026-07-11 03:55:46",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 91,
+        "sourceCount": 232,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "my-setup",
+        "version": 4,
+        "submittedAt": "2026-05-20T00:58:59.565Z",
+        "coverImageUrl": "https://i.postimg.cc/0jhQbb5d/My-Setup.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.aicat.1eb78eb5-8fbf-4ebc-9344-2a1103994b72.nuvio",
+          "addonName": "Bingecat",
+          "manifestUrl": "https://bingecat.com/stremio/1eb78eb5-8fbf-4ebc-9344-2a1103994b72/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 71,
+      "public_id": "simple-kids-profile",
+      "title": "Simple Kids Profile",
+      "description": "This Collection will force kid-friendly content, as long as *Cinemata is uninstalled!*\n\nIncludes:\n\n- Popular Franchise\n- Cartoons\n- Streaming Services with only kid-friendly content (*series and movies*) \n-Family movies by decade\n\n# Uninstall Cinemata!!!!\n\nThis setup has search disabled by default. \n\nIf you want to enable Kid-Safe search install this *optional* addon:\n\nhttps://aiometadata.fortheweak.cloud/stremio/330e7fc9-5d0f-44ea-8ba9-5f55906d10f9/manifest.json\n\n\n**Discussion / Support here:**\nhttps://www.reddit.com/r/Nuvio/s/L77vGMX0aZ\n\n**Torbox Referral link**\nhttps://torbox.app/subscription?referral=de40af80-863e-4384-aa47-7699c11a286c\n\n**When you use someone's referral code:**\n*You* (the referred user) receive an extra 7 days times the number of months purchased added to the plan you purchased.\n\nThe other person (the referrer) receives an extra 7 days times the number of months purchased added to their current plan.",
+      "tags": [
+        "kids",
+        "kid-friendly",
+        "safe",
+        "cartoons",
+        "family movies"
+      ],
+      "image_url": "https://i.postimg.cc/kXsK9YcS/Kids-Censored.gif",
+      "likes_count": 101,
+      "installs_count": 3437,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-18 18:01:56",
+      "approved_at": "2026-05-18 18:01:56",
+      "updated_at": "2026-08-02 20:01:16",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 31,
+        "sourceCount": 43,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "simple-kids-profile",
+        "version": 9,
+        "submittedAt": "2026-05-18T16:46:20.833Z",
+        "coverImageUrl": "https://i.postimg.cc/kXsK9YcS/Kids-Censored.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadatafortheweebs.midnightignite.me/stremio/5f5cbfce-72d8-4b38-81f0-1e9d1879da2e/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 69,
+      "public_id": "nuvio-hybrid-collections-v1",
+      "title": "Nuvio Hybrid Collections V1",
+      "description": "Curated Nuvio profile with four clean collections: Networks, Productions, Languages, and Genres.\n\nUses TMDB Discover sources with consistent Trending and Best rows for Movies and Series.\n\nNetwork folders are optimized with count-based company vs network filter selection to maximize coverage while keeping the UI simple and consistent.\n\nBuilt as a practical V1 baseline for sharing, testing, and future tuning.",
+      "tags": [],
+      "image_url": "https://dummyimage.com/900x506/1b1b1b/f5f5f5.png&text=Netflix",
+      "likes_count": 34,
+      "installs_count": 1858,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-16 08:23:58",
+      "approved_at": "2026-05-16 08:23:58",
+      "updated_at": "2026-05-16 08:23:58",
+      "stats": {
+        "collectionCount": 4,
+        "folderCount": 76,
+        "sourceCount": 304,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "nuvio-hybrid-collections-v1",
+        "version": 1,
+        "submittedAt": "2026-05-15T12:09:45.776Z",
+        "coverImageUrl": "https://dummyimage.com/900x506/1b1b1b/f5f5f5.png&text=Netflix"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 68,
+      "public_id": "decades-of-horror",
+      "title": "‎Decades of Horror",
+      "description": "A TMDB based decades of horror collection. No Add-ons required.",
+      "tags": [
+        "movies",
+        "horror"
+      ],
+      "image_url": "https://github.com/davecollections/nuvio-assets/blob/main/assets/backdrops/horror/horror%20backdropv2.png?raw=true",
+      "likes_count": 28,
+      "installs_count": 667,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-16 08:23:00",
+      "approved_at": "2026-05-16 08:23:00",
+      "updated_at": "2026-05-16 08:23:00",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 5,
+        "sourceCount": 5,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "decades-of-horror",
+        "version": 1,
+        "submittedAt": "2026-05-16T07:51:52.890Z",
+        "coverImageUrl": "https://github.com/davecollections/nuvio-assets/blob/main/assets/backdrops/horror/horror%20backdropv2.png?raw=true"
+      },
+      "collectionMeta": {
+        "id": "collection-aa3af320",
+        "title": "‎Decades of Horror",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 66,
+      "public_id": "genres-9",
+      "title": "Genres",
+      "description": "Genres cover with movies stills",
+      "tags": [],
+      "image_url": "https://i.ibb.co/YBv7bwjp/DSC-0149.jpg",
+      "likes_count": 38,
+      "installs_count": 1003,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-15 06:25:57",
+      "approved_at": "2026-05-15 06:25:57",
+      "updated_at": "2026-05-15 06:25:57",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 15,
+        "sourceCount": 118,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-9",
+        "version": 1,
+        "submittedAt": "2026-05-14T15:26:54.249Z",
+        "coverImageUrl": "https://i.ibb.co/YBv7bwjp/DSC-0149.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-hftcv0ta-community",
+        "title": "‎",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "Atl Metadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/f5af1786-f388-48e2-bda7-6ca5a97a3f1f/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 59,
+      "public_id": "zagmared-anime-focused-build",
+      "title": "ZagmaRed Anime Focused Build",
+      "description": "anime-focused Nuvio build 🎌🔥\n\nThe build includes:\n\n* Anime studios 🎬\n* Genres 🎌\n* Anime collections 📂\n* Dynamic weekly lists 📈\n* Donghua 🇨🇳\n* Trending & airing anime 📺\n and more\n\nEverything is powered through AIOMetadata with dynamic lists from MDBList, so most sections update automatically 🔄\n\nTried to keep the UI clean and easy to browse while still having a lot of content 👀\n\nHope some of you enjoy it 🙌\n\nDiligent_Dream_4667",
+      "tags": [
+        "anime"
+      ],
+      "image_url": "https://i.postimg.cc/ydcB35f7/ezgif-77366ace6ef464b5.gif",
+      "likes_count": 97,
+      "installs_count": 2856,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-12 04:50:33",
+      "approved_at": "2026-05-12 04:50:33",
+      "updated_at": "2026-05-12 10:47:58",
+      "stats": {
+        "collectionCount": 5,
+        "folderCount": 38,
+        "sourceCount": 42,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "zagmared-anime-focused-build",
+        "version": 1,
+        "submittedAt": "2026-05-11T22:50:46.847Z",
+        "coverImageUrl": "https://i.postimg.cc/ydcB35f7/ezgif-77366ace6ef464b5.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "aimetadata",
+          "manifestUrl": "https://aiometadata.fortheweak.cloud/stremio/97074f78-03c4-4d7b-937c-ecb5dcb08627/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 57,
+      "public_id": "colecciones-completas-barrios",
+      "title": "COLECCIONES COMPLETAS-BARRIOS",
+      "description": "Aiometadata: \n\nhttps://drive.google.com/file/d/1UTaq0FNgny5F31AWrfLRGfclGMFUizkv/view?usp=drivesdk\n\nDon't forget to add your API... I hope you enjoy the collection😏",
+      "tags": [],
+      "image_url": "https://64.media.tumblr.com/c3b338f22cb465c5c691bc2a63a31210/466e342d71851e0d-ae/s640x960/57c5ca0082894b6796b965e90d5149b767ab69b4.gifv",
+      "likes_count": 21,
+      "installs_count": 305,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-11 21:01:22",
+      "approved_at": "2026-05-11 21:01:22",
+      "updated_at": "2026-05-11 21:01:22",
+      "stats": {
+        "collectionCount": 7,
+        "folderCount": 124,
+        "sourceCount": 166,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "colecciones-completas-barrios",
+        "version": 1,
+        "submittedAt": "2026-05-11T13:44:25.595Z",
+        "coverImageUrl": "https://64.media.tumblr.com/c3b338f22cb465c5c691bc2a63a31210/466e342d71851e0d-ae/s640x960/57c5ca0082894b6796b965e90d5149b767ab69b4.gifv"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOB222",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 55,
+      "public_id": "kaptain-s-mega-collection-v0-4",
+      "title": "Kaptain's Mega Collection (Easy Install, No Addons)",
+      "description": "Official Mega Collection Maintained by Kaptain. \n(LAST UPDATE 8.10.26) \n\nOne Click Install. No Addons needed. Largest collection available. \n\nMega Collection including:\n* 11 Master Categories\n* 471 Folders\n* 2306 Sources\n* 200 Film Collections\n* 100 Actors\n* 50 Directors\n* 30 Networks\n* 19 Streaming Services\n* 25 Genres\n* 20 Studios\n* 8 Decades\n* 6 Anime Collections\n* 3 Award Collections\n* 10 Moods & Vibes\n* 38 International Cinema\n* 7 Documentaries\n* 6 Kids & Family\n* 6 Reality TV\nFor search results, keep an addon installed like Cinemeta. https://v3-cinemeta.strem.io",
+      "tags": [
+        "kaptain",
+        "anime",
+        "streaming",
+        "networks",
+        "actors",
+        "directors",
+        "studios",
+        "awards"
+      ],
+      "image_url": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/nuvio_mega_collection.png",
+      "likes_count": 486,
+      "installs_count": 20898,
+      "reports_count": 12,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-11 21:01:06",
+      "approved_at": "2026-05-11 21:01:06",
+      "updated_at": "2026-08-10 22:32:54",
+      "stats": {
+        "collectionCount": 16,
+        "folderCount": 601,
+        "sourceCount": 3051,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "kaptain-s-mega-collection-v0-4",
+        "version": 10,
+        "submittedAt": "2026-05-11T16:31:03.581Z",
+        "coverImageUrl": "https://raw.githubusercontent.com/ImKaptain/nuvio-assets/main/Collection_Cards/nuvio_mega_collection.png"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 50,
+      "public_id": "by-collection",
+      "title": "HomelessBrians Setup - By Franchise Section Only",
+      "description": "A collection of movie franchises with matching cover art.",
+      "tags": [],
+      "image_url": "https://i.ibb.co/LzNL6m8s/Screen-Record.gif",
+      "likes_count": 67,
+      "installs_count": 1348,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-10 20:54:07",
+      "approved_at": "2026-05-10 20:54:07",
+      "updated_at": "2026-07-11 03:55:40",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 49,
+        "sourceCount": 56,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "by-collection",
+        "version": 3,
+        "submittedAt": "2026-05-09T18:05:44.975Z",
+        "coverImageUrl": "https://i.ibb.co/LzNL6m8s/Screen-Record.gif"
+      },
+      "collectionMeta": {
+        "id": "collection-28bc4fb9-community",
+        "title": "🔗 By Franchise",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.aicat.1eb78eb5-8fbf-4ebc-9344-2a1103994b72.nuvio",
+          "addonName": "Bingecat",
+          "manifestUrl": "https://bingecat.com/stremio/1eb78eb5-8fbf-4ebc-9344-2a1103994b72/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 42,
+      "public_id": "actors",
+      "title": "Actors",
+      "description": "This is a complete setup of different actors with curated lists including their movies and shows split or all together.",
+      "tags": [
+        "actors",
+        "movies",
+        "shows",
+        "collections"
+      ],
+      "image_url": "https://i.postimg.cc/gjVvtsst/downey_jr.jpg",
+      "likes_count": 14,
+      "installs_count": 282,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-10 02:40:47",
+      "approved_at": "2026-05-10 02:40:47",
+      "updated_at": "2026-05-10 02:40:47",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 56,
+        "sourceCount": 78,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "actors",
+        "version": 1,
+        "submittedAt": "2026-05-09T22:09:12.424Z",
+        "coverImageUrl": "https://i.postimg.cc/gjVvtsst/downey_jr.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-f40e1fed",
+        "title": "Attori",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 41,
+      "public_id": "genres-8",
+      "title": "Genres",
+      "description": "Includes anime,Bollywood,action,comedy,thriller,mystery,horror",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/tCbCNz53/Anime.jpg",
+      "likes_count": 11,
+      "installs_count": 223,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-09 16:21:43",
+      "approved_at": "2026-05-09 16:21:43",
+      "updated_at": "2026-05-09 16:21:43",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 11,
+        "sourceCount": 25,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-8",
+        "version": 1,
+        "submittedAt": "2026-05-09T11:07:25.863Z",
+        "coverImageUrl": "https://i.postimg.cc/tCbCNz53/Anime.jpg"
+      },
+      "collectionMeta": {
+        "id": "f5d85ab1-70ee-4ea4-9ba3-570006691f49",
+        "title": "Genres",
+        "viewMode": "ROWS",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 38,
+      "public_id": "horror",
+      "title": "Horror",
+      "description": "just a small collection for horror",
+      "tags": [],
+      "image_url": "https://i.imgur.com/NcCO2Zu.png",
+      "likes_count": 19,
+      "installs_count": 341,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-08 19:01:11",
+      "approved_at": "2026-05-08 19:01:11",
+      "updated_at": "2026-05-09 08:29:39",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 1,
+        "sourceCount": 2,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "horror",
+        "version": 1,
+        "submittedAt": "2026-05-08T15:09:12.424Z",
+        "coverImageUrl": "https://i.imgur.com/NcCO2Zu.png"
+      },
+      "collectionMeta": {
+        "id": "collection-a70744af-community",
+        "title": "Horror",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 37,
+      "public_id": "simple-collection-v2-modern-no-aiometada",
+      "title": "Simple Collection (Modern TV) No AIOMetadata",
+      "description": "# Cinemata optional. \n**Works *even*  without Cinemata installed!**\n\n- Discover: Latest, Trending, Popular, Top Rated\n\n- Streaming Services (7 services - TV Shows only)\n\n- Franchises - 22 Popular Franchises\n\n- Genres - **21** Genres - Added Martial Arts & Reality TV\n\n- Decades (Shows + Movies) - 1980s, 1990s, 2000s,2010s, 2020s\n\n- Directors - all the movies from **31** industry heavyweights.\n\nDiscussion /  Support: https://www.reddit.com/r/Nuvio/s/ifxjrAQE9I\n\n\n**Torbox Referral link**\nhttps://torbox.app/subscription?referral=de40af80-863e-4384-aa47-7699c11a286c\n\n**When you use someone's referral code:**\n\n*You* (the referred user) receive an extra 7 days times the number of months purchased added to the plan you purchased.\n\nThe other person (the referrer) receives an extra 7 days times the number of months purchased added to their current plan.",
+      "tags": [
+        "modern",
+        "inter font",
+        "simple",
+        "discovery",
+        "streaming services",
+        "franchises",
+        "genres",
+        "decades"
+      ],
+      "image_url": "https://i.postimg.cc/BQ4nZ93t/Simple-censored.gif",
+      "likes_count": 166,
+      "installs_count": 7235,
+      "reports_count": 3,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-08 19:01:09",
+      "approved_at": "2026-05-08 19:01:09",
+      "updated_at": "2026-06-13 04:22:05",
+      "stats": {
+        "collectionCount": 6,
+        "folderCount": 90,
+        "sourceCount": 271,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "simple-collection-v2-modern-no-aiometada",
+        "version": 3,
+        "submittedAt": "2026-05-08T15:56:24.035Z",
+        "coverImageUrl": "https://i.postimg.cc/BQ4nZ93t/Simple-censored.gif"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "com.linvo.cinemeta",
+          "addonName": "com.linvo.cinemeta",
+          "manifestUrl": "https://v3-cinemeta.strem.io/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 34,
+      "public_id": "decades",
+      "title": "📅 Decades",
+      "description": "Decades Including 2020 all the way to 1950's (& Before). Each category contains folders of the whole  decade aggregated on top and every year listed below. Filters include minimum rating of 5, 100 votes on TMDB with some exceptions in the 2010s category (To force out documentaries, but major films should be unaffected - will update if exclusion filters are brought into play, i.e. -multiple Genres, -multiple keywords, digital release filter etc.)",
+      "tags": [
+        "decades",
+        "years"
+      ],
+      "image_url": "https://github.com/starman2908/Strem/blob/main/Gemini_Generated_Image_vsu4pzvsu4pzvsu4.png?raw=true",
+      "likes_count": 35,
+      "installs_count": 1033,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-08 12:53:32",
+      "approved_at": "2026-05-08 12:53:32",
+      "updated_at": "2026-05-08 21:49:55",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 8,
+        "sourceCount": 85,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "decades",
+        "version": 1,
+        "submittedAt": "2026-05-08T12:41:49.134Z",
+        "coverImageUrl": "https://github.com/starman2908/Strem/blob/main/Gemini_Generated_Image_vsu4pzvsu4pzvsu4.png?raw=true"
+      },
+      "collectionMeta": {
+        "id": "collection-6b34c615",
+        "title": "📅 Decades",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 33,
+      "public_id": "decades-ita-eng-aiometadata-required",
+      "title": "Decades ITA/ENG [AIOMetadata Required]",
+      "description": "This is a simple Decades collection geared towards Italian users but its quite usable for English users and non. It doesn't require anything crazy and it's quite complete and easy to add to you're setup.",
+      "tags": [
+        "decades",
+        "movies",
+        "shows",
+        "collections"
+      ],
+      "image_url": "https://i.postimg.cc/FRs8YwmF/Gemini-Generated-Image-7tczgt7tczgt7tcz(1).png",
+      "likes_count": 9,
+      "installs_count": 155,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-08 12:53:09",
+      "approved_at": "2026-05-08 12:53:09",
+      "updated_at": "2026-05-08 12:53:09",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 7,
+        "sourceCount": 7,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "decades-ita-eng-aiometadata-required",
+        "version": 1,
+        "submittedAt": "2026-05-08T12:43:59.921Z",
+        "coverImageUrl": "https://i.postimg.cc/FRs8YwmF/Gemini-Generated-Image-7tczgt7tczgt7tcz(1).png"
+      },
+      "collectionMeta": {
+        "id": "collection-bbe9721c",
+        "title": "Decenni",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": false,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "public_id": "genres-7",
+      "title": "Genres",
+      "description": "all genres with posters matching the genre",
+      "tags": [],
+      "image_url": "https://i.postimg.cc/2jcNKBHj/genre.jpg",
+      "likes_count": 25,
+      "installs_count": 403,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-08 11:51:29",
+      "approved_at": "2026-05-08 11:51:29",
+      "updated_at": "2026-05-13 07:19:56",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 36,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-7",
+        "version": 1,
+        "submittedAt": "2026-05-08T10:57:40.392Z",
+        "coverImageUrl": "https://i.postimg.cc/2jcNKBHj/genre.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-d97251e1",
+        "title": "Genres",
+        "viewMode": "TABBED_GRID",
+        "pinToTop": true,
+        "showAllTab": true
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "Latest Aio metadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "public_id": "nuvio-perfect-collections-incl-dynamic-backdrops-2",
+      "title": "🍿 Nuvio Perfect Collections",
+      "description": "### **Read more on the [🚀 Nuvio Perfect Setup](https://luckynumb3rs.github.io/stremio-perfect-setup/guide/Nuvio/) guide.**\n*AIOMetadata needs to be installed before adding this pack. You can install the included pre-configured AIOMetadata addon directly for a quick setup, but I suggest using the template files to create your own configuration, especially if you want personalized Trakt Recommendations and better AI Search.*",
+      "tags": [
+        "genres",
+        "streaming",
+        "themes",
+        "discover",
+        "trending",
+        "popular",
+        "full",
+        "studios"
+      ],
+      "image_url": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/assets/images/screens/nuvio-community.webp",
+      "likes_count": 580,
+      "installs_count": 29763,
+      "reports_count": 14,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 18:42:38",
+      "approved_at": "2026-05-07 18:42:38",
+      "updated_at": "2026-06-07 18:07:59",
+      "stats": {
+        "collectionCount": 8,
+        "folderCount": 83,
+        "sourceCount": 174,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "nuvio-perfect-collections-incl-dynamic-backdrops-2",
+        "version": 4,
+        "submittedAt": "2026-05-07T18:40:33.013Z",
+        "coverImageUrl": "https://cdn.jsdelivr.net/gh/luckynumb3rs/stremio-perfect-setup/assets/images/screens/nuvio-community.webp"
+      },
+      "collectionMeta": {
+        "id": null,
+        "title": null,
+        "viewMode": null,
+        "pinToTop": null,
+        "showAllTab": null
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": "https://aiometadata.viren070.me/stremio/cac946db-ed6c-4017-be5f-ae776fee7973/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "public_id": "streaming",
+      "title": "Streaming Services",
+      "description": "For most North American streaming services.",
+      "tags": [
+        "streaming",
+        "netflix",
+        "prime",
+        "apple tv",
+        "peacock"
+      ],
+      "image_url": "https://wallpapersok.com/images/high/almost-famous-hollywood-movies-collection-42y41gqc28t2mijg.jpg",
+      "likes_count": 15,
+      "installs_count": 480,
+      "reports_count": 1,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 17:48:42",
+      "approved_at": "2026-05-07 17:48:42",
+      "updated_at": "2026-05-18 04:01:04",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 29,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "streaming",
+        "version": 1,
+        "submittedAt": "2026-05-07T17:47:08.595Z",
+        "coverImageUrl": "https://wallpapersok.com/images/high/almost-famous-hollywood-movies-collection-42y41gqc28t2mijg.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-a33b28eb",
+        "title": "Streaming",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "pw.ers.netflix-catalog",
+          "addonName": "Streaming Catalogs",
+          "manifestUrl": "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHosZHBlLHNoZCxiYm86dDAtZnJlZS1ycGRiOlVTOjE3NzcxODI3NjI5Njc6MDowOkNB/manifest.json"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "public_id": "genres-3",
+      "title": "🎭 Genres",
+      "description": "This contains most genres (no documentary). Each genre has subsection folders of decades. Content has Minimum rating of 5 on IMDB, a minimum score of 100 on TMDB  - sorted by popularity.  No addons needed.",
+      "tags": [
+        "genres",
+        "decades"
+      ],
+      "image_url": "https://wallpaperaccess.com/full/3658921.jpg",
+      "likes_count": 44,
+      "installs_count": 1223,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 17:48:31",
+      "approved_at": "2026-05-07 17:48:31",
+      "updated_at": "2026-05-07 17:48:31",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 16,
+        "sourceCount": 128,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "genres-3",
+        "version": 1,
+        "submittedAt": "2026-05-07T17:47:12.904Z",
+        "coverImageUrl": "https://wallpaperaccess.com/full/3658921.jpg"
+      },
+      "collectionMeta": {
+        "id": "collection-5220312f",
+        "title": "🎭 Genres",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": false,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 15,
+      "public_id": "simple-streaming-services",
+      "title": "‎Simple Streaming Services",
+      "description": "No Addons Needed. \nHero backdrops and  Hero videos included - all set up for the modern TV Interface.\nOnly Shows, No Movies.",
+      "tags": [
+        "streaming services",
+        "shows",
+        "netflix",
+        "amazon prime",
+        "paramount+",
+        "hbo max"
+      ],
+      "image_url": "https://i.postimg.cc/wTb6vztg/Netflix.jpg",
+      "likes_count": 74,
+      "installs_count": 3307,
+      "reports_count": 2,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 17:36:16",
+      "approved_at": "2026-05-07 17:36:16",
+      "updated_at": "2026-05-16 08:23:20",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 7,
+        "sourceCount": 21,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "simple-streaming-services",
+        "version": 2,
+        "submittedAt": "2026-05-07T17:29:36.668Z",
+        "coverImageUrl": "https://i.postimg.cc/wTb6vztg/Netflix.jpg"
+      },
+      "collectionMeta": {
+        "id": "01c9338a-fcab-444c-bf65-0695a796660f",
+        "title": "‎Streaming Services",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 10,
+      "public_id": "genres-2",
+      "title": "Genres",
+      "description": "",
+      "tags": [],
+      "image_url": "https://ik.imagekit.io/StremioProxy/https://www.nuvioapp.space/uploads/covers/cd52bdf4-c767-4822-b6a3-2d6f873d5e46.jpg?tr=pr-true,fo-auto,f-auto,q-80",
+      "likes_count": 6,
+      "installs_count": 171,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 16:58:02",
+      "approved_at": "2026-05-07 16:58:02",
+      "updated_at": "2026-05-07 16:58:02",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 12,
+        "sourceCount": 49,
+        "addonCount": 1
+      },
+      "community": {
+        "id": "genres-2",
+        "version": 1,
+        "submittedAt": "2026-05-07T16:57:03.197Z",
+        "coverImageUrl": "https://ik.imagekit.io/StremioProxy/https://www.nuvioapp.space/uploads/covers/cd52bdf4-c767-4822-b6a3-2d6f873d5e46.jpg?tr=pr-true,fo-auto,f-auto,q-80"
+      },
+      "collectionMeta": {
+        "id": "collection-4b7e46da",
+        "title": "Genres",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": [
+        {
+          "addonId": "aio-metadata",
+          "addonName": "AIOMetadata",
+          "manifestUrl": ""
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "public_id": "franchises",
+      "title": "22 ‎Franchises - No Addons",
+      "description": "22 popular Franchises. \nNo Addons required.",
+      "tags": [
+        "franchises",
+        "star wars",
+        "harry potter",
+        "lotr",
+        "hobbit",
+        "middle earth",
+        "marvel",
+        "dc"
+      ],
+      "image_url": "https://i.postimg.cc/sDtDfKWJ/Star-Wars-BG.jpg",
+      "likes_count": 32,
+      "installs_count": 1124,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 16:43:59",
+      "approved_at": "2026-05-07 16:43:59",
+      "updated_at": "2026-05-15 06:25:49",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 22,
+        "sourceCount": 33,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "franchises",
+        "version": 2,
+        "submittedAt": "2026-05-07T16:40:41.938Z",
+        "coverImageUrl": "https://i.postimg.cc/sDtDfKWJ/Star-Wars-BG.jpg"
+      },
+      "collectionMeta": {
+        "id": "966190a9-3785-4ef0-9f1b-883478bf618c",
+        "title": "‎Franchises",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    },
+    {
+      "id": 5,
+      "public_id": "directors-inter-font",
+      "title": "‎Directors - Inter Font",
+      "description": "No 3rd party catalogs required.\n\nUses Inter Font and transparent background for a clean look with TV interface.",
+      "tags": [
+        "directors"
+      ],
+      "image_url": "https://i.postimg.cc/2S8X7RGv/Directors.png",
+      "likes_count": 46,
+      "installs_count": 911,
+      "reports_count": 0,
+      "status": "published",
+      "moderation_status": "published",
+      "created_at": "2026-05-07 16:30:13",
+      "approved_at": "2026-05-07 16:30:13",
+      "updated_at": "2026-06-13 04:22:21",
+      "stats": {
+        "collectionCount": 1,
+        "folderCount": 33,
+        "sourceCount": 33,
+        "addonCount": 0
+      },
+      "community": {
+        "id": "directors-inter-font",
+        "version": 5,
+        "submittedAt": "2026-05-07T16:29:08.035Z",
+        "coverImageUrl": "https://i.postimg.cc/2S8X7RGv/Directors.png"
+      },
+      "collectionMeta": {
+        "id": "00cfe083-3478-4030-b053-6cbbe1eb5c64-community",
+        "title": "‎Directors",
+        "viewMode": "FOLLOW_LAYOUT",
+        "pinToTop": true,
+        "showAllTab": false
+      },
+      "requiredAddons": []
+    }
+  ]
+}

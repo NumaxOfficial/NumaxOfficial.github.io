@@ -12,9 +12,23 @@
 // from a neutral third-party origin on 2026-09-02, so the browser can reach
 // them directly. The one exception is Nuvio's community-collections API,
 // which is NOT CORS-open (re-verified the same day, from a non-nuvio.tv
-// origin: request fails before auth). That is why COLLECTIONS.blocked is
-// true and the Collections tab shows an honest blocked state instead of a
-// fake list — it needs the stateless relay from MARKETPLACE-PLAN 0.1.
+// origin: request fails before auth) — Numax's own tab can never call it.
+//
+// Collections install works anyway, without a relay, because of how Nuvio's
+// own install already behaves: it's a one-time copy into the profile's
+// collections_json, never live-synced again after (confirmed live — see
+// MARKETPLACE-PLAN 0.4). That means a snapshot captured once from inside a
+// real logged-in nuvio.tv session (same origin-trick verify-settings-sync.js
+// uses) is exactly as good as a live read for install purposes — it's not
+// "stale data standing in for live data", it's the same one-time copy Nuvio
+// itself would have made, just captured up front instead of at click-time.
+// Two files per collection ship from that capture: the light entry in
+// community-collections-snapshot.json (repo root) for browsing, and the
+// full folders/sources/required-addons payload in
+// community-collections/<public_id>.json for the actual install write,
+// which goes through the normal engine.planTarget + api.applyPlan path
+// like everything else. Both need re-capturing by hand to pick up new or
+// edited community collections — there's no live refresh.
 // ============================================================
 (function () {
   'use strict';
@@ -29,10 +43,18 @@
   const UPTIME_API = 'https://uptime.ibbylabs.dev/v1/status';
 
   const COLLECTIONS = {
-    blocked: true,
-    why: 'Nuvio’s community-collections API sends no CORS headers, so the browser cannot read it directly. It needs the relay described in the marketplace plan.',
-    site: 'https://nuvio.tv/collections',
+    // No longer "blocked" — install works from a manually-refreshed capture,
+    // not a relay. Kept as an honest caveat string, not a hard gate.
+    why: 'Browsing and installing use a manually-refreshed snapshot, not a live read of Nuvio’s community-collections API (it sends no CORS headers, so Numax’s own tab can never reach it directly). New or edited community collections won’t show up until the snapshot is refreshed.',
+    site: 'https://nuvio.tv/community-collections',
+    detailUrl: id => 'https://nuvio.tv/community-collections/' + encodeURIComponent(id),
   };
+  // Lightweight browse-only capture — title/description/image/tags/stats and
+  // required-addon list, with the heavy folders/sources payload stripped out.
+  // Refreshed by hand (see repo root's community-collections-snapshot.json),
+  // not live — a capturedAt timestamp ships with it so the UI can say how old
+  // it is instead of pretending it's current.
+  const COLLECTIONS_SNAPSHOT_URL = 'community-collections-snapshot.json';
 
   // ======================================================================
   // fetch helpers
@@ -183,6 +205,51 @@
   }
 
   // ======================================================================
+  // community collections snapshot (manually refreshed, not live)
+  // ======================================================================
+  let _collectionsSnapshot = null;
+  async function loadCollectionsSnapshot(force) {
+    if (_collectionsSnapshot && !force) return _collectionsSnapshot;
+    const doc = await fetchJson(COLLECTIONS_SNAPSHOT_URL);
+    if (!doc || !Array.isArray(doc.items)) throw new Error('snapshot file is missing or malformed');
+    _collectionsSnapshot = doc;
+    return doc;
+  }
+
+  // Full per-collection install payload (folders/sources + required addons),
+  // captured the same session as the snapshot but shipped as one small file
+  // per collection instead of bundled into it — installing a 20-folder
+  // collection shouldn't force downloading someone else's 600-folder one.
+  // Same "no live sync after install" contract as Nuvio's own site (0.4):
+  // this is a copy of what the creator had at capture time, not a live read.
+  const COLLECTIONS_DIR = 'community-collections/';
+  function collectionFileName(publicId) { return COLLECTIONS_DIR + String(publicId).replace(/[^a-zA-Z0-9_-]/g, '_') + '.json'; }
+  // Two envelope shapes seen live: a plain collection (`envelope.collection`,
+  // one object) and a "collection_pack" (`envelope.collections`, an array —
+  // e.g. Nuvio Perfect Collections ships 8 at once). Normalize both to an
+  // array so callers never need to care which one they got. Packs can also
+  // carry `resources` — extra downloadable config files (e.g. an AIOMetadata
+  // JSON) that aren't part of a Nuvio profile write at all; surfaced as a
+  // count/name list so nothing is silently dropped, not auto-installed.
+  const _collectionInstallCache = new Map();
+  async function loadCollectionInstall(publicId, force) {
+    if (!force && _collectionInstallCache.has(publicId)) return _collectionInstallCache.get(publicId);
+    const doc = await fetchJson(collectionFileName(publicId));
+    const envelope = doc && doc.envelope;
+    let collections = null;
+    if (envelope && Array.isArray(envelope.collections)) collections = envelope.collections;
+    else if (envelope && envelope.collection) collections = [envelope.collection];
+    if (!envelope || !collections || !collections.length) throw new Error('install file is missing or malformed');
+    const value = {
+      collections,
+      requiredAddons: (envelope.requirements && envelope.requirements.addons) || [],
+      resources: Array.isArray(envelope.resources) ? envelope.resources : [],
+    };
+    _collectionInstallCache.set(publicId, value);
+    return value;
+  }
+
+  // ======================================================================
   // AIOStreams / AIOMetadata instances
   // ======================================================================
   let _uptimeCache = null;
@@ -323,6 +390,6 @@
     STAPLES, ADDON_GROUPS, COLLECTIONS,
     PLUGIN_INDEX_SITE, UPTIME_SITE: 'https://uptime.ibbylabs.dev/',
     loadPluginIndex, loadManifest, loadInstances, isConfigurable,
-    configureUrl, normalizeManifestUrl,
+    configureUrl, normalizeManifestUrl, loadCollectionsSnapshot, loadCollectionInstall,
   };
 })();
