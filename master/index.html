@@ -726,6 +726,108 @@
     border-radius:12px; padding:12px 14px; margin:12px 0;
   }
 
+  /* ===== setup wizard =====================================================
+     The rail is the only navigation: panes are shown one at a time, and a step
+     stays locked until the one before it has produced what it needs (a profile,
+     mainly). Locking is a class on the button, never a removed element, so the
+     whole path is always visible even when you can't jump to it yet. */
+  .panel[data-panel="wizard"]{ max-width:1800px; }
+  .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
+  .wz-step{ display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); background:transparent;
+    color:var(--t55); border-radius:999px; padding:7px 15px 7px 7px; font-size:12.5px; font-weight:600;
+    cursor:pointer; font-family:inherit; transition:color var(--mo-micro,.16s) var(--mo-ease,ease), border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
+  .wz-step .n{ width:21px; height:21px; border-radius:50%; display:grid; place-items:center; flex:none;
+    background:var(--surface-2); color:var(--t45); font-family:ui-monospace,monospace; font-size:11px; }
+  .wz-step:hover:not(:disabled){ color:var(--t); border-color:rgba(255,255,255,.24); }
+  .wz-step.on{ background:var(--surface-3); color:var(--t); border-color:rgba(255,255,255,.2); }
+  .wz-step.on .n{ background:var(--accent); color:#fff; }
+  .wz-step.did .n{ background:rgba(67,160,71,.22); color:#7bd88f; }
+  .wz-step:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* the "you are writing to X" strip that follows you from step 2 onward */
+  .wz-target{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
+    border-left:3px solid var(--accent); border-radius:12px; padding:10px 14px; margin-bottom:16px; font-size:12.5px; }
+  .wz-target b{ font-weight:600; }
+  .wz-target .muted{ font-size:12px; }
+
+  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:4px; }
+  .wz-foot .spacer{ flex:1; }
+
+  /* choice cards — used by routes, debrid and metadata alike */
+  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
+  .wz-pick{ text-align:left; font-family:inherit; color:inherit; cursor:pointer; position:relative;
+    background:var(--surface); border:2px solid var(--line); border-radius:16px; padding:16px 17px;
+    transition:border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
+  .wz-pick:hover{ border-color:rgba(255,255,255,.26); }
+  .wz-pick.on{ border-color:var(--accent); background:rgba(229,57,53,.07); }
+  .wz-pick-h{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .wz-pick-n{ font-size:15px; font-weight:700; letter-spacing:-.01em; }
+  .wz-pick-one{ font-size:12.5px; color:var(--t70); margin-top:7px; line-height:1.5; }
+  .wz-pick-price{ font-size:11.5px; color:var(--t45); margin-top:6px; font-family:ui-monospace,monospace; }
+  .wz-tag{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+    border-radius:999px; padding:2px 9px; background:rgba(67,160,71,.18); color:#7bd88f; }
+  .wz-tag.plain{ background:var(--surface-2); color:var(--t45); }
+  .wz-tag.warn{ background:rgba(240,160,32,.16); color:#f0c060; }
+  /* pros / cons: a plain two-column list, no icons doing the talking */
+  .wz-pc{ display:grid; grid-template-columns:1fr; gap:5px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-2); }
+  .wz-pc div{ font-size:12px; line-height:1.5; display:flex; gap:8px; }
+  .wz-pc .s{ flex:none; width:11px; font-family:ui-monospace,monospace; font-weight:700; }
+  .wz-pc .pro .s{ color:#7bd88f; } .wz-pc .con .s{ color:#f0a060; }
+  .wz-pc .con{ color:var(--t55); }
+
+  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+  .wz-nodebrid{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); }
+
+  /* instance rows — name, uptime, open */
+  .wz-inst{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
+    border-radius:11px; padding:10px 13px; margin-bottom:8px; }
+  .wz-inst .nm{ font-size:13.5px; font-weight:600; }
+  .wz-inst .up{ font-family:ui-monospace,monospace; font-size:11.5px; color:#7bd88f; }
+  .wz-inst .up.low{ color:#f0c060; }
+  .wz-inst .spacer{ flex:1; }
+
+  /* numbered guide */
+  .wz-guide-step{ display:flex; gap:13px; padding:12px 0; border-top:1px solid var(--line-2); }
+  .wz-guide-step:first-child{ border-top:none; padding-top:0; }
+  .wz-guide-step .gn{ flex:none; width:23px; height:23px; border-radius:50%; background:var(--surface-2);
+    color:var(--t55); display:grid; place-items:center; font-family:ui-monospace,monospace; font-size:11px; }
+  .wz-guide-step .gt{ font-size:13.5px; font-weight:600; }
+  .wz-guide-step .gb{ font-size:12.5px; color:var(--t55); margin-top:4px; line-height:1.55; }
+
+  /* the one thing about the Nuvio-resolves route people get wrong */
+  .wz-catch{ font-size:13px; line-height:1.6; color:#ffd9a0; background:rgba(240,160,32,.08);
+    border:1px solid rgba(240,160,32,.3); border-left:3px solid #f0a060; border-radius:12px; padding:13px 15px; }
+
+  /* api key rows */
+  .wz-key{ border-top:1px solid var(--line-2); padding:16px 0; }
+  .wz-key:first-child{ border-top:none; padding-top:0; }
+  .wz-key-h{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .wz-key-n{ font-size:14.5px; font-weight:700; }
+  .wz-key-b{ font-size:12.5px; color:var(--t70); margin-top:6px; line-height:1.5; }
+  .wz-key-w{ font-size:12px; color:var(--t45); margin-top:5px; line-height:1.5; }
+  .wz-key-in{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:11px; }
+  .wz-key-in input{ flex:1; min-width:220px; }
+  .wz-steps{ margin:10px 0 0; padding-left:19px; font-size:12px; color:var(--t55); line-height:1.6; }
+  .wz-steps li + li{ margin-top:3px; }
+
+  /* new-profile inline form */
+  .wz-newprof{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
+    background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .wz-newprof input[type=text]{ flex:1; min-width:180px; }
+  .pchip.wz-add{ border-style:dashed; color:var(--t55); }
+  .pchip.wz-add .plus{ width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
+    background:var(--surface-2); font-size:19px; color:var(--t55); }
+
+  .wz-next{ margin:0; padding-left:19px; font-size:13px; color:var(--t55); line-height:1.7; }
+  .wz-done{ display:flex; align-items:center; gap:9px; font-size:12.5px; padding:9px 0; border-top:1px solid var(--line-2); }
+  .wz-done:first-child{ border-top:none; }
+  .wz-done .ic{ flex:none; width:17px; height:17px; }
+
+  @media (max-width:700px){
+    .wz-step .t{ display:none; }
+    .wz-step{ padding:7px; }
+  }
+
   /* ===== marketplace ===== */
   .mk-tabs{ display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
   .mk-tab{ border:1px solid var(--line); background:transparent; color:var(--t55); border-radius:999px; padding:7px 15px; font-size:12.5px; font-weight:600; cursor:pointer; }
@@ -1193,6 +1295,7 @@
   <aside class="sidebar">
     <div class="sb-brand"><span class="wm">NUMAX</span><span class="for">for Nuvio</span></div>
     <div class="sb-sec">Workspace</div>
+    <button class="navbtn" data-nav="wizard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 3 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/><path d="M17 4.5 17.8 7l2.5.8-2.5.8-.8 2.5-.8-2.5L13.7 8l2.5-.7Z"/><path d="m11.5 11.5 8 8-2 2-8-8Z"/><path d="m9.5 13.5-6 6 2 2 6-6"/></svg>Setup wizard</button>
     <button class="navbtn on" data-nav="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 6.5a3 3 0 0 1 0 5.8M21 20a5 5 0 0 0-4-4.9"/></svg>Nuvio accounts<span class="cnt" id="nav-ac-cnt"></span></button>
     <button class="navbtn" data-nav="profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg>Profile</button>
     <button class="navbtn" data-nav="sync"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg>Sync desk</button>
@@ -1207,6 +1310,174 @@
 
   <main class="main">
     <div class="topbar"><span class="crumb">Numax&nbsp;/&nbsp;<b id="crumb">Nuvio accounts</b></span></div>
+
+    <!-- setup wizard -->
+    <section class="panel" data-panel="wizard" style="display:none">
+      <div class="phead"><span class="eyebrow">Setup wizard</span><h1>A working Nuvio, start to finish.</h1>
+        <p>Five steps: an account and a profile, the API keys worth having, where your streams come from, and what your home screen looks like. Everything is written into the profile you pick — nothing is kept by Numax.</p></div>
+
+      <div class="wz-rail" id="wz-rail">
+        <button class="wz-step on" data-wzstep="account"><span class="n">1</span><span class="t">Account &amp; profile</span></button>
+        <button class="wz-step" data-wzstep="keys"><span class="n">2</span><span class="t">API keys</span></button>
+        <button class="wz-step" data-wzstep="streams"><span class="n">3</span><span class="t">Streams</span></button>
+        <button class="wz-step" data-wzstep="meta"><span class="n">4</span><span class="t">Metadata</span></button>
+        <button class="wz-step" data-wzstep="done"><span class="n">5</span><span class="t">Done</span></button>
+      </div>
+
+      <div class="wz-target" id="wz-target" style="display:none"></div>
+
+      <!-- 1 — account & profile -->
+      <div class="wz-pane on" data-wzpane="account">
+        <div class="card" id="wz-signin-card" style="display:none">
+          <div class="chead"><h3>Sign in with Google first</h3></div>
+          <p class="muted sm">Numax keeps your linked Nuvio accounts in your own Google Drive, so the wizard needs that connection before it can do anything.</p>
+        </div>
+
+        <div class="panel-cols" id="wz-account-cols">
+          <div class="card">
+            <div class="chead"><h3>Use an account you've linked</h3></div>
+            <p class="muted sm" style="margin-bottom:14px">Pick the Nuvio account this profile belongs to.</p>
+            <div class="field-col">
+              <div class="nsel-slot"><select class="sel" id="wz-account"></select></div>
+            </div>
+            <p class="muted sm" style="margin-top:12px">Not there? Link it on the <b>Nuvio accounts</b> tab, then come back.</p>
+          </div>
+
+          <div class="card">
+            <div class="chead"><h3>Or create a brand-new one</h3></div>
+            <p class="muted sm" style="margin-bottom:14px">Makes a real Nuvio account and links it to Numax in one go. You'll be signed straight in — there's no confirmation email to wait for.</p>
+            <div class="field-col">
+              <input type="email" id="wz-new-email" placeholder="Email address" autocomplete="off">
+              <input type="password" id="wz-new-pass" placeholder="Password (6 characters or more)" autocomplete="new-password">
+              <input type="password" id="wz-new-pass2" placeholder="Repeat the password" autocomplete="new-password">
+              <input type="text" id="wz-new-label" placeholder="Name it in Numax (optional)" maxlength="40">
+              <button class="btn btn-primary" id="wz-new-btn">Create account</button>
+              <div class="inline-status" id="wz-new-status"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="wz-profile-card">
+          <div class="chead"><h3>Profile</h3><span class="spacer"></span><span class="pill-count" id="wz-profile-count"></span></div>
+          <p class="muted sm" style="margin-bottom:14px">Everything the wizard writes goes to this one profile. Nuvio allows six per account.</p>
+          <div class="chip-grid" id="wz-profiles"></div>
+          <div class="wz-newprof" id="wz-newprof" style="display:none">
+            <input type="text" id="wz-prof-name" placeholder="Profile name" maxlength="60">
+            <input type="color" id="wz-prof-color" value="#1E88E5" aria-label="Profile colour">
+            <button class="btn btn-solid btn-xs" id="wz-prof-create">Create</button>
+            <button class="btn btn-ghost btn-xs" id="wz-prof-cancel">Cancel</button>
+          </div>
+          <div class="inline-status" id="wz-profile-status" style="margin-top:12px"></div>
+        </div>
+      </div>
+
+      <!-- 2 — api keys -->
+      <div class="wz-pane" data-wzpane="keys" style="display:none">
+        <div class="card">
+          <div class="chead"><h3>Keys worth having</h3><span class="spacer"></span><span class="muted sm">Fill in what you want — blanks are skipped.</span></div>
+          <p class="muted sm" style="margin-bottom:16px">Each one is free. Numax writes them into the profile the same way Nuvio's own app does, and switches on the feature that uses them.</p>
+          <div id="wz-keys"></div>
+          <div class="mk-install" style="margin-top:16px">
+            <button class="btn btn-primary" id="wz-keys-save">Save keys to this profile</button>
+            <div class="inline-status" id="wz-keys-status" style="margin-top:10px"></div>
+            <div class="mk-res" id="wz-keys-res"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 — streams -->
+      <div class="wz-pane" data-wzpane="streams" style="display:none">
+        <div class="card">
+          <div class="chead"><h3>Where your streams come from</h3></div>
+          <p class="muted sm" style="margin-bottom:16px">Both routes need a source add-on. The real difference is where your debrid key lives and who turns a torrent into something playable.</p>
+          <div class="wz-routes" id="wz-routes"></div>
+        </div>
+
+        <div id="wz-route-aiostreams" style="display:none">
+          <div class="card">
+            <div class="chead"><h3>1 · Pick a debrid service</h3><span class="spacer"></span><span class="muted sm">Sorted by what I'd pick first.</span></div>
+            <div class="wz-debrid" id="wz-debrid"></div>
+            <div class="wz-nodebrid">
+              <button class="btn btn-ghost btn-xs" id="wz-nodebrid-btn">I don't want a debrid service</button>
+              <span class="muted sm" id="wz-debrid-picked"></span>
+            </div>
+          </div>
+          <div class="card">
+            <div class="chead"><h3>2 · Pick an instance</h3><span class="spacer"></span><span class="pill-count" id="wz-inst-count"></span>
+              <button class="btn btn-ghost btn-xs" id="wz-inst-refresh">Refresh</button></div>
+            <p class="muted sm" style="margin-bottom:12px">Anyone can host AIOStreams. These are the public ones, newest uptime figures first — pick one and it opens in a new tab.</p>
+            <div class="inline-status" id="wz-inst-status" style="margin-bottom:10px"></div>
+            <div id="wz-instances"></div>
+          </div>
+          <div class="card">
+            <div class="chead"><h3>3 · Set it up over there</h3></div>
+            <div id="wz-guide"></div>
+          </div>
+          <div class="card">
+            <div class="chead"><h3>4 · Bring the link back</h3></div>
+            <div id="wz-aio-install"></div>
+          </div>
+        </div>
+
+        <div id="wz-route-native" style="display:none">
+          <div class="card">
+            <div class="chead"><h3>Read this first</h3></div>
+            <div class="wz-catch" id="wz-native-catch"></div>
+          </div>
+          <div class="card">
+            <div class="chead"><h3>1 · Connect your account</h3></div>
+            <p class="muted sm" style="margin-bottom:14px">Nuvio supports two services here. Paste the API key and Numax connects it and switches link resolving on.</p>
+            <div class="wz-debrid" id="wz-native-debrid"></div>
+            <div class="field-col" style="margin-top:16px">
+              <input type="password" id="wz-native-key" placeholder="API key" autocomplete="off">
+              <button class="btn btn-primary" id="wz-native-save">Connect and turn on resolving</button>
+              <div class="inline-status" id="wz-native-status"></div>
+              <div class="mk-res" id="wz-native-res"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="chead"><h3>2 · Add a torrent add-on</h3></div>
+            <p class="muted sm" style="margin-bottom:14px">Pick one, configure it with <b>no debrid key of its own</b>, then paste the link it gives you into the box below.</p>
+            <div id="wz-p2p"></div>
+            <div id="wz-p2p-install" style="margin-top:16px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 — metadata -->
+      <div class="wz-pane" data-wzpane="meta" style="display:none">
+        <div class="card">
+          <div class="chead"><h3>Posters, descriptions and your home screen</h3></div>
+          <p class="muted sm" style="margin-bottom:8px">Each of these is set up on its own site. Configure it there, bring the link back, and Numax writes it in.</p>
+          <p class="muted sm" id="wz-order-tip" style="margin-bottom:16px"></p>
+          <div id="wz-meta"></div>
+        </div>
+      </div>
+
+      <!-- 5 — done -->
+      <div class="wz-pane" data-wzpane="done" style="display:none">
+        <div class="card">
+          <div class="chead"><h3>What the wizard did</h3></div>
+          <div id="wz-summary"></div>
+        </div>
+        <div class="card">
+          <div class="chead"><h3>Worth doing next</h3></div>
+          <ul class="wz-next">
+            <li>Open <b>Nuvio</b> on your device and sign in with this account — it pulls everything down on first sync.</li>
+            <li>Take a backup on the <b>Google Drive</b> tab, so this setup is recoverable.</li>
+            <li>Use <b>Sync desk</b> to copy this profile onto your other profiles instead of doing all this again.</li>
+            <li>Browse <b>Marketplace</b> for extra add-ons, plugins and community collections.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="wz-foot">
+        <button class="btn btn-ghost" id="wz-back">Back</button>
+        <span class="spacer"></span>
+        <span class="muted sm" id="wz-foot-note"></span>
+        <button class="btn btn-primary" id="wz-next">Next</button>
+      </div>
+    </section>
 
     <!-- accounts -->
     <section class="panel mo-fit" data-panel="accounts">
@@ -1619,6 +1890,7 @@
 <script src="./nuvio-settings-schema.js"></script>
 <script src="./ui-motion.js"></script>
 <script src="./market.js"></script>
+<script src="./wizard.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
