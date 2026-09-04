@@ -27,7 +27,7 @@ INDEX = os.path.join(ROOT, 'index.html')
 REQUESTS = os.path.join(HERE, 'requests.md')
 BACKUPS = os.path.join(HERE, 'backups')
 
-PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8731
+PORT = next((int(a) for a in sys.argv[1:] if a.isdigit()), 8731)
 
 def read_text(path):
     """newline='' on BOTH read and write, always. Python's default text mode
@@ -467,15 +467,22 @@ class Server(socketserver.ThreadingTCPServer):
 
 def port_taken(port):
     """A plain `python -m http.server` binds 0.0.0.0 and would shadow us on
-    localhost while we happily bind 127.0.0.1 - so check before serving,
-    or Studio looks broken when it is simply not the one being reached."""
+    localhost while we happily bind 127.0.0.1 - so check before serving, or
+    Studio looks broken when it is simply not the one being reached.
+
+    This connects rather than test-binds: on Windows a second bind to a busy
+    port SUCCEEDS unless the first socket set SO_EXCLUSIVEADDRUSE, so a bind
+    probe cheerfully reports a squatted port as free. If something answers a
+    connection, the port is taken - that holds on every platform."""
     import socket
-    for family, addr in ((socket.AF_INET, '0.0.0.0'), (socket.AF_INET6, '::')):
-        s = socket.socket(family, socket.SOCK_STREAM)
+    for host in ('127.0.0.1', 'localhost'):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.4)
         try:
-            s.bind((addr, port))
+            if s.connect_ex((host, port)) == 0:
+                return True
         except OSError:
-            return True
+            pass
         finally:
             s.close()
     return False
@@ -492,8 +499,18 @@ if __name__ == '__main__':
     print('Numax Studio')
     print('  serving %s' % ROOT)
     print('  open    http://localhost:%d/' % PORT)
-    print('  stop    Ctrl+C')
+    print('  stop    Ctrl+C, or just close this window')
+    # Bind first, then open the browser: the socket is already listening by
+    # the time Server() returns, so the first request cannot race the start-up
+    # and greet you with a connection error.
+    httpd = Server(('127.0.0.1', PORT), Handler)
+    if '--no-browser' not in sys.argv:
+        try:
+            import webbrowser
+            webbrowser.open('http://localhost:%d/' % PORT)
+        except Exception:
+            pass
     try:
-        Server(('127.0.0.1', PORT), Handler).serve_forever()
+        httpd.serve_forever()
     except KeyboardInterrupt:
         print('\nstopped.')
