@@ -40,9 +40,9 @@
   const KEYS = [
     {
       id: 'tmdb', name: 'TMDB', provider: 'tmdb', field: 'api_key',
-      tag: 'Recommended',
+      tag: 'Required', required: true,
       blurb: 'Better artwork, cast, episode titles and descriptions on every title.',
-      why: 'Nuvio’s own metadata is thin without it. This is the single biggest visible upgrade of the four.',
+      why: 'Nuvio’s own metadata is thin without it, and almost everything else you add reads better with it in place. The wizard asks for this one before it will move on.',
       getUrl: 'https://www.themoviedb.org/settings/api',
       getLabel: 'themoviedb.org',
       steps: [
@@ -281,10 +281,16 @@
   // done rather than offering to install it again.
   const METADATA = [
     {
-      id: 'cinemeta', name: 'Cinemeta', tag: 'Already installed', builtin: true,
-      blurb: 'Nuvio’s default metadata source. Every new profile comes with it.',
-      body: 'Nothing to do here. If you install AIOMetadata below, it’s worth turning Cinemeta off afterwards so the two don’t disagree with each other — you can do that on the Profile tab.',
+      // `check` means: look at what the profile actually has rather than assume.
+      // Nuvio ships Cinemeta on a new profile, but a profile that has been
+      // tidied up (or had AIOMetadata put in its place) may not have it, and
+      // claiming "already installed" at that point is simply wrong.
+      id: 'cinemeta', name: 'Cinemeta', check: 'https://v3-cinemeta.strem.io/manifest.json',
+      matches: [/(^|\/\/)(v3-)?cinemeta\./i],
+      blurb: 'Nuvio’s default metadata source — titles, posters and descriptions.',
+      body: 'Nuvio installs this on a new profile, so usually there is nothing to do. If you add AIOMetadata below, it is worth turning Cinemeta off afterwards so the two don’t disagree — you can do that on the Profile tab.',
       url: 'https://v3-cinemeta.strem.io/',
+      installName: 'Cinemeta',
     },
     {
       id: 'bingecat', name: 'BingeCat', tag: 'Recommended', builtin: false,

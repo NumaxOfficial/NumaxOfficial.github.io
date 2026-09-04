@@ -2391,7 +2391,7 @@
   // which the append-at-the-end arithmetic below cannot express. Nothing in the
   // Marketplace passes it, so its behaviour is unchanged.
   async function mkWrite(o) {
-    const { kind, master, targets, mode, st, res, btn, label, aid, keepOrder, onDone } = o;
+    const { kind, master, targets, mode, st, res, btn, label, aid, keepOrder, onDone, auto } = o;
     btn.disabled = true; clr(res); status(st, 'Reading target profiles…');
     const plans = [];
     try {
@@ -2413,7 +2413,7 @@
         });
         plans.push({ t, plan });
       }
-    } catch (e) { status(st, 'Failed: ' + e.message, 'err'); btn.disabled = false; return; }
+    } catch (e) { status(st, 'Failed: ' + e.message, 'err'); btn.disabled = false; return { written: false, ok: false }; }
 
     const anyChange = plans.some(p => p.plan.hasChanges);
     const anyRemoval = plans.some(p => p.plan.hasRemovals);
@@ -2430,7 +2430,7 @@
 
     // "Nothing to do" is an outcome, not a dead end: the button stays live so
     // switching Merge -> Overwrite (or picking another profile) re-plans.
-    if (!anyChange) { status(st, 'Already there — nothing to do.', 'ok'); btn.disabled = true; return; }
+    if (!anyChange) { status(st, 'Already there — nothing to do.', 'ok'); btn.disabled = true; return { written: false, ok: true }; }
 
     let confirmed = !anyRemoval;
     if (anyRemoval) {
@@ -2442,7 +2442,7 @@
     }
     btn.disabled = !confirmed;
     btn.textContent = 'Confirm';
-    btn.onclick = async () => {
+    const doWrite = async () => {
       btn.disabled = true; status(st, 'Writing…');
       let ok = 0; const fails = [];
       for (const { t, plan } of plans) {
@@ -2474,7 +2474,16 @@
       }
       if (typeof onDone === 'function') onDone(!fails.length);
       if (pfA && pfI != null) openProfile(pfA, pfI, true);
+      return { written: true, ok: !fails.length };
     };
+    btn.onclick = doWrite;
+    // `auto` (Setup Wizard only) skips the second click when there is nothing
+    // to confirm. It NEVER skips the removal gate: if this plan would delete
+    // anything the profile has, anyRemoval is true, the tick is still required
+    // and the caller still has to click. The wizard only ever merges a single
+    // add-on into a profile, so in practice that gate is simply never reached.
+    if (auto && !anyRemoval) return doWrite();
+    return { written: false, ok: true };
   }
 
   // Re-reads each written profile and confirms every item is actually present.
@@ -2946,11 +2955,45 @@
 
   const wzTarget = () => (wz.aid && wz.idx != null) ? { aid: wz.aid, idx: wz.idx, name: wzProfileName() } : null;
   function wzProfileName() {
+    const p = (wzProfiles || []).find(x => x.index === wz.idx);
+    if (p) return p.name;
     const rec = cache[wz.aid];
-    const p = rec && rec.profiles.find(x => x.index === wz.idx);
-    return p ? p.name : 'Profile ' + wz.idx;
+    const c = rec && rec.profiles.find(x => x.index === wz.idx);
+    return c ? c.name : 'Profile ' + wz.idx;
   }
   function wzLog(what) { wz.done.push(what); }
+
+  // ---- reading the profile list -----------------------------------------
+  // Deliberately NOT loadAccount(): that runs sync_export_account_backup, a
+  // whole-account export the picker does not need, and which is the most
+  // likely call to fail on an account that has never synced from a device.
+  // sync_pull_profiles is small and is the same read the create path uses.
+  //
+  // TWO independent reads, and they must agree. get_sync_overview returns its
+  // own profile map from a different query, so a short or partial read from
+  // either one is caught instead of being trusted. This matters because the
+  // create path below does a WHOLE-ACCOUNT FULL REPLACE: a list that is missing
+  // profiles is not a display glitch there, it is data loss.
+  let wzProfiles = null, wzProfGen = 0;
+  async function wzReadProfiles(aid) {
+    const c = A.client(store, aid);
+    const [live, overview] = await Promise.all([
+      withTimeout(c.pullProfiles(), READ_TIMEOUT, 'Reading profiles'),
+      c.rpc('get_sync_overview', {}).catch(() => null),   // cross-check only; never fatal on its own
+    ]);
+    const rows = rawList(live);
+    const idx = rows.map(r => r.profile_index).filter(n => n != null).sort((a, b) => a - b);
+    let crossChecked = false;
+    if (overview && overview.profiles && typeof overview.profiles === 'object') {
+      const other = Object.keys(overview.profiles).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+      if (other.join() !== idx.join()) {
+        throw new Error('Nuvio returned two different profile lists (' + (idx.join(', ') || 'none') +
+          ' vs ' + (other.join(', ') || 'none') + ') — reload before changing anything');
+      }
+      crossChecked = true;
+    }
+    return { rows, idx, crossChecked };
+  }
 
   function refreshWizard() {
     if (!WZ) return;
@@ -2976,25 +3019,39 @@
 
   async function wzRenderProfiles(aid) {
     const box = $('wz-profiles'); if (!box) return;
+    const gen = ++wzProfGen;                       // a slower earlier read must never paint over a newer one
     clr(box); box.appendChild(el('span', 'muted sm shimmer', 'Reading profiles…'));
     $('wz-newprof').style.display = 'none';
-    let profiles;
-    try { profiles = (await loadAccount(aid)).profiles; }
-    catch (e) { clr(box); box.appendChild(el('span', 'muted sm err-text', "Couldn't read that account: " + e.message)); return; }
+    $('wz-profile-count').textContent = '';
+    let read;
+    try { read = await wzReadProfiles(aid); }
+    catch (e) {
+      if (gen !== wzProfGen) return;
+      clr(box);
+      box.appendChild(el('span', 'muted sm err-text', "Couldn't read this account's profiles: " + e.message));
+      const retry = el('button', 'btn btn-ghost btn-xs', 'Try again'); retry.style.marginLeft = '10px';
+      retry.onclick = () => wzRenderProfiles(aid);
+      box.appendChild(retry);
+      logAct('Wizard: profile read failed — ' + e.message, 'err');
+      wzShow(wz.step);
+      return;
+    }
+    if (gen !== wzProfGen) return;
+    wzProfiles = normProfiles(read.rows);
     clr(box);
-    $('wz-profile-count').textContent = profiles.length + ' of 6';
-    // Changing account invalidates a target chosen under the previous one.
+    $('wz-profile-count').textContent = wzProfiles.length + ' of 6';
     if (wz.aid !== aid) { wz.aid = aid; wz.idx = null; wz.done = []; }
-    if (wz.idx != null && !profiles.some(p => p.index === wz.idx)) wz.idx = null;
-    profiles.forEach(p => {
+    if (wz.idx != null && !wzProfiles.some(p => p.index === wz.idx)) wz.idx = null;
+    wzProfiles.forEach(p => {
       const c = el('button', 'pchip' + (p.index === wz.idx ? ' on' : '')); c.type = 'button';
       c.appendChild(avatar(p, 42)); c.appendChild(el('span', 'pcn', p.name));
-      c.onclick = () => { wz.aid = aid; wz.idx = p.index; wz.done = []; wzRenderProfiles(aid); wzShow(wz.step); };
+      c.onclick = () => { wz.aid = aid; wz.idx = p.index; wz.done = []; wzRenderProfiles(aid); };
       box.appendChild(c);
     });
-    if (profiles.length < 6) {
+    if (wzProfiles.length < 6) {
       const add = el('button', 'pchip wz-add'); add.type = 'button';
-      add.appendChild(el('span', 'plus', '+')); add.appendChild(el('span', 'pcn', 'New profile'));
+      add.appendChild(el('span', 'plus', '+'));
+      add.appendChild(el('span', 'pcn', wzProfiles.length ? 'New profile' : 'Create the first profile'));
       add.onclick = () => {
         $('wz-newprof').style.display = 'flex';
         $('wz-prof-name').value = ''; $('wz-prof-name').focus();
@@ -3004,44 +3061,59 @@
     } else {
       box.appendChild(el('span', 'muted sm', 'All six profile slots are used.'));
     }
+    // A brand-new Nuvio account normally arrives with one profile already made.
+    // Say so when it does not, instead of showing an empty row with no
+    // explanation, which reads as a failure.
+    if (!wzProfiles.length) box.appendChild(el('p', 'empty', 'This account has no profiles yet — make the first one above.'));
     wzShow(wz.step);
   }
 
-  // Create a profile. sync_push_profiles replaces the WHOLE account's profile
-  // list, so this pulls first, appends to what is actually live, and refuses to
-  // push unless every existing profile_index is still present in what it built.
+  // Create a profile.
+  //
+  // sync_push_profiles is a WHOLE-ACCOUNT FULL REPLACE: whatever list is sent
+  // becomes the account's entire set of profiles, and anything absent from it
+  // is deleted along with its add-ons, settings and watch history. So the only
+  // question that matters here is whether the list this was built from is
+  // complete.
+  //
+  // An earlier version checked the new list against the same read it was built
+  // from, which is circular — it can prove the append was done correctly, and
+  // nothing at all about whether the read was short. wzReadProfiles now settles
+  // that with a second, independent read (get_sync_overview) and refuses when
+  // they disagree; on top of that this refuses to push at all unless the
+  // cross-check actually ran, and re-reads immediately afterwards to confirm
+  // every profile that existed before still exists.
   async function wzCreateProfile() {
     const aid = $('wz-account').value, st = $('wz-profile-status');
     const name = $('wz-prof-name').value.trim();
     if (!aid) { status(st, 'Pick an account first.', 'err'); return; }
     if (!name) { status(st, 'Give the profile a name.', 'err'); return; }
     const btn = $('wz-prof-create'); btn.disabled = true;
-    status(st, 'Creating the profile…');
+    status(st, 'Checking the account before writing…');
     try {
       const c = A.client(store, aid);
-      const live = rawList(await c.pullProfiles());
-      if (!live.length) throw new Error("couldn't read the existing profiles");
-      if (live.length >= 6) throw new Error('this account already has all six profiles');
-      const used = live.map(p => p.profile_index);
-      let next = 1; while (used.includes(next)) next++;
+      const read = await wzReadProfiles(aid);
+      if (!read.crossChecked) {
+        throw new Error('could not double-check the profile list against Nuvio, and adding a profile rewrites the whole list — not risking it. Reload and try again');
+      }
+      if (read.idx.length >= 6) throw new Error('this account already has all six profiles');
+      let next = 1; while (read.idx.includes(next)) next++;
       if (next > 6) throw new Error('no free profile slot');
       const row = { profile_index: next, name: name.slice(0, 60), avatar_color_hex: $('wz-prof-color').value || '#1E88E5',
         uses_primary_addons: false, uses_primary_plugins: false, avatar_id: null, avatar_url: null };
-      const nextList = live.map(normRow).concat([row]);
-      // Belt and braces on a full-replace write: prove nothing was dropped.
-      const before = used.slice().sort((a, b) => a - b).join(),
-            after = nextList.map(p => p.profile_index).sort((a, b) => a - b).join();
-      if (after !== before + ',' + next && !after.startsWith(before)) throw new Error('profile list changed while creating — reload and try again');
-      if (used.some(i => !nextList.some(p => p.profile_index === i))) throw new Error('safety check failed — an existing profile would have been lost');
+      const nextList = read.rows.map(normRow).concat([row]);
+      const missing = read.idx.filter(i => !nextList.some(p => p.profile_index === i));
+      if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost');
+      status(st, 'Creating the profile…');
       await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
       inval(aid);
-      // Read back: a 204 is not evidence the row exists.
-      const check = rawList(await c.pullProfiles());
-      if (!check.some(p => p.profile_index === next)) throw new Error('Nuvio accepted the write but the profile is not there afterwards');
-      if (used.some(i => !check.some(p => p.profile_index === i))) throw new Error('a profile went missing — restore from a Drive backup');
+      const after = await wzReadProfiles(aid);
+      if (!after.idx.includes(next)) throw new Error('Nuvio accepted the write but the profile is not there afterwards');
+      const lost = read.idx.filter(i => !after.idx.includes(i));
+      if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
       wz.aid = aid; wz.idx = next; wz.done = ['Created the profile “' + name + '”.'];
       status(st, 'Created “' + name + '” and selected it.', 'ok');
-      logAct('Wizard: created profile ' + name + ' (index ' + next + ')', 'ok');
+      logAct('Wizard: created profile ' + name + ' (index ' + next + '); list ' + read.idx.join(',') + ' -> ' + after.idx.join(','), 'ok');
       $('wz-newprof').style.display = 'none';
       await wzRenderProfiles(aid);
       celebrate($('wz-profile-card'));
@@ -3143,7 +3215,7 @@
         t.appendChild(avatar({ name: wzProfileName() }, 26));
         const tx = el('span'); tx.innerHTML = 'Setting up <b>' + esc(wzProfileName()) + '</b> <span class="muted">on ' + esc(accountName(wz.aid)) + '</span>';
         t.appendChild(tx);
-        const sp = el('span'); sp.style.flex = '1'; t.appendChild(sp);
+        t.appendChild(el('span', 'wz-pick-sp'));
         const ch = el('button', 'btn btn-ghost btn-xs', 'Change'); ch.onclick = () => wzShow('account'); t.appendChild(ch);
       } else t.style.display = 'none';
     }
@@ -3151,8 +3223,10 @@
     $('wz-back').disabled = i === 0;
     $('wz-next').disabled = (i === WZ_STEPS.length - 1) || !ready;
     $('wz-next').textContent = i === WZ_STEPS.length - 2 ? 'Finish' : 'Next';
-    $('wz-foot-note').textContent = ready ? '' : 'Pick or create a profile to carry on.';
+    $('wz-foot-note').textContent = !ready ? 'Pick or create a profile to carry on.'
+      : (wz.step === 'done' ? '' : 'Next saves this step first.');
     if (wz.step === 'keys') wzRenderKeys();
+    if (wz.step === 'meta') wzMarkMetaInstalled();
     if (wz.step === 'streams') wzRenderStreams();
     if (wz.step === 'meta') wzRenderMeta();
     if (wz.step === 'done') wzRenderDone();
@@ -3160,6 +3234,18 @@
   const wzGo = d => { const i = WZ_STEPS.indexOf(wz.step) + d; if (i >= 0 && i < WZ_STEPS.length) wzShow(WZ_STEPS[i]); };
 
   // ---- shared: pros/cons block ----
+  // A selectable card. NOT a <button>: these cards carry their own "Open site"
+  // button, and interactive content nested inside a button is invalid HTML and
+  // lays out unpredictably (which is exactly what it did). Built as a div with
+  // the button role and keyboard handling instead, so it still behaves like one.
+  function wzCard(cls, onPick) {
+    const c = el('div', 'wz-pick' + (cls ? ' ' + cls : ''));
+    c.setAttribute('role', 'button'); c.tabIndex = 0;
+    const go = e => { if (e.target.closest('button')) return; onPick(); };
+    c.onclick = go;
+    c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(); } };
+    return c;
+  }
   function wzProsCons(pros, cons) {
     const w = el('div', 'wz-pc');
     (pros || []).forEach(p => { const r = el('div', 'pro'); r.innerHTML = '<span class="s">+</span><span>' + p + '</span>'; w.appendChild(r); });
@@ -3179,8 +3265,8 @@
       const w = el('div', 'wz-key');
       const h = el('div', 'wz-key-h');
       h.appendChild(el('span', 'wz-key-n', k.name));
-      if (k.tag) h.appendChild(wzTag(k.tag, /optional/i.test(k.tag) ? 'plain' : ''));
-      const sp = el('span'); sp.style.flex = '1'; h.appendChild(sp);
+      if (k.tag) h.appendChild(wzTag(k.tag, k.required ? 'req' : (/optional/i.test(k.tag) ? 'plain' : '')));
+      h.appendChild(el('span', 'wz-pick-sp'));
       const get = el('button', 'btn btn-ghost btn-xs', 'Get one · ' + k.getLabel);
       get.onclick = () => wzOpen(k.getUrl);
       h.appendChild(get);
@@ -3193,10 +3279,13 @@
       const disc = mkDisclosure('How to get it', k.steps.length + ' steps', false);
       disc.body.appendChild(ol);
       w.appendChild(disc.node);
-      const row = el('div', 'wz-key-in');
-      const inp = el('input'); inp.type = 'password'; inp.id = 'wz-key-' + k.id; inp.placeholder = k.placeholder; inp.autocomplete = 'off';
-      row.appendChild(inp);
-      w.appendChild(row);
+      const inp = el('input'); inp.type = 'password'; inp.id = 'wz-key-' + k.id;
+      inp.placeholder = k.placeholder; inp.autocomplete = 'off'; inp.className = 'wz-key-input';
+      if (k.required) inp.setAttribute('aria-required', 'true');
+      // The "this is required" highlight is cleared the moment you start typing,
+      // rather than sitting there red while you fix it.
+      inp.addEventListener('input', () => inp.classList.remove('wz-need'));
+      w.appendChild(inp);
       box.appendChild(w);
     });
     box.dataset.built = '1';
@@ -3207,11 +3296,17 @@
   // exists. A platform with no blob is skipped and said out loud, rather than
   // inventing one — the app writes its own on first sync.
   async function wzSaveKeys() {
-    const t = wzTarget(); if (!t) return;
+    const t = wzTarget(); if (!t) return false;
     const st = $('wz-keys-status'), res = $('wz-keys-res'), btn = $('wz-keys-save');
     clr(res);
     const entered = WZ.KEYS.map(k => ({ k, v: ($('wz-key-' + k.id).value || '').trim() })).filter(x => x.v);
-    if (!entered.length) { status(st, 'Nothing typed in — skipping this step is fine.', 'ok'); return; }
+    const missingRequired = WZ.KEYS.filter(k => k.required && !entered.some(x => x.k.id === k.id) && !wzSavedKeys.has(k.id));
+    if (missingRequired.length) {
+      status(st, missingRequired.map(k => k.name).join(' and ') + ' is required — paste its key first.', 'err');
+      missingRequired.forEach(k => { const i = $('wz-key-' + k.id); if (i) i.classList.add('wz-need'); });
+      return false;
+    }
+    if (!entered.length) { status(st, 'Nothing typed in.', 'ok'); return true; }
     btn.disabled = true; status(st, 'Saving keys…');
     const lines = [], problems = [];
     try {
@@ -3227,6 +3322,7 @@
         const ok = row && String(row.credential_json[x.k.field] || '') === x.v;
         lines.push({ name: x.k.name, ok: live.length ? ok : null });
         if (live.length && !ok) problems.push(x.k.name + ': Nuvio accepted the key but it is not stored afterwards.');
+        else wzSavedKeys.set(x.k.id, x.v);
       });
       // 2. the switches that make them do something
       const flipped = await wzApplyToggles(t, entered.reduce((acc, x) => acc.concat(
@@ -3245,6 +3341,7 @@
         status(st, problems.length + ' problem' + (problems.length === 1 ? '' : 's') + ' — see below.', 'err');
         const ul = el('ul', 'modal-details'); problems.forEach(p => ul.appendChild(el('li', '', p))); res.appendChild(ul);
         logAct('Wizard: API keys — ' + problems.length + ' problem(s)', 'err');
+        return false;
       } else {
         status(st, 'Saved ' + entered.length + ' key' + (entered.length === 1 ? '' : 's') + ' — checked and confirmed.', 'ok');
         wzLog('Saved ' + entered.map(x => x.k.name).join(', ') + ' to this profile.');
@@ -3252,48 +3349,80 @@
         celebrate(res);
       }
       inval(t.aid);
+      return true;
     } catch (e) {
       status(st, "Couldn't save: " + e.message, 'err');
       logAct('Wizard: API key save failed — ' + e.message, 'err');
+      return false;
     } finally { btn.disabled = false; }
   }
 
   // Read-modify-write on each platform blob: pull the live one (with its
   // updated_at so the guarded RPC can reject a concurrent change), set only the
-  // named leaves, push it back. Never creates a blob for a platform that has
-  // none — that profile has simply never been opened in that app yet.
+  // named leaves, push it back.
+  //
+  // When a platform has NO blob at all — which is the normal state of a
+  // freshly created profile, confirmed live: all three platforms return [] —
+  // one is created. An earlier version skipped those and merely said so, which
+  // is why a TorBox key could land while "Resolve playable links" stayed off:
+  // the switch lives in the blob, and there was no blob to put it in.
+  //
+  // Creating one is safe because a Nuvio blob is a SPARSE OVERLAY of defaults,
+  // not a full dump — a real profile's TV blob holds only the handful of
+  // leaves that differ from default. So { version, features:{ the leaves we
+  // set } } is exactly the shape Nuvio itself writes.
+  //
+  // The version is per-platform and must not be guessed: read live off the test
+  // account, tv is 1 while mobile and desktop are 3. Writing tv's 1 into a
+  // mobile blob is the kind of thing that silently makes an app ignore it.
+  const WZ_BLOB_VERSION = { tv: 1, mobile: 3, desktop: 3 };
   async function wzApplyToggles(t, wants) {
     const notes = [], problems = [];
     const byPlat = {};
     wants.forEach(w => { (byPlat[w.platform] = byPlat[w.platform] || []).push(...w.sets); });
     const c = A.client(store, t.aid);
-    const missing = [];
+    const created = [];
     for (const platform of PLATS) {
       const sets = byPlat[platform]; if (!sets || !sets.length) continue;
       let row;
       try { row = await c.pullSettings(t.idx, platform); }
-      catch (e) { problems.push(platform + ' settings could not be read: ' + e.message); continue; }
-      if (!row || !row.settings_json) { missing.push(platform); continue; }
-      const blob = JSON.parse(JSON.stringify(row.settings_json));
+      catch (e) { problems.push(wzPlatLabel(platform) + ' settings could not be read: ' + e.message); continue; }
+      const fresh = !(row && row.settings_json);
+      const blob = fresh
+        ? { version: WZ_BLOB_VERSION[platform] || 1, features: {} }
+        : JSON.parse(JSON.stringify(row.settings_json));
       let changed = 0;
       sets.forEach(([feat, key, val, type]) => { if (blobGet(blob, feat, key, undefined) !== val) { blobSet(blob, feat, key, val, type); changed++; } });
       if (!changed) { notes.push(wzPlatLabel(platform) + ' already switched on'); continue; }
       try {
-        const expected = row.updated_at || null;
-        await c.rpc('sync_push_profile_settings_blob_guarded', {
-          p_profile_id: t.idx, p_settings_json: blob, p_platform: platform, p_expected_updated_at: expected,
-        });
-        notes.push('Switched the features on for ' + wzPlatLabel(platform));
+        if (fresh) {
+          // Nothing to guard against — there is no existing row to lose a race
+          // with, and the guarded RPC has no "expect absent" form.
+          await c.rpc('sync_push_profile_settings_blob', {
+            p_profile_id: t.idx, p_settings_json: blob, p_platform: platform, p_origin_client_id: 'numax-web',
+          });
+        } else {
+          await c.rpc('sync_push_profile_settings_blob_guarded', {
+            p_profile_id: t.idx, p_settings_json: blob, p_platform: platform, p_expected_updated_at: row.updated_at || null,
+          });
+        }
+        // A push answers 204, so read the switch back rather than assume.
+        let ok = null;
+        try {
+          const check = await c.pullSettings(t.idx, platform);
+          ok = !!(check && check.settings_json) && sets.every(([f, k, v]) => blobGet(check.settings_json, f, k, undefined) === v);
+        } catch (e) { /* leave ok null — reported as unverified below */ }
+        if (ok === false) problems.push(wzPlatLabel(platform) + ': Nuvio accepted the change but the switches are not on afterwards.');
+        else {
+          notes.push((fresh ? 'Created the ' : 'Switched the features on for ') + wzPlatLabel(platform) + (fresh ? ' settings and switched the features on' : ''));
+          if (fresh) created.push(platform);
+        }
       } catch (e) {
         const conflict = (A.ConflictError && e instanceof A.ConflictError) || /40001|409|another device/i.test(e.message || '');
         problems.push(wzPlatLabel(platform) + ': ' + (conflict ? 'changed on another device while saving — open this step again and retry' : e.message));
       }
     }
-    if (missing.length) {
-      const names = missing.map(wzPlatLabel);
-      const list = names.length > 1 ? names.slice(0, -1).join(', ') + ' or ' + names[names.length - 1] : names[0];
-      notes.push('No ' + list + ' settings on this profile yet — the keys are saved, and those switches come on by themselves the first time you open Nuvio there');
-    }
+    if (created.length) logAct('Wizard: created settings for ' + created.join(', ') + ' on profile ' + t.idx, 'info');
     return { notes, problems };
   }
   const wzPlatLabel = p => ({ tv: 'Android TV', mobile: 'mobile', desktop: 'desktop' }[p] || p);
@@ -3306,13 +3435,13 @@
     if (box && box.dataset.built !== '1') {
       clr(box);
       WZ.ROUTES.forEach(r => {
-        const c = el('button', 'wz-pick'); c.type = 'button'; c.dataset.wzroute = r.id;
+        const c = wzCard('', () => { wz.route = r.id; wzRenderStreams(); });
+        c.dataset.wzroute = r.id;
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', r.name));
         if (r.tag) h.appendChild(wzTag(r.tag));
         c.appendChild(h);
         c.appendChild(el('div', 'wz-pick-one', r.oneLiner));
         c.appendChild(wzProsCons(r.pros, r.cons));
-        c.onclick = () => { wz.route = r.id; wzRenderStreams(); };
         box.appendChild(c);
       });
       box.dataset.built = '1';
@@ -3361,18 +3490,19 @@
   }
 
   function wzDebridCard(d, nativeOnly) {
-    const c = el('button', 'wz-pick'); c.type = 'button'; c.dataset.wzdebrid = d.id;
-    const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', d.name));
+    const c = wzCard('', () => { wz.debrid = d.id; nativeOnly ? wzMarkNativeDebrid() : wzMarkDebrid(); });
+    c.dataset.wzdebrid = d.id;
+    const h = el('div', 'wz-pick-h');
+    h.appendChild(el('span', 'wz-pick-n', d.name));
     if (d.tag) h.appendChild(wzTag(d.tag));
-    if (!nativeOnly && d.native) h.appendChild(wzTag('Nuvio can drive this too', 'plain'));
-    const sp = el('span'); sp.style.flex = '1'; h.appendChild(sp);
+    if (!nativeOnly && d.native) h.appendChild(wzTag('Nuvio drives this too', 'plain'));
+    h.appendChild(el('span', 'wz-pick-sp'));
     const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
     open.onclick = e => { e.stopPropagation(); wzOpen(d.url); };
     h.appendChild(open);
     c.appendChild(h);
     if (d.price) c.appendChild(el('div', 'wz-pick-price', d.price));
     c.appendChild(wzProsCons(d.pros, d.cons));
-    c.onclick = () => { wz.debrid = d.id; nativeOnly ? wzMarkNativeDebrid() : wzMarkDebrid(); };
     return c;
   }
   function wzMarkDebrid() {
@@ -3468,13 +3598,13 @@
   // Writes a debrid key the way Nuvio's own Connected Services screen ends up
   // storing it, and turns on the two switches that make it do anything.
   async function wzSaveNativeKey() {
-    const t = wzTarget(); if (!t) return;
+    const t = wzTarget(); if (!t) return false;
     const st = $('wz-native-status'), res = $('wz-native-res'), btn = $('wz-native-save');
     clr(res);
     const d = WZ.DEBRID.find(x => x.id === wz.debrid && x.native);
-    if (!d) { status(st, 'Pick TorBox or Premiumize first.', 'err'); return; }
+    if (!d) { status(st, 'Pick TorBox or Premiumize first.', 'err'); return false; }
     const key = ($('wz-native-key').value || '').trim();
-    if (!key) { status(st, 'Paste the API key first.', 'err'); return; }
+    if (!key) { status(st, 'Paste the API key first.', 'err'); return false; }
     btn.disabled = true; status(st, 'Connecting…');
     const problems = [];
     try {
@@ -3500,52 +3630,102 @@
       if (problems.length) {
         status(st, problems.length + ' problem' + (problems.length === 1 ? '' : 's') + ' — see below.', 'err');
         const ul = el('ul', 'modal-details'); problems.forEach(p => ul.appendChild(el('li', '', p))); res.appendChild(ul);
+        inval(t.aid);
+        return false;
       } else {
         status(st, d.name + ' connected and link resolving is on. If Nuvio still shows it unlinked, use its own Connected Services screen — some builds only accept the key through their device-code flow.', 'ok');
+        wzSavedKeys.set('debrid', key);
         wzLog('Connected ' + d.name + ' and turned on link resolving.');
         logAct('Wizard: connected ' + d.name + ' on ' + t.name, 'ok');
         celebrate(res);
       }
       inval(t.aid);
+      return true;
     } catch (e) {
       status(st, "Couldn't save: " + e.message, 'err');
       logAct('Wizard: debrid connect failed — ' + e.message, 'err');
+      return false;
     } finally { btn.disabled = false; }
   }
 
   // ======================================================================
-  // step 4 — metadata
+  // step 4 - metadata
   // ======================================================================
   function wzRenderMeta() {
     if ($('wz-order-tip')) $('wz-order-tip').textContent = WZ.ORDER_TIP;
-    const box = $('wz-meta'); if (!box || box.dataset.built === '1') return;
-    clr(box);
-    WZ.METADATA.forEach(m => {
-      const w = el('div', 'wz-key');
-      const h = el('div', 'wz-key-h');
-      h.appendChild(el('span', 'wz-key-n', m.name));
-      if (m.tag) h.appendChild(wzTag(m.tag, m.builtin ? 'plain' : ''));
-      const sp = el('span'); sp.style.flex = '1'; h.appendChild(sp);
-      if (!m.builtin) {
+    const box = $('wz-meta'); if (!box) return;
+    if (box.dataset.built !== '1') {
+      clr(box);
+      WZ.METADATA.forEach(m => {
+        const w = el('div', 'wz-key'); w.dataset.wzmeta = m.id;
+        const h = el('div', 'wz-key-h');
+        h.appendChild(el('span', 'wz-key-n', m.name));
+        h.appendChild(el('span', 'wz-meta-tag'));
+        h.appendChild(el('span', 'wz-pick-sp'));
         const b = el('button', 'btn btn-ghost btn-xs', m.instances ? 'Pick an instance' : 'Open site');
         b.onclick = () => m.instances ? wzMetaInstances(w, m) : wzOpen(m.url);
         h.appendChild(b);
-      }
-      w.appendChild(h);
-      w.appendChild(el('div', 'wz-key-b', m.blurb));
-      w.appendChild(el('div', 'wz-key-w', m.body));
-      const slot = el('div'); slot.style.marginTop = '10px'; w.appendChild(slot);
-      if (!m.builtin) wzInstallBox(slot, { label: m.name, hint: 'The manifest link ' + m.name + ' gave you.', defaultName: m.name, top: true });
-      box.appendChild(w);
-    });
-    box.dataset.built = '1';
+        w.appendChild(h);
+        w.appendChild(el('div', 'wz-key-b', m.blurb));
+        w.appendChild(el('div', 'wz-key-w', m.body));
+        const slot = el('div', 'wz-meta-slot'); w.appendChild(slot);
+        wzInstallBox(slot, {
+          step: 'meta', label: m.name,
+          hint: 'The manifest link ' + m.name + ' gave you.',
+          defaultName: m.installName || m.name,
+          defaultUrl: m.check || '',
+          top: true,
+        });
+        box.appendChild(w);
+      });
+      box.dataset.built = '1';
+    }
+    wzMarkMetaInstalled();
   }
+
+  // Whether each metadata add-on is ACTUALLY on the profile, read live rather
+  // than asserted. Nuvio does ship Cinemeta on a new profile, but a profile that
+  // has been tidied up (or had AIOMetadata put in its place) will not have it,
+  // and a card claiming "already installed" at that point is simply wrong.
+  let wzMetaGen = 0;
+  async function wzMarkMetaInstalled() {
+    const t = wzTarget(); if (!t) return;
+    const gen = ++wzMetaGen;
+    document.querySelectorAll('#wz-meta .wz-meta-tag').forEach(slot => {
+      clr(slot); slot.appendChild(el('span', 'wz-tag plain shimmer', 'checking\u2026'));
+    });
+    let urls = [];
+    try {
+      const { backup } = await loadAccount(t.aid);
+      urls = (sliceProfile(backup, t.idx).addons || []).map(a => String(a.url || ''));
+    } catch (e) {
+      if (gen !== wzMetaGen) return;
+      document.querySelectorAll('#wz-meta .wz-meta-tag').forEach(s2 => { clr(s2); s2.appendChild(el('span', 'wz-tag plain', 'could not check')); });
+      return;
+    }
+    if (gen !== wzMetaGen) return;
+    WZ.METADATA.forEach(m => {
+      const card = document.querySelector('#wz-meta [data-wzmeta="' + m.id + '"]'); if (!card) return;
+      const pats = m.matches || [];
+      const on = urls.some(u => pats.some(re => re.test(u)) || (m.check && u === m.check));
+      const slot = card.querySelector('.wz-meta-tag'); clr(slot);
+      // Installed is a fact worth stating; "not installed" is not, because the
+      // open box below already says so. Otherwise just show what it is good for.
+      if (on) slot.appendChild(wzTag('On this profile'));
+      else if (m.tag) slot.appendChild(wzTag(m.tag, 'plain'));
+      // Nothing to fill in for something already there - collapse the box
+      // rather than inviting a pointless re-add.
+      const s3 = card.querySelector('.wz-meta-slot');
+      if (s3) s3.style.display = on ? 'none' : '';
+    });
+  }
+
   async function wzMetaInstances(card, m) {
     let holder = card.querySelector('.wz-inst-holder');
     if (holder) { holder.remove(); return; }
-    holder = el('div', 'wz-inst-holder'); holder.style.marginTop = '10px';
-    holder.appendChild(el('span', 'muted sm shimmer', 'Reading the uptime tracker…'));
-    card.insertBefore(holder, card.lastChild);
+    holder = el('div', 'wz-inst-holder');
+    holder.appendChild(el('span', 'muted sm shimmer', 'Reading the uptime tracker\u2026'));
+    card.insertBefore(holder, card.querySelector('.wz-meta-slot'));
     try {
       if (!MK) throw new Error('the marketplace data layer did not load');
       const list = await MK.loadInstances(m.instances, false);
@@ -3553,7 +3733,7 @@
       list.forEach(i => {
         const r = el('div', 'wz-inst');
         r.appendChild(el('span', 'nm', i.name));
-        r.appendChild(el('span', 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : ''), i.uptime != null ? i.uptime.toFixed(2) + '% up' : 'uptime unknown'));
+        r.appendChild(el('span', 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : ''), i.uptime != null ? i.uptime.toFixed(2) + '%' : '\u2014'));
         r.appendChild(el('span', 'spacer'));
         const b = el('button', 'btn btn-solid btn-xs', 'Open'); b.onclick = () => wzOpen(i.url);
         r.appendChild(b); holder.appendChild(r);
@@ -3565,57 +3745,75 @@
   // ======================================================================
   // shared "paste the link back" box
   // ======================================================================
-  // The write itself is mkWrite — the Marketplace's own path, which is
-  // engine.planTarget + api.applyPlan plus its read-back verification. The only
-  // thing added here is `top`, which places a metadata add-on above whatever is
-  // already installed, because Nuvio reads metadata add-ons top down.
+  // The write is mkWrite - the Marketplace's own path (engine.planTarget +
+  // api.applyPlan plus its read-back check). Two wizard-only extras: `top`,
+  // which places a metadata add-on above what is installed because Nuvio reads
+  // metadata add-ons top down, and registration with wzPending so Next can save
+  // this box without the user having to press its own button first.
+  const wzPending = { keys: [], streams: [], meta: [] };
+  // What this run has already written, keyed by provider id ('tmdb', 'mdblist',
+  // 'animeskip', 'debrid'). Next uses it to skip a field that is unchanged
+  // since it was saved, so pressing Next twice is not two writes.
+  const wzSavedKeys = new Map();
   function wzInstallBox(host_, opts) {
     clr(host_);
     const w = el('div', 'mk-install');
-    const url = el('input'); url.type = 'url'; url.placeholder = 'https://…/manifest.json'; url.autocomplete = 'off';
+    const url = el('input'); url.type = 'url'; url.placeholder = 'https://\u2026/manifest.json'; url.autocomplete = 'off';
+    if (opts.defaultUrl) url.value = opts.defaultUrl;
     w.appendChild(url);
-    w.appendChild(el('div', 'muted sm', opts.hint));
-    const nameRow = el('div', 'wz-key-in');
-    const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name it in Nuvio'; nm.value = opts.defaultName || ''; nm.maxLength = 60;
-    nameRow.appendChild(nm); w.appendChild(nameRow);
+    w.appendChild(el('div', 'muted sm mk-hint', opts.hint));
+    const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name it in Nuvio';
+    nm.value = opts.defaultName || ''; nm.maxLength = 60; nm.className = 'mk-name';
+    w.appendChild(nm);
     let atTop = !!opts.top;
     if (opts.top) {
-      const lab = el('label', 'switch-row'); lab.style.marginTop = '10px';
+      const lab = el('label', 'switch-row');
       const cb = el('input'); cb.type = 'checkbox'; cb.checked = true;
       cb.onchange = () => { atTop = cb.checked; };
       const tx = el('div', 'tx'); tx.appendChild(el('b', '', 'Put it at the top of the add-on list'));
       tx.appendChild(el('span', '', WZ.ORDER_TIP));
       lab.appendChild(cb); lab.appendChild(tx); w.appendChild(lab);
     }
-    const st = el('div', 'inline-status'); st.style.marginTop = '10px';
+    const st = el('div', 'inline-status');
     const res = el('div', 'mk-res');
-    const btn = el('button', 'btn btn-primary', 'Add to this profile'); btn.style.marginTop = '10px';
+    const btn = el('button', 'btn btn-primary', 'Add to this profile');
+    let saved = '';                                   // the url this box last wrote
     // mkWrite is preview-then-confirm: it rewrites this button's label and
-    // handler for the confirm click. Editing either field afterwards has to put
-    // the button back to "preview", or a second click would re-run the plan
-    // built from the OLD link.
+    // handler. Editing either field afterwards has to put the button back, or a
+    // second click would re-run the plan built from the OLD link.
     const arm = () => {
       btn.disabled = false; btn.textContent = 'Add to this profile';
-      btn.onclick = () => wzAddAddon({ url, nm, btn, st, res, label: opts.label, top: () => atTop, rearm: arm });
+      btn.onclick = () => run(false);
     };
+    const run = (auto) => wzAddAddon({
+      url, nm, btn, st, res, label: opts.label, top: () => atTop, rearm: arm, auto,
+      onSaved: u => { saved = u; },
+    });
     [url, nm].forEach(i => i.addEventListener('input', () => { clr(res); status(st, ''); arm(); }));
     arm();
     w.appendChild(btn); w.appendChild(st); w.appendChild(res);
     host_.appendChild(w);
+    wzPending[opts.step].push({
+      // offsetParent is null for a hidden box, which is how an already-installed
+      // metadata card (its box collapsed) stays out of Next's way.
+      dirty: () => { const u = url.value.trim(); return !!u && u !== saved && host_.offsetParent !== null; },
+      commit: () => run(true),
+      label: opts.label,
+    });
   }
 
   async function wzAddAddon(o) {
-    const t = wzTarget(); if (!t) return;
+    const t = wzTarget(); if (!t) return { written: false, ok: false };
     const u = (o.url.value || '').trim();
-    if (!u) { status(o.st, 'Paste the link first.', 'err'); return; }
-    if (!/^https?:\/\//i.test(u)) { status(o.st, 'That does not look like a link — it should start with https://', 'err'); return; }
+    if (!u) { status(o.st, 'Paste the link first.', 'err'); return { written: false, ok: false }; }
+    if (!/^https?:\/\//i.test(u)) { status(o.st, 'That does not look like a link \u2014 it should start with https://', 'err'); return { written: false, ok: false }; }
     const name = (o.nm.value || '').trim() || o.label;
     const master = [{ url: u, name, enabled: true }];
     let keepOrder = false;
     // "Put it at the top" cannot be expressed by mkWrite's append arithmetic, so
-    // the whole desired list is built here instead: the new add-on at 0 and
-    // everything already installed shifted down one. Those shifts show up
-    // honestly in the report as updates, because that is what they are.
+    // the whole desired list is built here: the new add-on at 0 and everything
+    // already installed shifted down one. Those shifts show up in the report as
+    // updates, because that is exactly what they are.
     if (o.top()) {
       try {
         const { backup } = await loadAccount(t.aid, true);
@@ -3624,14 +3822,57 @@
         have.forEach((a, i) => master.push({ url: a.url, name: a.name ?? null, enabled: a.enabled !== false, sort_order: i + 1 }));
         keepOrder = true;
       } catch (e) {
-        status(o.st, "Couldn't read the profile to reorder — adding it at the end instead.", 'err');
+        status(o.st, "Couldn't read the profile to reorder \u2014 adding it at the end instead.", 'err');
       }
     }
-    await mkWrite({
+    const r = (await mkWrite({
       kind: 'addons', master, targets: [{ aid: t.aid, idx: t.idx, name: t.name }],
-      mode: 'merge', st: o.st, res: o.res, btn: o.btn, label: name, aid: t.aid, keepOrder,
+      mode: 'merge', st: o.st, res: o.res, btn: o.btn, label: name, aid: t.aid, keepOrder, auto: o.auto,
       onDone: ok => { if (ok) wzLog('Added ' + name + ' to this profile.'); else o.rearm(); },
-    });
+    })) || { written: false, ok: true };
+    if (r.ok) o.onSaved(u);
+    if (r.ok && r.written) wzMarkMetaInstalled();
+    return r;
+  }
+
+  // ======================================================================
+  // Next = save, then move on
+  // ======================================================================
+  // Having to press a step's own save button and THEN Next is busywork. Next
+  // commits whatever is filled in and unsaved on the current step first, and
+  // only advances if that worked. The per-item buttons stay, because a step can
+  // hold several things and you may want them one at a time.
+  async function wzCommitStep(step) {
+    if (step === 'keys') {
+      const inp = $('wz-key-tmdb');
+      const tmdb = (inp && inp.value || '').trim();
+      if (!tmdb && !wzSavedKeys.has('tmdb')) {
+        status($('wz-keys-status'), 'TMDB is required \u2014 paste its key before moving on.', 'err');
+        if (inp) { inp.classList.add('wz-need'); inp.focus(); }
+        return false;
+      }
+      const anyNew = WZ.KEYS.some(k => { const v = ($('wz-key-' + k.id).value || '').trim(); return v && wzSavedKeys.get(k.id) !== v; });
+      return anyNew ? wzSaveKeys() : true;
+    }
+    if (step === 'streams' && wz.route === 'native') {
+      const key = ($('wz-native-key').value || '').trim();
+      if (key && wzSavedKeys.get('debrid') !== key && !(await wzSaveNativeKey())) return false;
+    }
+    for (const b of (wzPending[step] || []).filter(x => x.dirty())) {
+      const r = await b.commit();
+      if (!r || !r.ok) return false;
+    }
+    return true;
+  }
+  async function wzNext() {
+    const btn = $('wz-next'); if (btn.disabled) return;
+    const label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Saving\u2026';
+    let ok = true;
+    try { ok = await wzCommitStep(wz.step); }
+    catch (e) { ok = false; logAct('Wizard: could not save this step \u2014 ' + e.message, 'err'); }
+    btn.textContent = label; btn.disabled = false;
+    if (ok) wzGo(1);
   }
 
   function wzRenderDone() {
@@ -3667,7 +3908,7 @@
     if (WZ) {
       document.querySelectorAll('.wz-step').forEach(b => b.onclick = () => { if (!b.disabled) wzShow(b.dataset.wzstep); });
       $('wz-back').onclick = () => wzGo(-1);
-      $('wz-next').onclick = () => wzGo(1);
+      $('wz-next').onclick = wzNext;
       $('wz-account').onchange = () => wzRenderProfiles($('wz-account').value);
       $('wz-new-btn').onclick = wzCreateAccount;
       $('wz-new-pass2').addEventListener('keydown', e => { if (e.key === 'Enter') wzCreateAccount(); });

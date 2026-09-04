@@ -727,15 +727,21 @@
   }
 
   /* ===== setup wizard =====================================================
-     The rail is the only navigation: panes are shown one at a time, and a step
-     stays locked until the one before it has produced what it needs (a profile,
+     The rail is the only navigation: panes show one at a time, and a step stays
+     locked until the one before it has produced what it needs (a profile,
      mainly). Locking is a class on the button, never a removed element, so the
-     whole path is always visible even when you can't jump to it yet. */
-  .panel[data-panel="wizard"]{ max-width:1800px; }
-  .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
+     whole path stays visible even when you cannot jump to it yet.
+
+     Layout rule for this whole panel: every row that pairs text with a button
+     gives the text `min-width:0` and the button `flex:none`. Without that a long
+     add-on name or instance host pushes the button out of its card, which is
+     exactly what "text going out of boxes" was. */
+  .panel[data-panel="wizard"]{ max-width:1400px; }
+  .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
   .wz-step{ display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); background:transparent;
     color:var(--t55); border-radius:999px; padding:7px 15px 7px 7px; font-size:12.5px; font-weight:600;
-    cursor:pointer; font-family:inherit; transition:color var(--mo-micro,.16s) var(--mo-ease,ease), border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
+    cursor:pointer; font-family:inherit; white-space:nowrap;
+    transition:color var(--mo-micro,.16s) var(--mo-ease,ease), border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
   .wz-step .n{ width:21px; height:21px; border-radius:50%; display:grid; place-items:center; flex:none;
     background:var(--surface-2); color:var(--t45); font-family:ui-monospace,monospace; font-size:11px; }
   .wz-step:hover:not(:disabled){ color:var(--t); border-color:rgba(255,255,255,.24); }
@@ -747,85 +753,123 @@
   /* the "you are writing to X" strip that follows you from step 2 onward */
   .wz-target{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
     border-left:3px solid var(--accent); border-radius:12px; padding:10px 14px; margin-bottom:16px; font-size:12.5px; }
+  .wz-target > span:not(.wz-pick-sp){ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wz-target b{ font-weight:600; }
   .wz-target .muted{ font-size:12px; }
+  .wz-target .btn{ flex:none; }
 
-  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:4px; }
+  /* Cards inside a pane own their own rhythm; the grid owns the gap, so the
+     card's default bottom margin is dropped in both places to stop the
+     18-vs-36px unevenness between a grid row and the card under it. */
+  .wz-pane > .card, .wz-pane > div > .card{ margin-bottom:16px; }
+  .wz-pane > .panel-cols{ margin-bottom:16px; }
+  .wz-pane > .panel-cols > .card{ margin-bottom:0; }
+  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:2px; padding-bottom:4px; }
   .wz-foot .spacer{ flex:1; }
+  .wz-foot .btn{ flex:none; }
 
-  /* choice cards — used by routes, debrid and metadata alike */
-  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:14px; }
-  .wz-pick{ text-align:left; font-family:inherit; color:inherit; cursor:pointer; position:relative;
+  /* choice cards - routes, debrid. NOT <button>: they carry their own buttons. */
+  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; }
+  .wz-pick{ text-align:left; font-family:inherit; color:inherit; cursor:pointer; position:relative; min-width:0;
     background:var(--surface); border:2px solid var(--line); border-radius:16px; padding:16px 17px;
     transition:border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
   .wz-pick:hover{ border-color:rgba(255,255,255,.26); }
+  .wz-pick:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
   .wz-pick.on{ border-color:var(--accent); background:rgba(229,57,53,.07); }
-  .wz-pick-h{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-  .wz-pick-n{ font-size:15px; font-weight:700; letter-spacing:-.01em; }
-  .wz-pick-one{ font-size:12.5px; color:var(--t70); margin-top:7px; line-height:1.5; }
+  .wz-pick-h{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .wz-pick-sp{ flex:1 1 auto; min-width:0; }
+  .wz-pick-n{ font-size:15px; font-weight:700; letter-spacing:-.01em; min-width:0; overflow-wrap:anywhere; }
+  .wz-pick-h .btn{ flex:none; }
+  .wz-pick-one{ font-size:12.5px; color:var(--t70); margin-top:8px; line-height:1.5; overflow-wrap:anywhere; }
   .wz-pick-price{ font-size:11.5px; color:var(--t45); margin-top:6px; font-family:ui-monospace,monospace; }
-  .wz-tag{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase;
+  .wz-tag{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap;
     border-radius:999px; padding:2px 9px; background:rgba(67,160,71,.18); color:#7bd88f; }
   .wz-tag.plain{ background:var(--surface-2); color:var(--t45); }
-  .wz-tag.warn{ background:rgba(240,160,32,.16); color:#f0c060; }
-  /* pros / cons: a plain two-column list, no icons doing the talking */
-  .wz-pc{ display:grid; grid-template-columns:1fr; gap:5px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-2); }
+  .wz-tag.req{ background:rgba(229,57,53,.16); color:#ff9a94; }
+  /* pros / cons: a plain list, no icons doing the talking */
+  .wz-pc{ display:grid; gap:5px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-2); }
   .wz-pc div{ font-size:12px; line-height:1.5; display:flex; gap:8px; }
+  .wz-pc span:last-child{ min-width:0; overflow-wrap:anywhere; }
   .wz-pc .s{ flex:none; width:11px; font-family:ui-monospace,monospace; font-weight:700; }
   .wz-pc .pro .s{ color:#7bd88f; } .wz-pc .con .s{ color:#f0a060; }
   .wz-pc .con{ color:var(--t55); }
 
-  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
   .wz-nodebrid{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); }
+  .wz-nodebrid .btn{ flex:none; }
+  .wz-nodebrid .muted{ min-width:0; flex:1 1 240px; line-height:1.5; }
 
-  /* instance rows — name, uptime, open */
+  /* instance rows - name, uptime, open */
   .wz-inst{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
     border-radius:11px; padding:10px 13px; margin-bottom:8px; }
-  .wz-inst .nm{ font-size:13.5px; font-weight:600; }
-  .wz-inst .up{ font-family:ui-monospace,monospace; font-size:11.5px; color:#7bd88f; }
+  .wz-inst > div{ min-width:0; }
+  .wz-inst .nm{ font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-inst .muted{ overflow-wrap:anywhere; }
+  .wz-inst .up{ font-family:ui-monospace,monospace; font-size:11.5px; color:#7bd88f; flex:none; }
   .wz-inst .up.low{ color:#f0c060; }
-  .wz-inst .spacer{ flex:1; }
+  .wz-inst .spacer{ flex:1 1 auto; min-width:0; }
+  .wz-inst .btn{ flex:none; }
+  .wz-inst-holder{ margin-top:10px; }
 
   /* numbered guide */
   .wz-guide-step{ display:flex; gap:13px; padding:12px 0; border-top:1px solid var(--line-2); }
   .wz-guide-step:first-child{ border-top:none; padding-top:0; }
   .wz-guide-step .gn{ flex:none; width:23px; height:23px; border-radius:50%; background:var(--surface-2);
     color:var(--t55); display:grid; place-items:center; font-family:ui-monospace,monospace; font-size:11px; }
+  .wz-guide-step > div{ min-width:0; }
   .wz-guide-step .gt{ font-size:13.5px; font-weight:600; }
-  .wz-guide-step .gb{ font-size:12.5px; color:var(--t55); margin-top:4px; line-height:1.55; }
+  .wz-guide-step .gb{ font-size:12.5px; color:var(--t55); margin-top:4px; line-height:1.55; overflow-wrap:anywhere; }
 
   /* the one thing about the Nuvio-resolves route people get wrong */
   .wz-catch{ font-size:13px; line-height:1.6; color:#ffd9a0; background:rgba(240,160,32,.08);
     border:1px solid rgba(240,160,32,.3); border-left:3px solid #f0a060; border-radius:12px; padding:13px 15px; }
 
-  /* api key rows */
-  .wz-key{ border-top:1px solid var(--line-2); padding:16px 0; }
+  /* api key + metadata rows */
+  .wz-key{ border-top:1px solid var(--line-2); padding:18px 0; }
   .wz-key:first-child{ border-top:none; padding-top:0; }
-  .wz-key-h{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-  .wz-key-n{ font-size:14.5px; font-weight:700; }
-  .wz-key-b{ font-size:12.5px; color:var(--t70); margin-top:6px; line-height:1.5; }
-  .wz-key-w{ font-size:12px; color:var(--t45); margin-top:5px; line-height:1.5; }
-  .wz-key-in{ display:flex; gap:9px; align-items:center; flex-wrap:wrap; margin-top:11px; }
-  .wz-key-in input{ flex:1; min-width:220px; }
-  .wz-steps{ margin:10px 0 0; padding-left:19px; font-size:12px; color:var(--t55); line-height:1.6; }
+  .wz-key:last-child{ padding-bottom:0; }
+  .wz-key-h{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .wz-key-n{ font-size:14.5px; font-weight:700; min-width:0; overflow-wrap:anywhere; }
+  .wz-key-h .btn{ flex:none; }
+  .wz-key-b{ font-size:12.5px; color:var(--t70); margin-top:7px; line-height:1.55; max-width:76ch; }
+  .wz-key-w{ font-size:12px; color:var(--t45); margin-top:5px; line-height:1.55; max-width:76ch; }
+  .wz-key-input{ width:100%; margin-top:12px; }
+  .wz-need{ border-color:rgba(229,57,53,.6) !important; box-shadow:0 0 0 3px rgba(229,57,53,.12); }
+  .wz-steps{ margin:0; padding-left:19px; font-size:12px; color:var(--t55); line-height:1.6; }
   .wz-steps li + li{ margin-top:3px; }
+  .wz-key .disc{ margin-top:12px; }
+  .wz-meta-tag{ display:inline-flex; }
+  .wz-meta-slot{ margin-top:12px; }
+
+  /* the paste-the-link-back box: one column, even spacing, nothing overflowing */
+  .wz-pane .mk-install{ display:flex; flex-direction:column; gap:10px; }
+  .wz-pane .mk-install > *{ margin:0; }
+  .wz-pane .mk-install input[type=url], .wz-pane .mk-install input.mk-name{ width:100%; }
+  .wz-pane .mk-install .mk-hint{ margin-top:-4px; line-height:1.5; }
+  .wz-pane .mk-install .btn{ align-self:flex-start; }
+  .wz-pane .mk-install .inline-status:empty, .wz-pane .mk-install .mk-res:empty{ display:none; }
+  .wz-pane .switch-row{ align-items:flex-start; }
+  .wz-pane .switch-row input[type=checkbox]{ margin-top:2px; flex:none; }
 
   /* new-profile inline form */
   .wz-newprof{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
     background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
-  .wz-newprof input[type=text]{ flex:1; min-width:180px; }
+  .wz-newprof input[type=text]{ flex:1 1 200px; min-width:0; }
+  .wz-newprof .btn{ flex:none; }
   .pchip.wz-add{ border-style:dashed; color:var(--t55); }
   .pchip.wz-add .plus{ width:42px; height:42px; border-radius:50%; display:grid; place-items:center;
     background:var(--surface-2); font-size:19px; color:var(--t55); }
 
   .wz-next{ margin:0; padding-left:19px; font-size:13px; color:var(--t55); line-height:1.7; }
-  .wz-done{ display:flex; align-items:center; gap:9px; font-size:12.5px; padding:9px 0; border-top:1px solid var(--line-2); }
-  .wz-done:first-child{ border-top:none; }
-  .wz-done .ic{ flex:none; width:17px; height:17px; }
+  .wz-done{ display:flex; align-items:flex-start; gap:9px; font-size:12.5px; padding:9px 0; border-top:1px solid var(--line-2); }
+  .wz-done:first-child{ border-top:none; padding-top:0; }
+  .wz-done .ic{ flex:none; width:17px; height:17px; margin-top:1px; }
+  .wz-done span:last-child{ min-width:0; overflow-wrap:anywhere; }
 
-  @media (max-width:700px){
+  @media (max-width:760px){
     .wz-step .t{ display:none; }
     .wz-step{ padding:7px; }
+    .wz-routes, .wz-debrid{ grid-template-columns:1fr; }
   }
 
   /* ===== marketplace ===== */
@@ -1374,8 +1418,8 @@
       <!-- 2 — api keys -->
       <div class="wz-pane" data-wzpane="keys" style="display:none">
         <div class="card">
-          <div class="chead"><h3>Keys worth having</h3><span class="spacer"></span><span class="muted sm">Fill in what you want — blanks are skipped.</span></div>
-          <p class="muted sm" style="margin-bottom:16px">Each one is free. Numax writes them into the profile the same way Nuvio's own app does, and switches on the feature that uses them.</p>
+          <div class="chead"><h3>Keys worth having</h3><span class="spacer"></span><span class="muted sm">TMDB is required. The rest are up to you.</span></div>
+          <p class="muted sm" style="margin-bottom:16px">All three are free. Numax writes them into the profile the same way Nuvio's own app does, and switches on the feature that uses each one.</p>
           <div id="wz-keys"></div>
           <div class="mk-install" style="margin-top:16px">
             <button class="btn btn-primary" id="wz-keys-save">Save keys to this profile</button>
