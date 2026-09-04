@@ -57,6 +57,7 @@
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
+  let sySrcLabel = '';               // display name of the chosen source, for the stepper summary
   let sySettingsIncludeKeys = false; // mirrors syCreds.copy — API keys are opt-in, as in Nuvio's dialog
   let syKeysAnsweredFor = null;      // "accountId:profileIndex" the answer above was given for (see selectSource)
   // API keys / provider credentials, modelled on Nuvio's own copy dialog: one opt-in,
@@ -1278,6 +1279,8 @@
     if (!list.length) { $('sy-body').classList.remove('open'); $('sy-empty').style.display = ''; return; }
     $('sy-empty').style.display = 'none'; $('sy-body').classList.add('open');
     sel.value = (prev && list.some(r => r.accountId === prev)) ? prev : (syA && list.some(r => r.accountId === syA) ? syA : list[0].accountId);
+    // the desk is only measurable once its panel is on screen
+    syOpenSec(sySecOpen || 'source');
     renderSySource(sel.value);
   }
   async function renderSySource(id) {
@@ -1288,12 +1291,12 @@
     profiles.forEach(p => {
       const c = el('button', 'pchip' + (p.index === keep ? ' on' : ''));
       c.type = 'button'; c.appendChild(avatar(p, 26)); c.appendChild(el('span', 'pcn', p.name));
-      c.onclick = () => selectSource(id, p.index);
+      c.onclick = () => selectSource(id, p.index, true);
       box.appendChild(c);
     });
     selectSource(id, keep);
   }
-  async function selectSource(id, idx) {
+  async function selectSource(id, idx, userPicked) {
     // The "include API keys" answer belongs to the exact source profile it was given
     // for. This function runs again for the SAME source on every re-render — entering
     // the Sync Desk tab, switching accounts in the dropdown, refreshing the profile
@@ -1324,6 +1327,9 @@
       sySnapExt.watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
       resetSel(); renderSyItems(); renderSyTree(); await renderSyTargets(); updateSyCounts(); status($('sy-status'), '');
       renderReviewEmpty();
+      const prof = (await loadAccount(id)).profiles.find(p => p.index === idx);
+      sySrcLabel = prof ? (prof.name + ' · ' + accountName(id)) : '';
+      if (userPicked) syOpenSec('targets', { scroll: true }); else { syncSteps(); syRemeasure(); }
     } catch (e) { sySnap = null; status($('sy-status'), "Couldn't read source: " + e.message, 'err'); }
   }
   function resetSel() {
@@ -1537,6 +1543,70 @@
     if (!flags.copyTv && !flags.copyMobile && !flags.copyDesktop && !syCreds.copy) return { ok: false, why: 'nothing it can carry' };
     return { ok: true, flags };
   }
+  // ======================================================================
+  // Sync Desk stepper
+  //
+  // Presentation of progress only — it opens and closes sections and writes
+  // summary text. It never changes what a step contains or what Apply will do;
+  // every control inside a collapsed section is still in the DOM and still
+  // wired exactly as before.
+  // ======================================================================
+  let sySecOpen = 'source';
+  function sySecs() { return [...document.querySelectorAll('.sy-sec[data-systep]')]; }
+  function syMeasure(sec) {
+    const w = sec.querySelector('.sy-sec-w'), b = sec.querySelector('.sy-sec-b');
+    if (!w || !b) return;
+    if (!sec.classList.contains('open')) { w.style.height = '0px'; return; }
+    // 'auto' while idle so a chooser opening inside the section can still grow it
+    w.style.height = b.offsetHeight + 'px';
+    clearTimeout(w.__t);
+    w.__t = setTimeout(() => { if (sec.classList.contains('open')) w.style.height = 'auto'; }, 320);
+  }
+  function syOpenSec(key, opts) {
+    sySecOpen = key;
+    sySecs().forEach(sec => {
+      const on = sec.dataset.systep === key;
+      const w = sec.querySelector('.sy-sec-w');
+      if (w && w.style.height === 'auto') { w.style.height = sec.querySelector('.sy-sec-b').offsetHeight + 'px'; void w.offsetHeight; }
+      sec.classList.toggle('open', on);
+      syMeasure(sec);
+    });
+    syncSteps();
+    if (opts && opts.scroll) {
+      const sec = sySecs().find(x => x.dataset.systep === key);
+      if (sec) sec.scrollIntoView({ block: 'nearest', behavior: ((M.reduced && M.reduced()) || document.hidden) ? 'auto' : 'smooth' });
+    }
+  }
+  // Re-measure whenever something inside a section changes its height (a carry
+  // chooser opening, targets finishing their load) so the accordion never clips.
+  function syRemeasure() { sySecs().forEach(syMeasure); }
+  function syCarrySummary() {
+    const on = [];
+    const label = { addons: 'Add-ons', plugins: 'Plugins', collections: 'Collections', watchprogress: 'Watch progress', watched: 'Watched', settings: 'Settings' };
+    Object.keys(label).forEach(k => { const cb = $('sy-cat-' + k); if (cb && cb.checked) on.push(label[k]); });
+    return on;
+  }
+  function syncSteps() {
+    const srcName = (sySrcLabel || '').trim();
+    const nTgt = syTargets.size;
+    const carry = syCarrySummary();
+    const state = {
+      source: { done: !!srcName, sum: srcName || 'Pick the profile you want to copy from.' },
+      targets: { done: nTgt > 0, sum: nTgt ? nTgt + ' profile' + (nTgt === 1 ? '' : 's') + ' selected' : 'Select one or more profiles to receive it.' },
+      carry: { done: carry.length > 0, sum: carry.length ? (carry.length > 2 ? carry.slice(0, 2).join(', ') + ' +' + (carry.length - 2) : carry.join(', ')) : 'Nothing selected yet.' }
+    };
+    document.querySelectorAll('.sy-step[data-systep]').forEach(b => {
+      const k = b.dataset.systep, st = state[k];
+      b.classList.toggle('on', sySecOpen === k);
+      b.classList.toggle('done', st.done && sySecOpen !== k);
+      b.setAttribute('aria-selected', sySecOpen === k ? 'true' : 'false');
+      const sum = b.querySelector('.sy-step-sum'); if (sum) sum.textContent = st.sum;
+    });
+    sySecs().forEach(sec => {
+      const st = state[sec.dataset.systep]; if (!st) return;
+      const sum = sec.querySelector('.sy-sec-sum'); if (sum) sum.textContent = st.done ? st.sum : '';
+    });
+  }
   function updateSyCounts() {
     const s = sySnap || {};
     const set = (id, sel, tot) => { const e = $(id); if (e) e.textContent = tot ? sel + ' / ' + tot : '0 / 0'; };
@@ -1546,6 +1616,7 @@
     if ($('sy-cnt-settings')) $('sy-cnt-settings').textContent = sySel.settings.size + ' selected';
     if ($('sy-cnt-watchprogress')) $('sy-cnt-watchprogress').textContent = (sySnapExt.watchProgress || []).length + ' items';
     if ($('sy-cnt-watched')) $('sy-cnt-watched').textContent = (sySnapExt.watched || []).length + ' items';
+    syncSteps();
   }
 
   // ---- targets: grouped by account, chip-style, with per-account select all ----
@@ -1571,8 +1642,10 @@
         c.appendChild(avatar(p, 22)); c.appendChild(el('span', 'pcn', p.name));
         const chk = el('span', 'chk'); chk.textContent = '✓'; c.appendChild(chk);
         c.onclick = () => {
-          const on = syTargets.has(tid); on ? syTargets.delete(tid) : syTargets.add(tid);
+          const on = syTargets.has(tid), first = syTargets.size === 0;
+          on ? syTargets.delete(tid) : syTargets.add(tid);
           c.classList.toggle('on', !on); syncAcctBtn(); updateApplyBtnLabel(); scheduleLivePreview();
+          if (first && !on) syOpenSec('carry', { scroll: true });
         };
         chips.appendChild(c);
       });
@@ -1617,6 +1690,7 @@
   }
   function updateApplyBtnLabel() {
     const n = syTargets.size;
+    syncSteps();
     const btn = $('sy-apply'); if (!btn) return;
     btn.textContent = 'Apply to ' + n + ' profile' + (n === 1 ? '' : 's');
   }
@@ -2053,6 +2127,19 @@
   }
   const openTab = url => window.open(url, '_blank', 'noopener,noreferrer');
 
+  // One wiring for all three marketplace search boxes: debounced so a long list
+  // is not rebuilt on every keystroke, Escape clears, and the clear button and
+  // the input stay in step.
+  function mkFindWire(inputId, clearId, render) {
+    const inp = $(inputId), x = $(clearId);
+    if (!inp) return;
+    let t = null;
+    const run = () => { clearTimeout(t); t = setTimeout(render, 110); };
+    inp.addEventListener('input', run);
+    inp.addEventListener('keydown', e => { if (e.key === 'Escape') { inp.value = ''; render(); } });
+    if (x) x.onclick = () => { inp.value = ''; inp.focus(); render(); };
+  }
+
   // ---- add-ons ----
   function renderMkAddons() {
     const sbox = $('mk-staples'); clr(sbox);
@@ -2080,29 +2167,79 @@
       c.appendChild(acts); sbox.appendChild(c);
     });
 
-    const gbox = $('mk-addon-groups'); clr(gbox);
-    MK.ADDON_GROUPS.forEach(g => {
+    renderMkAddonGroups();
+  }
+
+  // Every group used to be expanded at once: close to thirty rows and sixty
+  // buttons on one screen. They are disclosures now, and the search box cuts
+  // across all of them — typing opens exactly the groups that still match, so
+  // nothing can hide behind a closed header.
+  const mkAddonOpen = new Set();
+  function mkDisc(sec, w, inner, open) {
+    sec.classList.toggle('open', open);
+    w.style.height = open ? inner.offsetHeight + 'px' : '0px';
+    clearTimeout(w.__t);
+    if (open) w.__t = setTimeout(() => { if (sec.classList.contains('open')) w.style.height = 'auto'; }, 320);
+  }
+  function renderMkAddonGroups() {
+    const gbox = $('mk-addon-groups'); if (!gbox) return;
+    clr(gbox);
+    const inp = $('mk-addon-search');
+    const q = ((inp && inp.value) || '').trim().toLowerCase();
+    const find = inp && inp.closest('.mk-find');
+    if (find) find.classList.toggle('has-q', !!q);
+    const hit = it => !q || it.name.toLowerCase().includes(q) || String(it.url).toLowerCase().includes(q);
+    let shown = 0, total = 0;
+    MK.ADDON_GROUPS.forEach((g, gi) => {
+      total += g.items.length;
+      const items = g.items.filter(hit);
+      if (!items.length) return;
+      shown += items.length;
+      const open = q ? true : (mkAddonOpen.size ? mkAddonOpen.has(g.title) : gi === 0);
       const sec = el('div', 'mk-sec');
-      const h = el('div', 'mk-sec-h');
+      const h = el('button', 'mk-sec-h'); h.type = 'button';
+      h.setAttribute('aria-expanded', open ? 'true' : 'false');
       h.appendChild(el('span', 'mk-sec-t ' + (g.tone || 'plain'), g.title));
       if (g.note) h.appendChild(el('span', 'mk-sec-n', g.note));
+      h.appendChild(el('span', 'spacer'));
+      h.appendChild(el('span', 'mk-sec-cnt', String(items.length)));
+      const car = el('span', 'mk-sec-car');
+      car.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+      h.appendChild(car);
       sec.appendChild(h);
+      const w = el('div', 'mk-sec-w'), inner = el('div', 'mk-sec-b');
       const rows = el('div', 'mk-rows');
-      g.items.forEach(it => {
+      items.forEach(it => {
         const r = el('div', 'mk-row');
         const ic = el('div', 'mk-ic'); ic.style.cssText = 'width:26px;height:26px;font-size:11px'; ic.textContent = it.name[0];
         const b = el('div', 'mk-rb');
         b.appendChild(el('div', 'mk-rn', it.name));
         b.appendChild(el('div', 'mk-ru', host(it.url)));
-        const open = el('button', 'btn btn-ghost btn-xs', 'Open');
-        open.onclick = () => { openTab(it.url); logAct('Opened ' + it.name, 'info'); };
+        const site = el('button', 'btn btn-ghost btn-xs', 'Open');
+        site.onclick = () => { openTab(it.url); logAct('Opened ' + it.name, 'info'); };
         const add = el('button', 'btn btn-ghost btn-xs', 'Add');
         add.onclick = () => openAddToProfile(add, it.name);
-        r.appendChild(ic); r.appendChild(b); r.appendChild(open); r.appendChild(add);
+        r.appendChild(ic); r.appendChild(b); r.appendChild(site); r.appendChild(add);
         rows.appendChild(r);
       });
-      sec.appendChild(rows); gbox.appendChild(sec);
+      inner.appendChild(rows); w.appendChild(inner); sec.appendChild(w);
+      h.onclick = () => {
+        const next = !sec.classList.contains('open');
+        // first interaction: seed the open-set from what is on screen, so
+        // opening a second group does not silently close the default one
+        if (!mkAddonOpen.size && !q) MK.ADDON_GROUPS.forEach((x, i) => { if (i === 0) mkAddonOpen.add(x.title); });
+        next ? mkAddonOpen.add(g.title) : mkAddonOpen.delete(g.title);
+        h.setAttribute('aria-expanded', next ? 'true' : 'false');
+        mkDisc(sec, w, inner, next);
+      };
+      gbox.appendChild(sec);
+      // opening state is applied once the node is in the document, so
+      // offsetHeight is real; no animation is wanted on a fresh render
+      if (open) { sec.classList.add('open'); w.style.height = 'auto'; }
     });
+    if (!shown) gbox.appendChild(el('p', 'mk-find-none', 'No add-on matches \u201c' + q + '\u201d.'));
+    const cnt = $('mk-addon-count');
+    if (cnt) cnt.textContent = q ? shown + ' of ' + total : total + ' add-ons';
   }
 
   async function openInstancePicker(anchor, group, label) {
@@ -2369,7 +2506,17 @@
     status(stn, '');
     $('mk-prov-count').textContent = mkProviders.length + ' repos';
     clr(box);
-    mkProviders.forEach(p => {
+    const inp = $('mk-prov-search');
+    const q = ((inp && inp.value) || '').trim().toLowerCase();
+    const find = inp && inp.closest('.mk-find');
+    if (find) find.classList.toggle('has-q', !!q);
+    const list = q
+      ? mkProviders.filter(p => (p.name + ' ' + p.lang + ' ' + p.manifestUrl).toLowerCase().includes(q))
+      : mkProviders;
+    if (q) $('mk-prov-count').textContent = list.length + ' of ' + mkProviders.length + ' repos';
+    if (!list.length) { box.appendChild(el('p', 'mk-find-none', 'No repo matches \u201c' + q + '\u201d.')); return; }
+    const grid = el('div', 'mk-prov-grid'); box.appendChild(grid);
+    list.forEach(p => {
       const row = el('div', 'mk-prov'); row.dataset.url = p.manifestUrl;
       const ic = el('div', 'mk-ic'); ic.textContent = p.name[0];
       const b = el('div', 'mk-pb');
@@ -2379,7 +2526,7 @@
       const open = el('button', 'btn btn-ghost btn-xs', 'View');
       open.onclick = () => openProvider(p);
       row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open);
-      box.appendChild(row);
+      grid.appendChild(row);
       // Reachability is a fact worth showing: the community index currently
       // lists several dead manifests as though they were healthy.
       MK.loadManifest(p.manifestUrl).then(m => {
@@ -2532,21 +2679,54 @@
     clr(box);
 
     const when = mkCollectionsCache.capturedAt ? new Date(mkCollectionsCache.capturedAt).toLocaleString() : 'unknown time';
-    const n = el('div', 'mk-note');
+    // The caveat is real and must stay readable, but it was a four-line wall of
+    // text sitting above every visit. One line now, with the detail a click away.
+    const n = el('div', 'mk-note mk-note-row');
     n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
-      + '<div><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.<br>' + esc(MK.COLLECTIONS.why) + '</div>';
+      + '<span class="mk-note-line"><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.</span>';
+    const why = el('div', 'mk-note-why', MK.COLLECTIONS.why);
+    const more = el('button', 'link', 'Why?');
+    more.onclick = () => { const on = n.classList.toggle('open'); more.textContent = on ? 'Hide' : 'Why?'; };
+    const brw = el('button', 'link', 'Browse on Nuvio');
+    brw.onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
+    const acts = el('span', 'mk-note-acts'); acts.appendChild(more); acts.appendChild(brw);
+    n.appendChild(acts); n.appendChild(why);
     box.appendChild(n);
 
-    const bar = el('div', 'actbar');
-    const b = el('button', 'btn btn-ghost btn-xs', 'Browse on Nuvio');
-    b.onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
-    bar.appendChild(b);
-    box.appendChild(bar);
-
     const grid = el('div', 'mk-coll-grid');
-    const items = (mkCollectionsCache.items || []).slice().sort((a, b) => (b.installs_count || 0) - (a.installs_count || 0));
-    items.forEach(c => grid.appendChild(renderMkCollCard(c)));
     box.appendChild(grid);
+    mkCollGrid = grid;
+    renderMkCollGrid();
+  }
+
+  // 99 cards with no way to narrow them was the whole problem here. Search and
+  // sort are pure view state: nothing is fetched again and the install path is
+  // untouched.
+  let mkCollGrid = null;
+  function renderMkCollGrid() {
+    const grid = mkCollGrid; if (!grid || !mkCollectionsCache) return;
+    clr(grid);
+    const inp = $('mk-coll-search');
+    const q = ((inp && inp.value) || '').trim().toLowerCase();
+    const find = inp && inp.closest('.mk-find');
+    if (find) find.classList.toggle('has-q', !!q);
+    const sort = ($('mk-coll-sort') && $('mk-coll-sort').value) || 'installs';
+    const all = mkCollectionsCache.items || [];
+    const hit = c => {
+      if (!q) return true;
+      const tags = Array.isArray(c.tags) ? c.tags.join(' ') : '';
+      const need = Array.isArray(c.requiredAddons) ? c.requiredAddons.map(a => a.addonName || a.addonId || '').join(' ') : '';
+      return (String(c.title || '') + ' ' + String(c.description || '') + ' ' + tags + ' ' + need).toLowerCase().includes(q);
+    };
+    const items = all.filter(hit).sort((a, b) => {
+      if (sort === 'title') return String(a.title || '').localeCompare(String(b.title || ''));
+      if (sort === 'likes') return (b.likes_count || 0) - (a.likes_count || 0);
+      return (b.installs_count || 0) - (a.installs_count || 0);
+    });
+    const cnt = $('mk-coll-count');
+    if (cnt) cnt.textContent = q ? items.length + ' of ' + all.length : all.length + ' collections';
+    if (!items.length) { grid.appendChild(el('p', 'mk-find-none', 'No collection matches \u201c' + q + '\u201d.')); return; }
+    items.forEach(c => grid.appendChild(renderMkCollCard(c)));
   }
 
   // Descriptions come from creators as raw markdown; there's no renderer here,
@@ -2573,7 +2753,12 @@
     if (c.description) body.appendChild(el('div', 'mk-coll-desc', mdStrip(c.description)));
     if (Array.isArray(c.tags) && c.tags.length) {
       const tg = el('div', 'mk-coll-tags');
-      c.tags.forEach(t => tg.appendChild(el('span', 'mk-lang', t)));
+      c.tags.slice(0, 4).forEach(t => tg.appendChild(el('span', 'mk-lang', t)));
+      if (c.tags.length > 4) {
+        const more = el('span', 'mk-coll-more', '+' + (c.tags.length - 4));
+        more.title = c.tags.join(', ');
+        tg.appendChild(more);
+      }
       body.appendChild(tg);
     }
     const s = c.stats || {};
@@ -2748,14 +2933,25 @@
     $('pf-save-btn').onclick = saveAllDirty;
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
     document.querySelectorAll('.mk-tab').forEach(b => b.onclick = () => switchMkTab(b.dataset.mktab));
+    // marketplace search / sort — view state only, nothing is refetched
+    mkFindWire('mk-addon-search', 'mk-addon-clear', renderMkAddonGroups);
+    mkFindWire('mk-prov-search', 'mk-prov-clear', () => renderMkPlugins());
+    mkFindWire('mk-coll-search', 'mk-coll-clear', renderMkCollGrid);
+    if ($('mk-coll-sort')) $('mk-coll-sort').addEventListener('change', renderMkCollGrid);
     $('mk-prov-refresh').onclick = () => renderMkPlugins(true);
     $('mk-prov-close').onclick = () => { $('mk-prov-detail-card').style.display = 'none'; };
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
+    // stepper: the header chips and the section headers open the same sections
+    document.querySelectorAll('.sy-step[data-systep]').forEach(b => b.onclick = () => syOpenSec(b.dataset.systep, { scroll: true }));
+    document.querySelectorAll('.sy-sec[data-systep] .sy-sec-h').forEach(h => h.onclick = () => {
+      const sec = h.closest('.sy-sec');
+      syOpenSec(sec.classList.contains('open') ? '' : sec.dataset.systep);
+    });
     $('sy-oldapp-dismiss').onclick = () => { $('sy-oldapp-notice').style.display = 'none'; };
     $('sy-select-all').onclick = sySelectAll;
     $('sy-deselect-all').onclick = syDeselectAll;
     $('sy-dev-choice').onclick = syDevChoice;
-    document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = (e) => { e.preventDefault(); $(b.dataset.target).classList.toggle('open'); });
+    document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = (e) => { e.preventDefault(); $(b.dataset.target).classList.toggle('open'); syRemeasure(); });
     // live preview on carry-over category toggles
     ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
       const cb = $(id); if (cb) cb.addEventListener('change', () => { updateSyCounts(); scheduleLivePreview(); });
@@ -2792,6 +2988,7 @@
     }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
+  window.addEventListener('resize', () => { if (typeof syRemeasure === 'function') syRemeasure(); });
   window.addEventListener('DOMContentLoaded', () => {
     wire(); renderActivity();
     enhanceAllSelects();

@@ -14,6 +14,10 @@
   var W = window, D = document;
   var RMQ = W.matchMedia ? W.matchMedia('(prefers-reduced-motion: reduce)') : null;
   function reduced() { return !!(RMQ && RMQ.matches); }
+  // 'smooth' is animated by the compositor and simply never advances while the
+  // document is hidden, which leaves scroll controls looking broken. Ask for it
+  // only when it can actually run.
+  function scrollEase() { return (reduced() || D.hidden) ? 'auto' : 'smooth'; }
   var raf = W.requestAnimationFrame ? W.requestAnimationFrame.bind(W) : function (f) { return setTimeout(f, 16); };
 
   // ---------------------------------------------------------------
@@ -44,7 +48,8 @@
     { key: 'pftabs', host: '.pf-tabs-bar', item: '.pf-editor-tab', kind: 'underline' },
     { key: 'settabs', host: '.set-tabs', item: '.set-tab', kind: 'pill' },
     { key: 'platbar', host: '.set-platbar', item: 'button', kind: 'pill' },
-    { key: 'sysec', host: '.sy-set-sections', item: '.sy-set-sec', kind: 'ghost' }
+    { key: 'sysec', host: '.sy-set-sections', item: '.sy-set-sec', kind: 'ghost' },
+    { key: 'mktabs', host: '.mk-tabs', item: '.mk-tab', kind: 'ghost' }
   ];
   var lastBox = {};
 
@@ -327,15 +332,27 @@
       b.setAttribute('aria-label', dir === 'prev' ? 'Scroll left' : 'Scroll right');
       b.textContent = dir === 'prev' ? '‹' : '›';
       b.onclick = function () {
-        scroller.scrollBy({ left: (dir === 'prev' ? -1 : 1) * Math.max(140, scroller.clientWidth * 0.7), behavior: reduced() ? 'auto' : 'smooth' });
+        scroller.scrollBy({ left: (dir === 'prev' ? -1 : 1) * Math.max(140, scroller.clientWidth * 0.7), behavior: scrollEase() });
       };
       wrap.appendChild(b); return b;
     };
-    var rec = { s: scroller, wrap: wrap, prev: mk('prev'), next: mk('next') };
+    var rec = { s: scroller, wrap: wrap, prev: mk('prev'), next: mk('next'), lastOn: null };
     scroller.addEventListener('scroll', schedule, { passive: true });
+    // A horizontal-only strip gets no scroll from a plain vertical wheel unless
+    // the page itself has nowhere to go, so translate it here. Trackpad
+    // horizontal gestures (deltaX) are left to the browser.
+    scroller.addEventListener('wheel', function (e) {
+      if (e.deltaY === 0 || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      var max = scroller.scrollWidth - scroller.clientWidth;
+      if (max <= 0) return;
+      var next = scroller.scrollLeft + e.deltaY;
+      if (next < 0 || next > max) return;   // let the page scroll at either end
+      e.preventDefault();
+      scroller.scrollLeft = next;
+    }, { passive: false });
     scroller.addEventListener('keydown', function (e) {
       if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-      scroller.scrollBy({ left: e.key === 'ArrowLeft' ? -170 : 170, behavior: reduced() ? 'auto' : 'smooth' });
+      scroller.scrollBy({ left: e.key === 'ArrowLeft' ? -170 : 170, behavior: scrollEase() });
     });
     rails.push(rec); schedule();
   }
@@ -359,11 +376,14 @@
   // keep the chosen profile visible when selection moves inside a rail
   function revealSelected() {
     for (var i = 0; i < rails.length; i++) {
-      var on = rails[i].s.querySelector('.pchip.on');
+      var r = rails[i];
+      var on = r.s.querySelector('.pchip.on');
+      if (on === r.lastOn) continue;   // nothing was re-selected; leave the scroll alone
+      r.lastOn = on;
       if (!on) continue;
-      var sr = rails[i].s.getBoundingClientRect(), br = on.getBoundingClientRect();
+      var sr = r.s.getBoundingClientRect(), br = on.getBoundingClientRect();
       if (br.left < sr.left - 1 || br.right > sr.right + 1) {
-        try { on.scrollIntoView({ inline: 'center', block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); } catch (e) {}
+        try { on.scrollIntoView({ inline: 'center', block: 'nearest', behavior: scrollEase() }); } catch (e) {}
       }
     }
   }
@@ -631,7 +651,9 @@
   function boot() {
     scanBg(D);
     rail(D.querySelector('.pf-picker-scroll'));
-    rail(D.getElementById('sy-source'));
+    // #sy-source is deliberately NOT a rail: its section is an accordion that is
+    // only open while a source is being chosen, so the chips simply wrap and
+    // nothing is ever hidden off the edge of a 380px column.
     mo.observe(D.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'disabled'] });
     schedule();
     // bars inside a panel that starts hidden have no geometry on first pass
