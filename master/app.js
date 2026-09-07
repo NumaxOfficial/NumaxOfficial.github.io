@@ -1394,6 +1394,21 @@
   }
   const syList = k => { const s = sySnap; return !s ? [] : (k === 'collections' ? (s.collections || []) : (s[k] || [])); };
   const syKey = (k, x) => k === 'collections' ? collKey(x) : x.url;
+
+  // The category tick and its item picks are one control, not two. Only the tick
+  // reaches the plan (`cats` in syPreview), so before this you could select 2 of 4
+  // add-ons, read "2 / 4" on the row, and have the whole category skipped at apply
+  // time with nothing saying so. The tick now always reports what is actually
+  // selected: none, some (a dash), or all.
+  function syMirrorCat(kind) {
+    const cb = $('sy-cat-' + kind); if (!cb) return;
+    // With no source read yet there is nothing to mirror, and forcing the tick
+    // off here would make it spring back the moment you clicked it.
+    if (!sySnap) return;
+    const picked = sySel[kind].size, total = syList(kind).length;
+    cb.checked = picked > 0;
+    cb.indeterminate = picked > 0 && picked < total;
+  }
   function renderSyItems() { ['addons', 'plugins', 'collections'].forEach(renderSyItem); }
   function renderSyItem(kind) {
     const box = $('sy-items-' + kind); clr(box); const list = syList(kind);
@@ -1414,7 +1429,7 @@
     sySel.collections = new Set((sySnap.collections || []).map(collKey));
     sySel.settings = new Set();
     PLATS.forEach(pl => tabsFor(pl).forEach(tab => { if (tab.key === 'playback' && tabStat(pl, tab).copyable > 0) sySel.settings.add(pl + '::' + tab.key); }));
-    $('sy-cat-addons').checked = true; $('sy-cat-plugins').checked = true; $('sy-cat-collections').checked = true;
+    // addons / plugins / collections ticks follow their picks via syMirrorCat().
     $('sy-cat-settings').checked = sySel.settings.size > 0;
     $('sy-cat-watchprogress').checked = false; $('sy-cat-watched').checked = false;
     renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
@@ -1614,6 +1629,7 @@
     set('sy-cnt-addons', sySel.addons.size, (s.addons || []).length);
     set('sy-cnt-plugins', sySel.plugins.size, (s.plugins || []).length);
     set('sy-cnt-collections', sySel.collections.size, (s.collections || []).length);
+    ['addons', 'plugins', 'collections'].forEach(syMirrorCat);
     if ($('sy-cnt-settings')) $('sy-cnt-settings').textContent = sySel.settings.size + ' selected';
     if ($('sy-cnt-watchprogress')) $('sy-cnt-watchprogress').textContent = (sySnapExt.watchProgress || []).length + ' items';
     if ($('sy-cnt-watched')) $('sy-cnt-watched').textContent = (sySnapExt.watched || []).length + ' items';
@@ -3502,7 +3518,16 @@
     h.appendChild(open);
     c.appendChild(h);
     if (d.price) c.appendChild(el('div', 'wz-pick-price', d.price));
-    c.appendChild(wzProsCons(d.pros, d.cons));
+    // Seven of these side by side, each with its own reasoning, was a wall of
+    // text. The detail folds away and opens on hover, keyboard focus, or once
+    // the card is the picked one — see .wz-pc-wrap. Route cards keep theirs
+    // open: there are only two and the reasoning IS the choice.
+    const wrap = el('div', 'wz-pc-wrap');
+    wrap.appendChild(wzProsCons(d.pros, d.cons));
+    c.appendChild(wrap);
+    const hint = el('div', 'wz-pick-more');
+    hint.appendChild(el('span', null, 'Pros and cons'));
+    c.appendChild(hint);
     return c;
   }
   function wzMarkDebrid() {
@@ -3533,17 +3558,54 @@
       clr(box); status(st, '');
       $('wz-inst-count').textContent = list.length + ' public';
       if (!list.length) { box.appendChild(el('p', 'empty', 'No instances listed right now.')); return; }
-      list.forEach(i => {
-        const r = el('div', 'wz-inst');
-        r.appendChild(el('span', 'nm', i.name));
-        const up = el('span', 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : ''), i.uptime != null ? i.uptime.toFixed(2) + '% up' : 'uptime unknown');
-        r.appendChild(up);
-        r.appendChild(el('span', 'spacer'));
-        const b = el('button', 'btn btn-solid btn-xs', 'Open');
-        b.onclick = () => { wzOpen(i.url); logAct('Wizard: opened AIOStreams instance ' + i.name, 'info'); };
-        r.appendChild(b);
-        box.appendChild(r);
-      });
+      const openIt = i => () => { wzOpen(i.url); logAct('Wizard: opened AIOStreams instance ' + i.name, 'info'); };
+      const upText = i => i.uptime != null ? i.uptime.toFixed(2) + '% up' : 'uptime unknown';
+      const upCls = i => 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : '');
+
+      // The list is sorted best-uptime-first, so the top one is the recommendation.
+      // It stays a full row; the rest are a choice you rarely need to make, so they
+      // wait behind "See more" and open as a grid.
+      const first = list[0];
+      const r = el('div', 'wz-inst');
+      r.appendChild(el('span', 'nm', first.name));
+      r.appendChild(el('span', upCls(first), upText(first)));
+      r.appendChild(el('span', 'spacer'));
+      const fb = el('button', 'btn btn-solid btn-xs', 'Open');
+      fb.onclick = openIt(first);
+      r.appendChild(fb);
+      box.appendChild(r);
+
+      const rest = list.slice(1);
+      if (rest.length) {
+        const more = el('div', 'wz-inst-more'); more.style.display = 'none';
+        rest.forEach(i => {
+          const sq = el('div', 'wz-inst-sq');
+          sq.appendChild(el('div', 'nm', i.name));
+          sq.appendChild(el('div', upCls(i), upText(i)));
+          sq.appendChild(el('span', 'sp'));
+          const b = el('button', 'btn btn-solid btn-xs', 'Open');
+          b.onclick = openIt(i);
+          sq.appendChild(b);
+          more.appendChild(sq);
+        });
+        const toggle = el('button', 'btn btn-ghost btn-xs wz-inst-seemore', 'See ' + rest.length + ' more');
+        toggle.onclick = () => {
+          if (more.style.display !== 'none') {
+            more.classList.remove('in');
+            more.style.display = 'none';
+            toggle.textContent = 'See ' + rest.length + ' more';
+            return;
+          }
+          // The delay only paces the animation; it never decides whether a card
+          // is visible. See .wz-inst-more.in in the stylesheet.
+          [...more.children].forEach((sq, n) => { sq.style.animationDelay = Math.min(n * 35, 420) + 'ms'; });
+          more.style.display = '';
+          more.classList.add('in');
+          toggle.textContent = 'Show fewer';
+        };
+        box.appendChild(toggle);
+        box.appendChild(more);
+      }
       box.dataset.built = '1';
     } catch (e) {
       clr(box); status(st, "Couldn't read the instance list: " + e.message, 'err');
@@ -3942,8 +4004,20 @@
     $('sy-deselect-all').onclick = syDeselectAll;
     $('sy-dev-choice').onclick = syDevChoice;
     document.querySelectorAll('.sy-tgl').forEach(b => b.onclick = (e) => { e.preventDefault(); $(b.dataset.target).classList.toggle('open'); syRemeasure(); });
-    // live preview on carry-over category toggles
-    ['sy-cat-addons', 'sy-cat-plugins', 'sy-cat-collections', 'sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
+    // Carry-over categories. Ticking one selects everything in it; unticking one
+    // clears its picks, so the count on the row can never claim items that are
+    // not going to be carried. syMirrorCat() drives the tick the other way.
+    ['addons', 'plugins', 'collections'].forEach(kind => {
+      const cb = $('sy-cat-' + kind); if (!cb) return;
+      cb.addEventListener('change', () => {
+        cb.indeterminate = false;
+        if (cb.checked) syList(kind).forEach(x => sySel[kind].add(syKey(kind, x)));
+        else sySel[kind].clear();
+        renderSyItem(kind); updateSyCounts(); scheduleLivePreview();
+      });
+    });
+    // These two carry no per-item picks, so the tick is the whole story.
+    ['sy-cat-watchprogress', 'sy-cat-watched'].forEach(id => {
       const cb = $(id); if (cb) cb.addEventListener('change', () => { updateSyCounts(); scheduleLivePreview(); });
     });
     // API keys are no longer a modal prompt — they are the "API keys and provider
