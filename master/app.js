@@ -2967,7 +2967,7 @@
   const WZ_STEPS = ['account', 'keys', 'streams', 'meta', 'done'];
   // Everything the wizard knows about the run in progress. Reset when the
   // target profile changes, so a summary can never describe a different profile.
-  let wz = { step: 'account', aid: null, idx: null, route: null, debrid: null, done: [] };
+  let wz = { step: 'account', aid: null, idx: null, mode: null, host: null, route: null, debrid: null, done: [] };
 
   const wzTarget = () => (wz.aid && wz.idx != null) ? { aid: wz.aid, idx: wz.idx, name: wzProfileName() } : null;
   function wzProfileName() {
@@ -3446,7 +3446,30 @@
   // ======================================================================
   // step 3 — streams
   // ======================================================================
+  // Two questions, one after the other: how much of this do you want to do
+  // yourself, and then (only on the manual path) which route. The route cards
+  // and both route panels are exactly what they were before; they just sit one
+  // card further in.
   function wzRenderStreams() {
+    const modes = $('wz-modes');
+    if (modes && modes.dataset.built !== '1') {
+      clr(modes);
+      WZ.MODES.forEach(m => {
+        const c = wzCard('', () => { wz.mode = m.id; wzRenderStreams(); });
+        c.dataset.wzmode = m.id;
+        const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', m.name));
+        if (m.tag) h.appendChild(wzTag(m.tag));
+        c.appendChild(h);
+        c.appendChild(el('div', 'wz-pick-one', m.oneLiner));
+        c.appendChild(wzProsCons(m.pros, m.cons));
+        modes.appendChild(c);
+      });
+      modes.dataset.built = '1';
+    }
+    document.querySelectorAll('[data-wzmode]').forEach(b => b.classList.toggle('on', b.dataset.wzmode === wz.mode));
+    $('wz-mode-simple').style.display = wz.mode === 'simple' ? '' : 'none';
+    $('wz-mode-advanced').style.display = wz.mode === 'advanced' ? '' : 'none';
+
     const box = $('wz-routes');
     if (box && box.dataset.built !== '1') {
       clr(box);
@@ -3463,10 +3486,267 @@
       box.dataset.built = '1';
     }
     document.querySelectorAll('[data-wzroute]').forEach(b => b.classList.toggle('on', b.dataset.wzroute === wz.route));
-    $('wz-route-aiostreams').style.display = wz.route === 'aiostreams' ? '' : 'none';
-    $('wz-route-native').style.display = wz.route === 'native' ? '' : 'none';
-    if (wz.route === 'aiostreams') wzRenderAio();
-    if (wz.route === 'native') wzRenderNative();
+    const adv = wz.mode === 'advanced';
+    $('wz-route-aiostreams').style.display = adv && wz.route === 'aiostreams' ? '' : 'none';
+    $('wz-route-native').style.display = adv && wz.route === 'native' ? '' : 'none';
+    if (wz.mode === 'simple') wzRenderSimple();
+    if (adv && wz.route === 'aiostreams') wzRenderAio();
+    if (adv && wz.route === 'native') wzRenderNative();
+  }
+
+  // ======================================================================
+  // step 3, simple — "do it all for me"
+  // ======================================================================
+  // Three things: a TorBox key, a host, one button. The button builds Furqan's
+  // exported AIOStreams template with that key in it, has the relay create it on
+  // the chosen host, and brings back the manifest link — which then goes into the
+  // profile through wzInstallBox, i.e. the same engine.planTarget + api.applyPlan
+  // path as every other write in this app. There is no second write mechanism.
+  function wzRenderSimple() {
+    const S = WZ.SIMPLE, P = WZ.PRESET;
+    const pre = $('wz-sim-preset');
+    if (pre.dataset.built !== '1') {
+      $('wz-sim-preset-t').textContent = P.title;
+      $('wz-sim-preset-b').textContent = P.blurb;
+      clr(pre);
+      P.points.forEach(p => pre.appendChild(el('li', null, p)));
+      $('wz-sim-preset-n').textContent = P.note;
+      $('wz-sim-key-b').textContent = S.keyBlurb;
+      $('wz-sim-key').placeholder = S.keyPlaceholder;
+      $('wz-sim-key-h').textContent = S.keyHint;
+      $('wz-sim-key-no').textContent = S.noTorbox;
+      $('wz-sim-hosts-b').textContent = S.instBlurb;
+      $('wz-sim-run').textContent = S.runLabel;
+      pre.dataset.built = '1';
+    }
+    // The relay is the one step a web page cannot take (see wizard.js RELAY).
+    // Without it this path says so plainly instead of offering a dead button.
+    const off = $('wz-sim-off');
+    if (!WZ.RELAY) {
+      off.textContent = S.notDeployed; off.style.display = '';
+      $('wz-sim-run').disabled = true;
+    } else { off.style.display = 'none'; }
+    if ($('wz-sim-hosts').dataset.built !== '1') wzLoadHosts();
+  }
+
+  async function wzLoadHosts() {
+    const box = $('wz-sim-hosts'), st = $('wz-sim-hosts-status');
+    clr(box); status(st, 'Reading the uptime tracker…');
+    try {
+      if (!MK) throw new Error('the marketplace data layer did not load');
+      const list = await MK.loadInstances('AIOStreams', true);
+      clr(box); status(st, '');
+      $('wz-sim-host-count').textContent = list.length + ' public';
+      if (!list.length) { box.appendChild(el('p', 'empty', 'No hosts listed right now — try Refresh in a minute.')); return; }
+      // Best uptime first, so the top one is the recommendation and is preselected.
+      if (!list.some(i => i.url === wz.host)) wz.host = list[0].url;
+      list.forEach(i => {
+        const r = el('div', 'wz-host');
+        r.setAttribute('role', 'button'); r.tabIndex = 0;
+        r.dataset.wzhost = i.url;
+        const pick = e => { if (e && e.target.closest('button')) return; wz.host = i.url; wzMarkHost(); };
+        r.onclick = pick;
+        r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+        r.appendChild(el('span', 'tick'));
+        r.appendChild(el('span', 'nm', i.name));
+        r.appendChild(el('span', 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : ''),
+          i.uptime != null ? i.uptime.toFixed(2) + '% up' : 'uptime unknown'));
+        r.appendChild(el('span', 'spacer'));
+        const open = el('button', 'btn btn-ghost btn-xs', 'Open');
+        open.onclick = e => { e.stopPropagation(); wzOpen(i.url); };
+        r.appendChild(open);
+        box.appendChild(r);
+      });
+      wzMarkHost();
+      box.dataset.built = '1';
+    } catch (e) {
+      clr(box); status(st, "Couldn't read the host list: " + e.message, 'err');
+      const again = el('button', 'btn btn-ghost btn-xs', 'Try again');
+      again.onclick = () => wzLoadHosts();
+      box.appendChild(again);
+    }
+  }
+  function wzMarkHost() {
+    document.querySelectorAll('#wz-sim-hosts [data-wzhost]').forEach(r => r.classList.toggle('on', r.dataset.wzhost === wz.host));
+  }
+
+  // The template is fetched rather than inlined so a newer export from Furqan's
+  // own AIOStreams can simply replace the file. Cached for the session.
+  let _wzTemplate = null;
+  async function wzTemplate() {
+    if (_wzTemplate) return JSON.parse(JSON.stringify(_wzTemplate));
+    const r = await fetch(WZ.TEMPLATE_URL, { cache: 'no-cache' });
+    if (!r.ok) throw new Error('the Numax preset file could not be read (HTTP ' + r.status + ')');
+    const j = await r.json();
+    if (!j || !j.config || typeof j.config !== 'object') throw new Error('the Numax preset file is not in the expected shape');
+    _wzTemplate = j;
+    return JSON.parse(JSON.stringify(j));
+  }
+
+  // AIOStreams needs a password on every configuration and cannot recover it.
+  // Generated rather than asked for — it is one less field, and it is shown with
+  // the result and flagged as the thing to write down.
+  function wzPassword() {
+    const abc = 'abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const n = new Uint32Array(20); crypto.getRandomValues(n);
+    return Array.from(n, x => abc[x % abc.length]).join('');
+  }
+
+  // Every placeholder AIOStreams' own template wizard would have prompted for.
+  // Left in place, the server reads the literal "<template_placeholder>" as a
+  // real value — TMDB rejects it and the whole create fails.
+  const WZ_PLACEHOLDER = /<(required_|optional_)?template_placeholder>/i;
+
+  async function wzSimRun() {
+    const t = wzTarget(); if (!t) return;
+    const st = $('wz-sim-status'), btn = $('wz-sim-run'), out = $('wz-sim-result');
+    const key = ($('wz-sim-key').value || '').trim();
+    if (!WZ.RELAY) { status(st, WZ.SIMPLE.notDeployed, 'err'); return; }
+    if (!key) { status(st, 'Paste your TorBox API key first.', 'err'); $('wz-sim-key').classList.add('wz-need'); return; }
+    $('wz-sim-key').classList.remove('wz-need');
+    if (!wz.host) { status(st, 'Pick a host first.', 'err'); return; }
+
+    let base;
+    try { base = new URL(wz.host).origin; } catch { status(st, 'That host address could not be read.', 'err'); return; }
+
+    btn.disabled = true; out.style.display = 'none'; clr(out);
+    status(st, WZ.SIMPLE.running);
+    const password = wzPassword();
+    try {
+      const tpl = await wzTemplate();
+      const cfg = tpl.config;
+      const svc = (cfg.services || []).find(s => s && s.id === 'torbox');
+      if (!svc) throw new Error('the Numax preset does not have a TorBox service in it');
+      svc.enabled = true;
+      svc.credentials = Object.assign({}, svc.credentials, { apiKey: key });
+
+      // The preset is NOT optional about TMDB: its title matching, year matching
+      // and digital-release filter all need one, and AIOStreams refuses the whole
+      // configuration without it (seen live, not assumed). So it is resolved here
+      // and the run stops with something actionable if there isn't one, rather
+      // than failing later with AIOStreams' own wording.
+      if (WZ_PLACEHOLDER.test(String(cfg.tmdbApiKey || ''))) {
+        status(st, 'Checking your TMDB key…');
+        const tmdb = await wzTmdbKey(t);
+        if (!tmdb) {
+          status(st, 'This setup needs a TMDB key — it is what gets titles and years right. Add one on the API keys step, then come back.', 'err');
+          btn.disabled = false; return;
+        }
+        cfg.tmdbApiKey = tmdb;
+      }
+      // Anything else the preset left as a placeholder is dropped: a placeholder
+      // is not a value, and AIOStreams would try to authenticate it as one.
+      Object.keys(cfg).forEach(k => { if (WZ_PLACEHOLDER.test(String(cfg[k] || ''))) delete cfg[k]; });
+
+      status(st, WZ.SIMPLE.running);
+      const r = await wzRelay(base, cfg, password);
+      if (!r.ok) {
+        status(st, /tmdb/i.test(r.error || '')
+          ? 'TMDB would not accept that key, and this setup needs it. Fix it on the API keys step and try again — nothing was created.'
+          : r.error, 'err');
+        btn.disabled = false; return;
+      }
+
+      status(st, 'Done — your setup is ready on ' + host(base) + '.', 'ok');
+      wzSimResult(r, password, base);
+      logAct('Wizard: created an AIOStreams configuration on ' + host(base) + ' for profile ' + t.idx, 'info');
+      wzLog('Built a tuned AIOStreams setup on ' + host(base) + '.');
+      celebrate($('wz-sim-run'));
+    } catch (e) {
+      status(st, "Couldn't build it: " + e.message, 'err');
+      btn.disabled = false;
+    }
+  }
+
+  // The TMDB key for this run: what was typed on the keys step if it is still on
+  // screen, otherwise what the profile already has stored. Coming back to the
+  // wizard later leaves that input empty while the key is sitting in the profile,
+  // and refusing to build at that point would be wrong.
+  async function wzTmdbKey(t) {
+    const typed = (($('wz-key-tmdb') || {}).value || '').trim();
+    if (typed) return typed;
+    try {
+      const rows = await A.client(store, t.aid).pullProviderCredentials(t.idx);
+      const row = (rows || []).find(r => r.provider === 'tmdb');
+      const k = row && row.credential_json && row.credential_json.api_key;
+      return (typeof k === 'string' && k.trim()) ? k.trim() : '';
+    } catch (e) { return ''; }
+  }
+
+  // The one call a browser cannot make against AIOStreams directly. Returns a
+  // flat {ok, ...} rather than throwing, so every failure carries a sentence.
+  async function wzRelay(base, config, password) {
+    let res;
+    try {
+      res = await fetch(WZ.RELAY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instance: base, config, password }),
+      });
+    } catch (e) {
+      return { ok: false, error: 'The Numax setup service could not be reached. Check your connection, or use the manual path below.' };
+    }
+    let j = null;
+    try { j = await res.json(); } catch { /* reported just below */ }
+    if (!res.ok || !j || !j.manifestUrl) {
+      return { ok: false, error: (j && j.error) || ('The setup service answered HTTP ' + res.status + ' and nothing was created.') };
+    }
+    return { ok: true, url: j.manifestUrl, uuid: j.uuid, configureUrl: j.configureUrl, keyUnchecked: !!j.keyUnchecked };
+  }
+
+  function wzSimResult(r, password, base) {
+    const out = $('wz-sim-result');
+    clr(out); out.style.display = '';
+    const w = el('div', 'wz-out');
+    w.appendChild(wzOutRow('Your add-on link', r.url));
+    w.appendChild(wzOutRow('Configuration ID', r.uuid));
+    w.appendChild(wzOutRow('Password', password));
+    out.appendChild(w);
+    const warn = el('div', 'wz-catch'); warn.style.marginTop = '12px';
+    warn.textContent = WZ.SIMPLE.saveWarn;
+    out.appendChild(warn);
+    if (r.keyUnchecked) {
+      const n = el('p', 'muted sm'); n.style.marginTop = '10px';
+      n.textContent = 'TorBox could not be reached to check that key, so it went in as typed. If nothing plays, check the key first.';
+      out.appendChild(n);
+    }
+    const row = el('div'); row.style.marginTop = '12px';
+    const openIt = el('button', 'btn btn-ghost btn-xs wz-out-open', 'Change it on ' + host(base));
+    openIt.onclick = () => wzOpen(r.configureUrl || base);
+    row.appendChild(openIt);
+    out.appendChild(row);
+
+    // Hand the link to the same install box every other add-on goes through, so
+    // Next writes it in with Merge-vs-Overwrite and per-item reporting intact.
+    const slot = $('wz-sim-install');
+    slot.style.display = '';
+    wzInstallBox(slot, {
+      step: 'streams', label: 'AIOStreams',
+      hint: WZ.SIMPLE.installHint,
+      defaultName: 'AIOStreams',
+      defaultUrl: r.url,
+    });
+  }
+
+  function wzOutRow(label, value) {
+    const r = el('div', 'wz-out-row');
+    const tx = el('div');
+    tx.appendChild(el('div', 'k', label));
+    tx.appendChild(el('div', 'v', value));
+    r.appendChild(tx);
+    const b = el('button', 'btn btn-ghost btn-xs', 'Copy');
+    b.onclick = async () => {
+      const done = await wzCopy(value);
+      b.textContent = done ? 'Copied' : 'Select it instead';
+      setTimeout(() => { b.textContent = 'Copy'; }, 1800);
+    };
+    r.appendChild(b);
+    return r;
+  }
+  // Clipboard access can be refused (no permission, insecure context). The value
+  // is select-all-on-click in the markup, so a refusal has a plain fallback.
+  async function wzCopy(text) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
   }
 
   function wzRenderAio() {
@@ -3497,7 +3777,7 @@
     // paste-back
     if ($('wz-aio-install').dataset.built !== '1') {
       wzInstallBox($('wz-aio-install'), {
-        label: 'AIOStreams',
+        step: 'streams', label: 'AIOStreams',
         hint: 'The manifest link AIOStreams gave you — it ends in /manifest.json.',
         defaultName: 'AIOStreams',
       });
@@ -3640,7 +3920,7 @@
     }
     if ($('wz-p2p-install').dataset.built !== '1') {
       wzInstallBox($('wz-p2p-install'), {
-        label: 'torrent add-on',
+        step: 'streams', label: 'torrent add-on',
         hint: 'The manifest link from whichever add-on you configured — with no debrid key in it.',
         defaultName: 'Streams',
       });
@@ -3855,7 +4135,15 @@
     arm();
     w.appendChild(btn); w.appendChild(st); w.appendChild(res);
     host_.appendChild(w);
-    wzPending[opts.step].push({
+    // A box can be rebuilt in place (the simple path rebuilds its own every time
+    // it produces a link). clr() above detached the old inputs but its pending
+    // entry would still be here, still reporting itself dirty, and Next would
+    // commit from fields that are no longer on the page — so the old entry for
+    // this same host goes first.
+    const q = wzPending[opts.step];
+    for (let i = q.length - 1; i >= 0; i--) if (q[i].host === host_) q.splice(i, 1);
+    q.push({
+      host: host_,
       // offsetParent is null for a hidden box, which is how an already-installed
       // metadata card (its box collapsed) stays out of Next's way.
       dirty: () => { const u = url.value.trim(); return !!u && u !== saved && host_.offsetParent !== null; },
@@ -3981,6 +4269,20 @@
       $('wz-nodebrid-btn').onclick = wzNoDebrid;
       $('wz-inst-refresh').onclick = wzLoadInstances;
       $('wz-native-save').onclick = wzSaveNativeKey;
+      $('wz-sim-run').onclick = wzSimRun;
+      $('wz-sim-key-open').onclick = () => wzOpen('https://torbox.app/settings');
+      $('wz-sim-hosts-refresh').onclick = wzLoadHosts;
+      // Editing the key means starting over, so the finished link and its install
+      // box are put away: a stale link left on screen next to a new key is a lie,
+      // and a hidden install box reports itself clean so Next won't write it.
+      $('wz-sim-key').addEventListener('input', () => {
+        $('wz-sim-key').classList.remove('wz-need');
+        if (WZ.RELAY) $('wz-sim-run').disabled = false;
+        status($('wz-sim-status'), '');
+        $('wz-sim-result').style.display = 'none';
+        $('wz-sim-install').style.display = 'none';
+      });
+      $('wz-sim-key').addEventListener('keydown', e => { if (e.key === 'Enter') wzSimRun(); });
     } else {
       const b = document.querySelector('.navbtn[data-nav="wizard"]'); if (b) b.style.display = 'none';
     }

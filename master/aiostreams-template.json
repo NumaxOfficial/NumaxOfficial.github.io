@@ -1,0 +1,437 @@
+{
+  "metadata": {
+    "id": "numax-2026-09-04.14-30-08-lkfhnnd",
+    "name": "Numax",
+    "description": "A template based on what I have found to be the simplest, universal fit for MOST homes. \n\nNotable changes:\n- A limited file size\n- Limited bit rate to prevent buffering\n- Minimal formatting\n- Sorting based on what I found to fetch me the best results\n\nYou are welcome to make any changes as this will be your own instance. ",
+    "source": "external",
+    "author": "NumaxOfficial",
+    "version": "1.0.0",
+    "category": "Debrid",
+    "serviceRequired": false,
+    "setToSaveInstallMenu": true
+  },
+  "config": {
+    "services": [
+      {
+        "id": "realdebrid",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "alldebrid",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "premiumize",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "debridlink",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "torbox",
+        "enabled": true,
+        "credentials": {}
+      },
+      {
+        "id": "stremio_nntp",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "nzbdav",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "aiostreams",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "altmount",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "offcloud",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "putio",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "easynews",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "easydebrid",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "debrider",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "pikpak",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "seedr",
+        "enabled": false,
+        "credentials": {}
+      },
+      {
+        "id": "stremthru_newz",
+        "enabled": false,
+        "credentials": {}
+      }
+    ],
+    "presets": [
+      {
+        "type": "stremthruTorz",
+        "instanceId": "aec",
+        "enabled": true,
+        "options": {
+          "name": "StremThru Torz",
+          "timeout": 7000,
+          "resources": [
+            "stream"
+          ],
+          "mediaTypes": [],
+          "includeP2P": false,
+          "useMultipleInstances": false
+        }
+      }
+    ],
+    "formatter": {
+      "id": "gdrive",
+      "definitions": {
+        "overrides": {
+          "gdrive": {
+            "name": "{stream.resolution::exists[\"{stream.resolution::replace('2160p','🎥 4K')::replace('1440p','🎥 2K')::replace('1080p','🎥1080p')::replace('720p','🎥720p')}\"||\"N/A\"]}{service.cached::istrue[\" 🎫 \"||\"\"]}{service.cached::isfalse[\" 🎟️ \"||\"\"]}\n{stream.quality::exists[\"{stream.quality::upper}\"||\"\"]}\n",
+            "description": "{stream.size::>0[\"📦 {stream.size::sbytes} \"||\"\"]}\n{stream.languages::exists[\"🔊 {stream.languages::join(', ')}\"||\"\"]}\n{stream.audioTags::exists[\"🎧 {stream.audioTags::join(' | ')} \"||\"\"]}\n\n"
+          }
+        }
+      }
+    },
+    "preferredQualities": [
+      "WEB-DL",
+      "BluRay",
+      "WEBRip",
+      "HDRip",
+      "HC HD-Rip",
+      "DVD REMUX",
+      "DVDRip",
+      "HDTV",
+      "CAM",
+      "TS",
+      "TC",
+      "SCR",
+      "Unknown"
+    ],
+    "preferredResolutions": [
+      "2160p",
+      "1440p",
+      "1080p",
+      "720p",
+      "576p",
+      "480p",
+      "360p",
+      "240p",
+      "144p",
+      "Unknown"
+    ],
+    "excludedQualities": [
+      "CAM",
+      "SCR",
+      "TS",
+      "TC",
+      "BluRay REMUX"
+    ],
+    "excludedVisualTags": [
+      "3D"
+    ],
+    "sortCriteria": {
+      "global": [
+        {
+          "key": "cached",
+          "direction": "desc"
+        },
+        {
+          "key": "library",
+          "direction": "desc"
+        },
+        {
+          "key": "resolution",
+          "direction": "desc"
+        },
+        {
+          "key": "language",
+          "direction": "desc"
+        },
+        {
+          "key": "streamExpressionScore",
+          "direction": "desc"
+        },
+        {
+          "key": "quality",
+          "direction": "desc"
+        },
+        {
+          "key": "size",
+          "direction": "desc"
+        },
+        {
+          "key": "regexPatterns",
+          "direction": "desc"
+        },
+        {
+          "key": "streamType",
+          "direction": "desc"
+        },
+        {
+          "key": "visualTag",
+          "direction": "desc"
+        },
+        {
+          "key": "audioTag",
+          "direction": "desc"
+        },
+        {
+          "key": "audioChannel",
+          "direction": "desc"
+        },
+        {
+          "key": "encode",
+          "direction": "desc"
+        },
+        {
+          "key": "subtitle",
+          "direction": "desc"
+        }
+      ],
+      "movies": [],
+      "series": [],
+      "anime": [],
+      "cached": [],
+      "uncached": [],
+      "cachedMovies": [],
+      "uncachedMovies": [],
+      "cachedSeries": [],
+      "uncachedSeries": [],
+      "cachedAnime": [],
+      "uncachedAnime": []
+    },
+    "posterService": "rpdb",
+    "deduplicator": {
+      "enabled": true,
+      "multiGroupBehaviour": "aggressive",
+      "keys": [
+        "filename",
+        "infoHash"
+      ],
+      "cached": "single_result",
+      "uncached": "per_service",
+      "p2p": "single_result",
+      "http": "disabled",
+      "live": "disabled",
+      "youtube": "disabled",
+      "external": "disabled",
+      "smartDetectAttributes": [
+        "size",
+        "resolution",
+        "quality",
+        "visualTags",
+        "audioTags",
+        "audioChannels",
+        "languages",
+        "encode",
+        "edition",
+        "network",
+        "remastered"
+      ],
+      "smartDetectRounding": 10,
+      "libraryBehaviour": "ignore",
+      "excludeAddons": [],
+      "merge": {
+        "fields": []
+      }
+    },
+    "autoPlay": {
+      "enabled": true,
+      "method": "matchingFile",
+      "attributes": [
+        "resolution",
+        "quality",
+        "releaseGroup"
+      ]
+    },
+    "cacheAndPlay": {
+      "enabled": false,
+      "streamTypes": [
+        "usenet"
+      ]
+    },
+    "statistics": {
+      "enabled": false,
+      "position": "bottom",
+      "statsToShow": [
+        "addon",
+        "filter",
+        "timing"
+      ],
+      "showFilterStatsOnNoStreams": true
+    },
+    "digitalReleaseFilter": {
+      "enabled": false,
+      "tolerance": 0,
+      "requestTypes": [],
+      "addons": [],
+      "showInfoOnFilter": true
+    },
+    "ageRangeTypes": [
+      "usenet"
+    ],
+    "seasonEpisodeMatching": {
+      "requestTypes": [],
+      "addons": []
+    },
+    "episodeTitleMatching": {
+      "addons": [],
+      "requestTypes": []
+    },
+    "languageInference": {
+      "enabled": true,
+      "sources": []
+    },
+    "yearMatching": {
+      "requestTypes": [],
+      "addons": [],
+      "strictTypes": [
+        "movie"
+      ]
+    },
+    "titleMatching": {
+      "requestTypes": [],
+      "addons": []
+    },
+    "precacheNextEpisode": false,
+    "precacheSingleStream": true,
+    "precacheSelector": "count(cached(streams)) == 0 ? uncached(streams) : []",
+    "enableSeadex": true,
+    "regexOverrides": [],
+    "checkOwned": true,
+    "catalogModifications": [],
+    "trusted": false,
+    "excludedResolutions": [],
+    "includedResolutions": [],
+    "requiredResolutions": [],
+    "includedQualities": [],
+    "requiredQualities": [],
+    "excludedLanguages": [],
+    "includedLanguages": [],
+    "requiredLanguages": [],
+    "preferredLanguages": [
+      "English"
+    ],
+    "includedVisualTags": [],
+    "requiredVisualTags": [],
+    "preferredVisualTags": [],
+    "preferredAudioTags": [],
+    "excludedStreamTypes": [],
+    "includedStreamTypes": [],
+    "requiredStreamTypes": [],
+    "preferredStreamTypes": [],
+    "excludedEncodes": [],
+    "includedEncodes": [],
+    "requiredEncodes": [],
+    "preferredEncodes": [],
+    "excludeCachedFromAddons": [],
+    "excludeCachedFromServices": [],
+    "excludeCachedFromStreamTypes": [],
+    "excludeUncachedFromAddons": [],
+    "excludeUncachedFromServices": [],
+    "excludeUncachedFromStreamTypes": [],
+    "excludedStreamExpressions": [
+      {
+        "expression": "isAnime ? resolution(streams, '2160p') : slice(streams, 0, 0)",
+        "enabled": true
+      }
+    ],
+    "rankedStreamExpressions": [
+      {
+        "expression": "isAnime ? negate(indexer(streams, 'Anitsu'), language(language(streams, 'English'), 'Japanese')) : slice(streams, 0, 0)",
+        "score": 5000,
+        "enabled": true
+      }
+    ],
+    "proxy": {
+      "id": "mediaflow",
+      "proxiedAddons": [],
+      "proxiedServices": []
+    },
+    "resultLimits": {
+      "resolution": 4,
+      "quality": 4
+    },
+    "size": {
+      "global": {
+        "movies": [
+          0,
+          35000000000
+        ],
+        "series": [
+          0,
+          20000000000
+        ],
+        "anime": [
+          0,
+          20000000000
+        ]
+      }
+    },
+    "bitrate": {
+      "useMetadataRuntime": true,
+      "global": {
+        "movies": [
+          0,
+          40000000
+        ],
+        "series": [
+          0,
+          40000000
+        ],
+        "anime": [
+          0,
+          40000000
+        ]
+      }
+    },
+    "hideErrorsForResources": [],
+    "tmdbApiKey": "<template_placeholder>",
+    "failover": {
+      "contentTypes": [
+        "usenet"
+      ]
+    },
+    "appliedTemplates": [
+      {
+        "id": "sample-2026-09-04.14-21-24-6jzkdug",
+        "version": "1.0.0"
+      }
+    ],
+    "seederRangeTypes": []
+  }
+}

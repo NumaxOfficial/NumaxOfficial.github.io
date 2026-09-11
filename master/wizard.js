@@ -187,7 +187,92 @@
   };
 
   // ======================================================================
-  // Step 3 — the two routes
+  // Step 3 — simple or advanced
+  // ======================================================================
+  // The first thing the streams step asks. Everything that was here before is
+  // still here, one card further in.
+  const MODES = [
+    {
+      id: 'simple', name: 'Do it all for me', tag: 'Recommended',
+      oneLiner: 'Paste your TorBox key, pick a host, and Numax builds a tuned AIOStreams setup and installs it. Takes about a minute.',
+      pros: [
+        'Nothing to configure on another website',
+        'Sources, filters, sorting and formatting are already set up sensibly',
+        'The finished link is written into this profile for you',
+      ],
+      cons: [
+        'TorBox only — any other debrid service goes through the manual path',
+        'You can still change anything afterwards on the host you picked',
+      ],
+    },
+    {
+      id: 'advanced', name: 'I’ve got it from here', tag: '',
+      oneLiner: 'Set it up yourself. The full guide, every debrid service, and the Nuvio-resolves-it route.',
+      pros: [
+        'Any debrid service, or none at all',
+        'Choose your own sources, filters and sorting from scratch',
+        'Also covers putting the debrid key into Nuvio instead of AIOStreams',
+      ],
+      cons: ['A few minutes of setup on another website'],
+    },
+  ];
+
+  // ======================================================================
+  // Step 3, simple — the relay and the preset
+  // ======================================================================
+  // AIOStreams can build a whole configuration from a JSON config and hand back
+  // a working manifest URL (POST <instance>/api/v1/user). A browser cannot make
+  // that call: AIOStreams only mounts its cross-origin permission on /api when
+  // an instance runs in development mode, and none of the 12 public instances
+  // do (checked live 2026-09-10). One small Cloudflare Worker does it instead —
+  // see relay/README.md, which is also where this URL comes from.
+  //
+  // Empty means "not deployed yet", and the wizard says exactly that rather
+  // than letting the button fail. This is the ONLY address the TorBox key is
+  // ever sent to besides the instance the user picked, so it is a constant on
+  // purpose: nothing at runtime can point it somewhere else.
+  const RELAY = 'https://numax-aio-create.nuviobaymax.workers.dev/';
+
+  // Furqan's own exported template, kept as the file he exported so a newer
+  // export can simply replace it. The wizard reads `.config`, fills in the
+  // TorBox key, and fills or drops the TMDB placeholder.
+  const TEMPLATE_URL = 'aiostreams-template.json';
+
+  // What the preset actually does, in the user's words, so "do it all for me"
+  // is not a black box. Kept in step with the template above.
+  const PRESET = {
+    title: 'What you’re getting',
+    blurb: 'A setup built for the common case: enough quality to look good on a big screen, capped so it never sits there buffering.',
+    points: [
+      'TorBox does the finding and the resolving, through StremThru Torz',
+      'Cached results first, then best resolution — so play is usually instant',
+      'CAM, screener and telesync rips excluded, and 3D left out',
+      'File size and bitrate capped, which is what stops mid-film buffering',
+      'Duplicate copies of the same release collapsed into one row',
+      'Tidy stream labels, and autoplay picks the matching file for you',
+    ],
+    note: 'It is your own configuration once it is made — change anything you like on the host afterwards.',
+  };
+
+  const SIMPLE = {
+    keyTitle: 'Your TorBox API key',
+    keyBlurb: 'This is the only thing Numax needs from you. It goes to the host you pick below and nowhere else.',
+    keyHint: 'Sign in at torbox.app, open Settings, and copy the API key there.',
+    keyPlaceholder: 'TorBox API key',
+    noTorbox: 'Don’t have TorBox? It starts at roughly $3/month, and the manual path works with every other service.',
+    instTitle: 'Pick a host',
+    instBlurb: 'Anyone can run AIOStreams. These are the public ones, best uptime first — your configuration lives on the one you choose, so pick a reliable one.',
+    runLabel: 'Set it up for me',
+    running: 'Building your setup…',
+    // Shown with the finished link. The UUID and password are the only way to
+    // edit the configuration later, and AIOStreams cannot recover either.
+    saveWarn: 'Write these two down somewhere safe. They are how you edit this setup later, and the host cannot recover them for you if they are lost.',
+    installHint: 'This is the link Numax just made. Press Next and it goes into this profile.',
+    notDeployed: 'The automatic setup is not switched on for this site yet, so this path cannot run. Use “I’ve got it from here” below — it does the same thing, with the setup done by you.',
+  };
+
+  // ======================================================================
+  // Step 3, advanced — the two routes
   // ======================================================================
   // The framing that matters, and the one most guides get wrong: BOTH routes
   // need a source add-on. Nuvio's built-in debrid only *resolves* hashes — it
@@ -317,5 +402,8 @@
   // on metadata installs rather than a silent reorder.
   const ORDER_TIP = 'Nuvio reads metadata add-ons from the top of the list down, so metadata belongs above your stream sources.';
 
-  window.NumaxWizard = { KEYS, DEBRID, NO_DEBRID, ROUTES, P2P_ADDONS, AIO_GUIDE, METADATA, ORDER_TIP };
+  window.NumaxWizard = {
+    KEYS, DEBRID, NO_DEBRID, MODES, RELAY, TEMPLATE_URL, PRESET, SIMPLE,
+    ROUTES, P2P_ADDONS, AIO_GUIDE, METADATA, ORDER_TIP,
+  };
 })();
