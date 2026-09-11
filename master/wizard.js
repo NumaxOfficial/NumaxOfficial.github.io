@@ -37,12 +37,20 @@
   // Anime Skip is animeskip_settings on TV but player_settings on mobile and
   // desktop, which is exactly the kind of thing that looks like "it didn't
   // save" if you write the TV spelling everywhere.
+  //
+  // `shape` / `verify` drive the live tick next to each box. `shape` is what
+  // counts as "fully typed in" and is the only thing that decides WHEN to ask;
+  // `verify` names the provider's own check-this-key endpoint, which app.js
+  // calls (the call is a write-shaped decision — it sends the key to that
+  // provider — so it lives there, next to the other network code, not here).
+  // All three were confirmed cross-origin-callable from a neutral origin on
+  // 2026-09-11: each answers with Access-Control-Allow-Origin: *.
   const KEYS = [
     {
       id: 'tmdb', name: 'TMDB', provider: 'tmdb', field: 'api_key',
       tag: 'Required', required: true,
       blurb: 'Better artwork, cast, episode titles and descriptions on every title.',
-      why: 'Nuvio’s own metadata is thin without it, and almost everything else you add reads better with it in place. The wizard asks for this one before it will move on.',
+      shape: /^[A-Za-z0-9]{32}$/, verify: 'tmdb',
       getUrl: 'https://www.themoviedb.org/settings/api',
       getLabel: 'themoviedb.org',
       steps: [
@@ -52,7 +60,6 @@
         'Copy the <b>v3 API key</b> — not the v4 read access token.',
       ],
       placeholder: 'TMDB v3 API key',
-      note: 'Mobile and desktop need your own key. Android TV doesn’t — but turning enrichment on there still helps.',
       toggles: {
         tv: [['tmdb_settings', 'tmdb_enabled', true, 'boolean'], ['tmdb_settings', 'tmdb_modern_home_enabled', true, 'boolean']],
         mobile: [['tmdb_settings', 'tmdb_enabled', true, 'boolean']],
@@ -63,7 +70,7 @@
       id: 'mdblist', name: 'MDBList', provider: 'mdblist', field: 'api_key',
       tag: 'Recommended',
       blurb: 'Ratings from IMDb, TMDB, Rotten Tomatoes, Metacritic, Trakt, Letterboxd and MyAnimeList.',
-      why: 'One key, every rating source at once. Nothing else in Nuvio shows critic and audience scores together.',
+      shape: /^[A-Za-z0-9]{16,}$/, verify: 'mdblist',
       getUrl: 'https://mdblist.com/preferences/',
       getLabel: 'mdblist.com',
       steps: [
@@ -72,7 +79,6 @@
         'Copy the key string only — not the whole URL it sits in.',
       ],
       placeholder: 'MDBList API key',
-      note: '',
       toggles: {
         tv: [['mdblist_settings', 'mdblist_enabled', true, 'boolean']],
         mobile: [['mdblist_settings', 'mdblist_enabled', true, 'boolean']],
@@ -83,7 +89,7 @@
       id: 'animeskip', name: 'Anime Skip', provider: 'animeskip', field: 'client_id',
       tag: 'Optional',
       blurb: 'Skips anime intros, recaps and credits automatically.',
-      why: 'Only worth it if you watch anime. Nuvio already checks IntroDB and AniSkip for free — this is the third source, and the only one that needs signing up for.',
+      shape: /^[A-Za-z0-9_-]{16,}$/, verify: 'animeskip',
       getUrl: 'https://anime-skip.com',
       getLabel: 'anime-skip.com',
       steps: [
@@ -93,7 +99,6 @@
         'Copy the generated <b>Client ID</b> — a long string of letters and numbers.',
       ],
       placeholder: 'Anime Skip Client ID',
-      note: 'This is a Client ID, not an API key.',
       toggles: {
         tv: [['animeskip_settings', 'animeskip_enabled', true, 'boolean']],
         mobile: [['player_settings', 'animeskip_enabled', true, 'boolean']],
@@ -183,7 +188,7 @@
     ],
     ok: 'Skip debrid',
     cancel: 'Go back and pick one',
-    after: 'No debrid selected. Stick to HTTP sources like PenguPlay, which stream directly and need no debrid — or add a VPN before using torrent sources.',
+    after: 'No debrid selected — stick to HTTP sources like PenguPlay, or add a VPN before using torrent sources.',
   };
 
   // ======================================================================
@@ -194,7 +199,7 @@
   const MODES = [
     {
       id: 'simple', name: 'Do it all for me', tag: 'Recommended',
-      oneLiner: 'Paste your TorBox key, pick a host, and Numax builds a tuned AIOStreams setup and installs it. Takes about a minute.',
+      oneLiner: 'Paste your TorBox key, pick a host, and Numax builds and installs a tuned AIOStreams setup for you.',
       pros: [
         'Nothing to configure on another website',
         'Sources, filters, sorting and formatting are already set up sensibly',
@@ -207,7 +212,7 @@
     },
     {
       id: 'advanced', name: 'I’ve got it from here', tag: '',
-      oneLiner: 'Set it up yourself. The full guide, every debrid service, and the Nuvio-resolves-it route.',
+      oneLiner: 'Set it up yourself, with any debrid service and full control over sources and filters.',
       pros: [
         'Any debrid service, or none at all',
         'Choose your own sources, filters and sorting from scratch',
@@ -242,7 +247,7 @@
   // is not a black box. Kept in step with the template above.
   const PRESET = {
     title: 'What you’re getting',
-    blurb: 'A setup built for the common case: enough quality to look good on a big screen, capped so it never sits there buffering.',
+    blurb: 'Enough quality to look good on a big screen, capped so it never sits there buffering.',
     points: [
       'TorBox does the finding and the resolving, through StremThru Torz',
       'Cached results first, then best resolution — so play is usually instant',
@@ -256,19 +261,19 @@
 
   const SIMPLE = {
     keyTitle: 'Your TorBox API key',
-    keyBlurb: 'This is the only thing Numax needs from you. It goes to the host you pick below and nowhere else.',
+    keyBlurb: 'The only thing Numax needs from you, and it goes to the host you pick below and nowhere else.',
     keyHint: 'Sign in at torbox.app, open Settings, and copy the API key there.',
     keyPlaceholder: 'TorBox API key',
-    noTorbox: 'Don’t have TorBox? It starts at roughly $3/month, and the manual path works with every other service.',
+    noTorbox: 'No TorBox? The manual path below works with every other debrid service.',
     instTitle: 'Pick a host',
-    instBlurb: 'Anyone can run AIOStreams. These are the public ones, best uptime first — your configuration lives on the one you choose, so pick a reliable one.',
+    instBlurb: 'Your configuration lives on the host you choose, so pick one with good uptime.',
     runLabel: 'Set it up for me',
     running: 'Building your setup…',
     // Shown with the finished link. The UUID and password are the only way to
     // edit the configuration later, and AIOStreams cannot recover either.
-    saveWarn: 'Write these two down somewhere safe. They are how you edit this setup later, and the host cannot recover them for you if they are lost.',
-    installHint: 'This is the link Numax just made. Press Next and it goes into this profile.',
-    notDeployed: 'The automatic setup is not switched on for this site yet, so this path cannot run. Use “I’ve got it from here” below — it does the same thing, with the setup done by you.',
+    saveWarn: 'Write these two down — they are the only way to edit this setup later, and the host cannot recover them.',
+    installHint: 'The link Numax just made — press Next and it goes into this profile.',
+    notDeployed: 'Automatic setup is not switched on for this site yet — use “I’ve got it from here” below instead.',
   };
 
   // ======================================================================
@@ -281,7 +286,7 @@
   const ROUTES = [
     {
       id: 'aiostreams', name: 'AIOStreams', tag: 'Recommended',
-      oneLiner: 'Your debrid key lives in AIOStreams. It finds, filters and resolves everything, and hands Nuvio one clean list.',
+      oneLiner: 'Your debrid key lives in AIOStreams, which finds, filters and resolves everything and hands Nuvio one clean list.',
       pros: [
         'Works with every debrid service, not just two',
         'One place to filter and sort by quality, codec, size, language, seeders — applied to every source at once',
@@ -296,7 +301,7 @@
     },
     {
       id: 'native', name: 'Nuvio + TorBox', tag: '',
-      oneLiner: 'Your debrid key lives in Nuvio. A torrent add-on finds raw magnets, Nuvio hands them to TorBox to resolve.',
+      oneLiner: 'Your debrid key lives in Nuvio, and a torrent add-on finds raw magnets for Nuvio to resolve.',
       pros: [
         'Nothing to configure on another website — the key goes straight into Nuvio',
         'No third-party instance to stay online',
@@ -309,7 +314,7 @@
         'Doesn’t carry over to Stremio or any other app',
       ],
       // Stated once, plainly, wherever this route is chosen.
-      catch: 'Nuvio’s built-in debrid only <b>resolves</b> links — it can’t find anything on its own. Whichever add-on you use must be set to return raw magnets, with its own debrid field left empty. If you put your key into the add-on as well, the add-on resolves first and Nuvio’s side never gets used.',
+      catch: 'Nuvio’s built-in debrid only <b>resolves</b> links — it can’t find anything on its own. So the add-on you use must return raw magnets with <b>its own debrid field empty</b>, or it resolves first and Nuvio’s side never gets used.',
     },
   ];
 
@@ -318,7 +323,7 @@
   // because that instance disables P2P.
   const P2P_ADDONS = [
     { name: 'Torrentio', blurb: 'The simplest option — leave every debrid field empty and it returns magnets.', url: 'https://torrentio.strem.fun/configure' },
-    { name: 'Comet', blurb: 'Broader coverage than Torrentio. Same rule: no debrid key in it.', url: 'https://comet.elfhosted.com/stremio/configure' },
+    { name: 'Comet', blurb: 'Broader coverage than Torrentio, with the same rule: no debrid key in it.', url: 'https://comet.elfhosted.com/stremio/configure' },
     { name: 'AIOStreams (P2P mode)', blurb: 'Skip the Services menu entirely, then set P2P to Required and exclude the cached/uncached debrid stream types.', instances: 'AIOStreams' },
   ];
 
@@ -364,6 +369,12 @@
   // ======================================================================
   // `builtin` = already on every new Nuvio profile, so the wizard shows it as
   // done rather than offering to install it again.
+  // Rendered as tiles, so each one carries its own artwork. Logo URLs were
+  // checked live 2026-09-11 (200, real image, small enough to be a tile):
+  // Cinemeta has no logo in its own manifest, so it uses Stremio's add-on mark;
+  // AIOMetadata's manifest logo is a 1.4MB PNG, so its favicon is used instead.
+  // Every tile falls back to a monogram if the image does not load, so a dead
+  // host degrades to a letter rather than a broken-image icon.
   const METADATA = [
     {
       // `check` means: look at what the profile actually has rather than assume.
@@ -372,27 +383,31 @@
       // claiming "already installed" at that point is simply wrong.
       id: 'cinemeta', name: 'Cinemeta', check: 'https://v3-cinemeta.strem.io/manifest.json',
       matches: [/(^|\/\/)(v3-)?cinemeta\./i],
+      logo: 'https://dl.strem.io/addon-logo.png', mono: 'C',
       blurb: 'Nuvio’s default metadata source — titles, posters and descriptions.',
-      body: 'Nuvio installs this on a new profile, so usually there is nothing to do. If you add AIOMetadata below, it is worth turning Cinemeta off afterwards so the two don’t disagree — you can do that on the Profile tab.',
+      body: 'Already on a new profile, so there is usually nothing to do here.',
       url: 'https://v3-cinemeta.strem.io/',
       installName: 'Cinemeta',
     },
     {
       id: 'bingecat', name: 'BingeCat', tag: 'Recommended', builtin: false,
+      logo: 'https://bingecat.com/static/logo.png', mono: 'B',
       blurb: 'Browse and build catalogs, with AI search and recommendations on top.',
-      body: 'Over 100,000 public catalogs you can import and merge, plus your own lists from TMDB, Trakt or MDBList. Free, and needs no API keys of its own.',
+      body: 'Over 100,000 public catalogs plus your own TMDB, Trakt and MDBList lists, free and with no API keys of its own.',
       url: 'https://bingecat.com/stremio/configure',
     },
     {
       id: 'aiometadata', name: 'AIOMetadata', tag: 'Most control', builtin: false,
+      logo: 'https://aiometadata.elfhosted.com/favicon.png', mono: 'A',
       blurb: 'TMDB, TheTVDB and MyAnimeList in one add-on, with a separate source per content type.',
-      body: 'The usual pick for people who want metadata exactly their way — you choose which source handles movies, which handles series, and which handles anime. Give it your own TMDB and TheTVDB keys so you’re not sharing rate limits with everyone else.',
+      body: 'Choose which source handles movies, series and anime, using your own keys.',
       instances: 'AIOMetadata',
     },
     {
       id: 'xperience', name: 'Xperience', tag: '', builtin: false,
+      logo: 'https://xperience-app.com/icon-192.png', mono: 'X',
       blurb: 'Build your home screen visually — 364+ curated rows across 18 categories.',
-      body: 'Pick the rows you want (Trending, genres, your Trakt lists, AI picks), tidy them into folders, and it stays up to date on its own. No JSON, no config file.',
+      body: 'Pick the rows you want, tidy them into folders, and it keeps itself up to date.',
       url: 'https://xperience-app.com/',
     },
   ];

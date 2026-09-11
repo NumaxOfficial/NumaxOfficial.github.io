@@ -1,439 +1,304 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Numax — Profile management for Nuvio</title>
-<meta name="description" content="Numax is a browser extension that saves, applies, and backs up your Nuvio profile configurations — addons, plugins, collections, settings, and watch progress — across multiple profiles.">
+<title>Numax — companion for Nuvio</title>
+<meta name="description" content="Numax sets up and manages your Nuvio profiles: a guided setup wizard, add-on marketplace, profile-to-profile sync, reusable templates and Google Drive backup.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* Theme lifted from /master so the front door and the app are one product.
+     Same tokens, same names — if the app's palette moves, move these too. */
   :root{
-    --bg:#0b0b0d;
-    --bg-raised:#131316;
-    --line:#232327;
-    --red:#e0263f;
-    --red-dim:#7a1523;
-    --text:#ededee;
-    --text-dim:#9a9aa1;
-    --text-faint:#5c5c63;
-    --mono: "SF Mono", "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
-    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --bg:#000; --surface:rgba(255,255,255,.035); --surface-2:rgba(255,255,255,.06); --surface-3:rgba(255,255,255,.09);
+    --line:rgba(255,255,255,.10); --line-2:rgba(255,255,255,.06);
+    --t:#fff; --t70:rgba(255,255,255,.72); --t55:rgba(255,255,255,.55); --t45:rgba(255,255,255,.45); --t35:rgba(255,255,255,.35);
+    --accent:#E53935; --accent-2:#c62828; --ok:#43A047;
+    --glass-bg:rgba(6,6,8,.58); --glass-border:rgba(255,255,255,.08);
+    --r:12px; --r-lg:16px; --r-xl:22px;
+    --f:"Inter", system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
   }
-
-  *{box-sizing:border-box;}
-  html{scroll-behavior:smooth;}
-
-  body{
-    margin:0;
-    background:var(--bg);
-    color:var(--text);
-    font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;
-    line-height:1.5;
-  }
-
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html{ scroll-behavior:smooth; }
+  body{ font-family:var(--f); background:var(--bg); color:var(--t); -webkit-font-smoothing:antialiased; line-height:1.5;
+    overflow-x:hidden; }
+  a{ color:inherit; }
+  img{ max-width:100%; }
   @media (prefers-reduced-motion: reduce){
-    html{scroll-behavior:auto;}
-    *{animation-duration:0.01ms !important; transition-duration:0.01ms !important;}
+    html{ scroll-behavior:auto; }
+    *{ animation-duration:.01ms !important; transition-duration:.01ms !important; }
   }
+  a:focus-visible, button:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; border-radius:4px; }
 
-  a{color:inherit;}
-  a:focus-visible, button:focus-visible{
-    outline:2px solid var(--red);
-    outline-offset:3px;
-    border-radius:2px;
-  }
+  .wrap{ max-width:1120px; margin:0 auto; padding:0 clamp(18px,4vw,32px); }
 
-  .wrap{
-    max-width:920px;
-    margin:0 auto;
-    padding:0 24px;
-  }
+  /* ---------- buttons ---------- */
+  .btn{ display:inline-flex; align-items:center; justify-content:center; gap:9px; border-radius:999px; border:1px solid var(--line);
+    background:var(--surface-2); color:var(--t); font-family:inherit; font-size:14px; font-weight:600; padding:12px 22px;
+    text-decoration:none; cursor:pointer; white-space:nowrap;
+    transition:background .18s ease, border-color .18s ease, transform .18s ease, box-shadow .18s ease; }
+  .btn:hover{ border-color:rgba(255,255,255,.26); background:var(--surface-3); transform:translateY(-1px); }
+  .btn svg{ width:17px; height:17px; flex:none; }
+  .btn-primary{ background:var(--accent); border-color:var(--accent); color:#fff;
+    box-shadow:0 8px 30px rgba(229,57,53,.28); }
+  .btn-primary:hover{ background:var(--accent-2); border-color:var(--accent-2); box-shadow:0 10px 36px rgba(229,57,53,.4); }
+  .btn-lg{ font-size:15px; padding:15px 28px; }
 
-  /* ---------- header ---------- */
-  header{
-    border-bottom:1px solid var(--line);
-    position:sticky;
-    top:0;
-    background:rgba(11,11,13,0.85);
-    backdrop-filter:blur(10px);
-    z-index:10;
-  }
-  .header-inner{
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
-    height:64px;
-  }
-  .wordmark{
-    font-family:var(--mono);
-    font-weight:700;
-    font-size:18px;
-    letter-spacing:0.02em;
-    text-decoration:none;
-    display:flex;
-    align-items:center;
-    gap:2px;
-  }
-  .wordmark .play{
-    color:var(--red);
-    font-size:15px;
-  }
-  nav{display:flex; gap:28px; font-size:14px;}
-  nav a{
-    color:var(--text-dim);
-    text-decoration:none;
-    transition:color 0.15s ease;
-  }
-  nav a:hover{color:var(--text);}
+  /* ---------- topbar ---------- */
+  header{ position:sticky; top:0; z-index:20; background:var(--glass-bg); backdrop-filter:blur(16px) saturate(140%);
+    -webkit-backdrop-filter:blur(16px) saturate(140%); border-bottom:1px solid var(--glass-border); }
+  .head-in{ display:flex; align-items:center; gap:18px; height:62px; }
+  .wm{ font-size:16px; font-weight:800; letter-spacing:.18em; text-decoration:none; flex:none; }
+  .wm .for{ display:block; font-size:9.5px; font-weight:600; letter-spacing:.22em; text-transform:uppercase; color:var(--t35); margin-top:-3px; }
+  .head-in nav{ display:flex; gap:22px; font-size:13.5px; margin-left:auto; }
+  .head-in nav a{ color:var(--t55); text-decoration:none; transition:color .16s ease; }
+  .head-in nav a:hover{ color:var(--t); }
+  .head-in .btn{ flex:none; padding:9px 18px; font-size:13px; }
+  @media (max-width:760px){ .head-in nav{ display:none; } .head-in .btn{ margin-left:auto; } }
 
   /* ---------- hero ---------- */
-  .hero{
-    padding:96px 0 72px;
-    border-bottom:1px solid var(--line);
-    position:relative;
-    overflow:hidden;
-  }
-  .hero::before{
-    content:"";
-    position:absolute;
-    top:-200px;
-    right:-160px;
-    width:520px;
-    height:520px;
-    background:radial-gradient(circle, var(--red-dim) 0%, transparent 70%);
-    opacity:0.35;
-    pointer-events:none;
-  }
-  .eyebrow{
-    font-family:var(--mono);
-    font-size:12px;
-    letter-spacing:0.12em;
-    text-transform:uppercase;
-    color:var(--red);
-    margin:0 0 20px;
-    display:flex;
-    align-items:center;
-    gap:10px;
-  }
-  .eyebrow::before{
-    content:"";
-    width:20px;
-    height:1px;
-    background:var(--red);
-  }
-  h1{
-    font-size:clamp(34px, 5.4vw, 54px);
-    line-height:1.06;
-    letter-spacing:-0.02em;
-    margin:0 0 22px;
-    max-width:15ch;
-  }
-  h1 em{
-    font-style:normal;
-    color:var(--red);
-  }
-  .lede{
-    font-size:18px;
-    line-height:1.6;
-    color:var(--text-dim);
-    max-width:52ch;
-    margin:0 0 36px;
-  }
-  .hero-actions{
-    display:flex;
-    gap:14px;
-    flex-wrap:wrap;
-  }
-  .btn{
-    display:inline-flex;
-    align-items:center;
-    gap:8px;
-    padding:13px 22px;
-    border-radius:8px;
-    font-size:14px;
-    font-weight:600;
-    text-decoration:none;
-    transition:transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-  }
-  .btn-primary{
-    background:var(--red);
-    color:#fff;
-  }
-  .btn-primary:hover{
-    background:#f0304a;
-    transform:translateY(-1px);
-  }
-  .btn-secondary{
-    background:transparent;
-    color:var(--text);
-    border:1px solid var(--line);
-  }
-  .btn-secondary:hover{
-    border-color:var(--text-faint);
-    transform:translateY(-1px);
-  }
+  .hero{ position:relative; padding:clamp(64px,10vw,116px) 0 clamp(48px,7vw,80px); overflow:hidden; }
+  /* Two soft accent washes, no canvas: the app owns the animated backgrounds,
+     the front door just needs depth. */
+  .hero::before, .hero::after{ content:''; position:absolute; border-radius:50%; pointer-events:none; z-index:0; }
+  .hero::before{ width:min(760px,120vw); height:min(760px,120vw); top:-46%; right:-18%;
+    background:radial-gradient(circle, rgba(229,57,53,.20) 0%, rgba(229,57,53,.05) 42%, transparent 68%); }
+  .hero::after{ width:min(560px,100vw); height:min(560px,100vw); bottom:-52%; left:-14%;
+    background:radial-gradient(circle, rgba(90,110,255,.13) 0%, transparent 66%); }
+  .hero .wrap{ position:relative; z-index:1; }
+  .eyebrow{ display:inline-flex; align-items:center; gap:9px; font-size:11px; font-weight:700; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--accent); text-shadow:0 0 18px rgba(229,57,53,.5); }
+  .eyebrow::before{ content:''; width:22px; height:1px; background:var(--accent); }
+  h1{ font-size:clamp(34px,6vw,60px); font-weight:800; letter-spacing:-.03em; line-height:1.03; margin:18px 0 0; max-width:16ch; }
+  h1 em{ font-style:normal; color:var(--accent); }
+  .lede{ font-size:clamp(15px,1.6vw,18px); color:var(--t70); max-width:56ch; margin-top:20px; line-height:1.6; }
+  .hero-actions{ display:flex; gap:12px; flex-wrap:wrap; margin-top:32px; }
+  .hero-note{ font-size:12.5px; color:var(--t35); margin-top:18px; }
 
-  /* ---------- disclaimer strip ---------- */
-  .disclaimer{
-    font-size:13px;
-    color:var(--text-faint);
-    padding:14px 0;
-    border-bottom:1px solid var(--line);
-  }
+  /* ---------- sections ---------- */
+  section.band{ padding:clamp(48px,7vw,82px) 0; border-top:1px solid var(--line-2); position:relative; }
+  .sec-head{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-bottom:clamp(24px,3vw,34px); }
+  .sec-head h2{ font-size:clamp(22px,3vw,30px); font-weight:800; letter-spacing:-.02em; }
+  .sec-head p{ font-size:13.5px; color:var(--t55); max-width:52ch; margin-top:8px; }
+  .sec-note{ font-size:11px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--t35); }
 
-  /* ---------- what it does ---------- */
-  .section{
-    padding:72px 0;
-    border-bottom:1px solid var(--line);
-  }
-  .section-head{
-    display:flex;
-    align-items:baseline;
-    justify-content:space-between;
-    margin-bottom:40px;
-    gap:24px;
-    flex-wrap:wrap;
-  }
-  .section-title{
-    font-size:26px;
-    letter-spacing:-0.01em;
-    margin:0;
-  }
-  .section-note{
-    font-family:var(--mono);
-    font-size:12px;
-    color:var(--text-faint);
-  }
+  /* ---------- tab widgets ---------- */
+  .tiles{ display:grid; grid-template-columns:repeat(auto-fill,minmax(272px,1fr)); gap:14px; }
+  .tile{ position:relative; display:flex; flex-direction:column; gap:11px; background:var(--surface);
+    border:1px solid var(--line); border-radius:var(--r-lg); padding:20px 20px 22px; min-width:0; overflow:hidden;
+    transition:border-color .2s ease, background .2s ease, transform .2s ease; }
+  .tile::after{ content:''; position:absolute; inset:-40% 55% 40% -40%; background:radial-gradient(circle, rgba(229,57,53,.14), transparent 68%);
+    opacity:0; transition:opacity .3s ease; pointer-events:none; }
+  .tile:hover{ border-color:rgba(255,255,255,.22); background:var(--surface-2); transform:translateY(-2px); }
+  .tile:hover::after{ opacity:1; }
+  .tile .ic{ position:relative; width:38px; height:38px; border-radius:11px; display:grid; place-items:center; flex:none;
+    background:var(--surface-2); border:1px solid var(--line); color:var(--accent); }
+  .tile .ic svg{ width:19px; height:19px; }
+  .tile h3{ position:relative; font-size:15px; font-weight:700; letter-spacing:-.01em; }
+  .tile p{ position:relative; font-size:13px; color:var(--t55); line-height:1.55; }
+  .tile .flag{ position:absolute; top:16px; right:16px; font-size:9.5px; font-weight:700; letter-spacing:.08em;
+    text-transform:uppercase; border-radius:999px; padding:3px 9px; background:rgba(229,57,53,.16); color:#ff9a94; }
 
-  .grid{
-    display:grid;
-    grid-template-columns:repeat(2, 1fr);
-    gap:1px;
-    background:var(--line);
-    border:1px solid var(--line);
-    border-radius:10px;
-    overflow:hidden;
-  }
-  .card{
-    background:var(--bg-raised);
-    padding:28px;
-  }
-  .card h3{
-    font-size:15px;
-    margin:0 0 10px;
-    display:flex;
-    align-items:center;
-    gap:9px;
-  }
-  .card h3 .dot{
-    width:6px;
-    height:6px;
-    border-radius:50%;
-    background:var(--red);
-    flex-shrink:0;
-  }
-  .card p{
-    font-size:14px;
-    color:var(--text-dim);
-    margin:0;
-    line-height:1.65;
-  }
+  /* ---------- two feature panels: support + extension ---------- */
+  .duo{ display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+  .pan{ position:relative; display:flex; flex-direction:column; gap:12px; border:1px solid var(--line); border-radius:var(--r-xl);
+    padding:clamp(22px,3vw,30px); overflow:hidden; background:var(--surface); }
+  .pan h3{ font-size:19px; font-weight:800; letter-spacing:-.02em; }
+  .pan p{ font-size:13.5px; color:var(--t55); line-height:1.6; max-width:44ch; }
+  .pan .btn{ align-self:flex-start; margin-top:6px; }
+  .pan-kofi{ background:linear-gradient(150deg, rgba(229,57,53,.16), rgba(255,255,255,.03) 58%); border-color:rgba(229,57,53,.26); }
+  .pan-ext{ background:linear-gradient(150deg, rgba(90,110,255,.13), rgba(255,255,255,.03) 58%); border-color:rgba(120,140,255,.2); }
+  .pan .kicker{ font-size:11px; font-weight:700; letter-spacing:.2em; text-transform:uppercase; color:var(--t45); }
 
-  @media (max-width:640px){
-    .grid{grid-template-columns:1fr;}
-  }
-
-  /* ---------- profile flow signature element ---------- */
-  .flow{
-    margin-top:56px;
-  }
-  .flow-label{
-    font-family:var(--mono);
-    font-size:12px;
-    color:var(--text-faint);
-    margin-bottom:18px;
-    letter-spacing:0.04em;
-  }
-  .flow-track{
-    display:flex;
-    align-items:center;
-    gap:0;
-    overflow-x:auto;
-    padding-bottom:8px;
-  }
-  .flow-node{
-    flex-shrink:0;
-    border:1px solid var(--line);
-    background:var(--bg-raised);
-    border-radius:8px;
-    padding:14px 18px;
-    font-size:13px;
-    font-family:var(--mono);
-    white-space:nowrap;
-    color:var(--text-dim);
-  }
-  .flow-node.active{
-    border-color:var(--red);
-    color:var(--text);
-    box-shadow:0 0 0 1px var(--red);
-  }
-  .flow-arrow{
-    flex-shrink:0;
-    width:36px;
-    height:1px;
-    background:var(--text-faint);
-    position:relative;
-    margin:0 6px;
-  }
-  .flow-arrow::after{
-    content:"";
-    position:absolute;
-    right:0;
-    top:-3px;
-    width:6px;
-    height:6px;
-    border-right:1px solid var(--text-faint);
-    border-top:1px solid var(--text-faint);
-    transform:rotate(45deg);
-  }
+  /* ---------- flow strip ---------- */
+  .flow{ display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; }
+  .fnode{ flex:1 1 190px; min-width:0; background:var(--surface); border:1px solid var(--line); border-radius:var(--r);
+    padding:15px 16px; }
+  .fnode .n{ font-size:10.5px; font-weight:700; letter-spacing:.14em; color:var(--accent); }
+  .fnode b{ display:block; font-size:14px; font-weight:700; margin-top:7px; }
+  .fnode span{ display:block; font-size:12.5px; color:var(--t55); margin-top:5px; line-height:1.5; }
 
   /* ---------- footer ---------- */
-  footer{
-    padding:40px 0 56px;
-  }
-  .footer-inner{
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    flex-wrap:wrap;
-    gap:16px;
-  }
-  .footer-links{
-    display:flex;
-    gap:22px;
-    font-size:13px;
-  }
-  .footer-links a{
-    color:var(--text-dim);
-    text-decoration:none;
-  }
-  .footer-links a:hover{color:var(--text);}
-  .footer-note{
-    font-size:12px;
-    color:var(--text-faint);
-    max-width:60ch;
-    margin-top:24px;
-    line-height:1.6;
-  }
+  footer{ border-top:1px solid var(--line-2); padding:38px 0 56px; }
+  .foot-in{ display:flex; align-items:center; justify-content:space-between; gap:18px; flex-wrap:wrap; }
+  .foot-links{ display:flex; gap:20px; flex-wrap:wrap; font-size:13px; }
+  .foot-links a{ color:var(--t55); text-decoration:none; }
+  .foot-links a:hover{ color:var(--t); }
+  .foot-note{ font-size:12px; color:var(--t35); margin-top:22px; max-width:66ch; line-height:1.6; }
+  .disclaim{ font-size:12.5px; color:var(--t35); padding:14px 0; border-top:1px solid var(--line-2); }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="wrap header-inner">
-    <a href="#" class="wordmark">NUM<span class="play">▸</span>X</a>
+  <div class="wrap head-in">
+    <a href="/" class="wm">NUMAX<span class="for">for Nuvio</span></a>
     <nav>
-      <a href="#what">What it does</a>
-      <a href="#data">Data &amp; access</a>
-      <a href="/privacy/">Privacy policy</a>
+      <a href="#tabs">What's inside</a>
+      <a href="#how">How it works</a>
+      <a href="#extension">Extension</a>
+      <a href="/privacy/">Privacy</a>
     </nav>
+    <a class="btn btn-primary" href="/master/">Open Numax</a>
   </div>
 </header>
 
 <section class="hero">
   <div class="wrap">
-    <p class="eyebrow">Browser extension for Nuvio</p>
-    <h1>Your Nuvio setup, <em>everywhere</em> you use it.</h1>
+    <span class="eyebrow">Companion app for Nuvio</span>
+    <h1>Set up Nuvio once. Then <em>never again</em>.</h1>
     <p class="lede">
-      Numax saves your addons, plugins, collections, settings, and watch
-      progress from one Nuvio profile and applies them to any other —
-      instantly, without redoing the setup by hand every time.
+      Numax builds a working Nuvio profile from scratch — API keys, streams,
+      metadata, add-ons — then copies that setup onto every other profile you
+      own and backs it up to your own Google Drive.
     </p>
     <div class="hero-actions">
-      <a class="btn btn-primary" href="https://chromewebstore.google.com/detail/lgpnfdddpfhclcgmcdfabgpmfbadffig">Add to Chrome</a>
-      <a class="btn btn-secondary" href="#what">See how it works</a>
+      <a class="btn btn-primary btn-lg" href="/master/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 12h13"/><path d="m12 5 7 7-7 7"/></svg>
+        Open Numax
+      </a>
+      <a class="btn btn-lg" href="#tabs">See what's inside</a>
+    </div>
+    <p class="hero-note">Free. Runs in your browser. Sign in with Google, link your Nuvio account, and you're going.</p>
+  </div>
+</section>
+
+<section class="band" id="tabs">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <h2>What's inside</h2>
+        <p>Nine tools down the side of the app. Here's what each one is for.</p>
+      </div>
+      <span class="sec-note">the sidebar</span>
+    </div>
+
+    <div class="tiles">
+      <div class="tile">
+        <span class="flag">Start here</span>
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m5 3 1 3 3 1-3 1-1 3-1-3-3-1 3-1Z"/><path d="M17 4.5 17.8 7l2.5.8-2.5.8-.8 2.5-.8-2.5L13.7 8l2.5-.7Z"/><path d="m11.5 11.5 8 8-2 2-8-8Z"/><path d="m9.5 13.5-6 6 2 2 6-6"/></svg></span>
+        <h3>Setup wizard</h3>
+        <p>Walks you through a brand-new Nuvio profile step by step and writes every setting in for you.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 6.5a3 3 0 0 1 0 5.8M21 20a5 5 0 0 0-4-4.9"/></svg></span>
+        <h3>Nuvio accounts</h3>
+        <p>Link the Nuvio accounts you look after, so you can manage all of them from one place.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.4"/><path d="M5.5 20a6.5 6.5 0 0 1 13 0"/></svg></span>
+        <h3>Profile</h3>
+        <p>Edit one profile's name, add-ons, plugins, collections and settings directly.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 3 8l9 5 9-5-9-5Z"/><path d="m3 13 9 5 9-5"/></svg></span>
+        <h3>Sync desk</h3>
+        <p>Copy a profile you like onto your other profiles, choosing exactly what travels.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/></svg></span>
+        <h3>Templates</h3>
+        <p>Save a setup you've perfected and apply it to any profile later, as many times as you like.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 4h8l5 9-4 7H7l-4-7Z"/><path d="M8 4 3 13h8M16 4l-4 7 4 9M11 13h10"/></svg></span>
+        <h3>Google Drive</h3>
+        <p>Back your profiles and templates up to a folder in your own Drive, and restore from it.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-1.4 9.2a2 2 0 0 1-2 1.8H6.4a2 2 0 0 1-2-1.8Z"/><path d="M8 9V6.5a4 4 0 0 1 8 0V9"/></svg></span>
+        <h3>Marketplace</h3>
+        <p>Browse add-ons and plugins that work with Nuvio and install them in one click.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+        <h3>Activity</h3>
+        <p>A running log of everything Numax has changed, so nothing ever happens quietly.</p>
+      </div>
+
+      <div class="tile">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg></span>
+        <h3>Settings</h3>
+        <p>How Numax itself behaves — including whether it's allowed to read your API keys at all.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<div class="disclaimer">
+<section class="band" id="how">
   <div class="wrap">
-    Numax is an independent project and is not affiliated with, endorsed by, or supported by Nuvio.
-  </div>
-</div>
-
-<section class="section" id="what">
-  <div class="wrap">
-    <div class="section-head">
-      <h2 class="section-title">What it does</h2>
-      <span class="section-note">core features</span>
+    <div class="sec-head">
+      <div>
+        <h2>How it works</h2>
+        <p>Four steps from a blank Nuvio account to a setup that follows you everywhere.</p>
+      </div>
+      <span class="sec-note">typical flow</span>
     </div>
-
-    <div class="grid">
-      <div class="card">
-        <h3><span class="dot"></span>Save a profile as a template</h3>
-        <p>Capture a profile's addons, plugins, collections, and settings as a reusable template you can apply anywhere.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot"></span>Apply across profiles</h3>
-        <p>Push a saved template to any other profile on your account — no manual re-adding, no re-configuring.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot"></span>Carry over watch history &amp; progress</h3>
-        <p>Bring watch history and in-progress titles along with the rest of a profile's configuration, if you choose to.</p>
-      </div>
-      <div class="card">
-        <h3><span class="dot"></span>Back up to your own Google Drive</h3>
-        <p>Optionally save templates to a Drive folder Numax creates for itself — nothing else in your Drive is touched.</p>
-      </div>
-    </div>
-
     <div class="flow">
-      <p class="flow-label">TYPICAL FLOW</p>
-      <div class="flow-track">
-        <div class="flow-node active">Save profile → template</div>
-        <div class="flow-arrow"></div>
-        <div class="flow-node">Pick target profile</div>
-        <div class="flow-arrow"></div>
-        <div class="flow-node">Apply template</div>
-        <div class="flow-arrow"></div>
-        <div class="flow-node">Optional: back up to Drive</div>
+      <div class="fnode"><span class="n">01</span><b>Link your account</b><span>Sign in with Google, then add your Nuvio email and password.</span></div>
+      <div class="fnode"><span class="n">02</span><b>Run the wizard</b><span>Keys, streams and metadata written straight into the profile you pick.</span></div>
+      <div class="fnode"><span class="n">03</span><b>Sync it across</b><span>Push that setup to your other profiles instead of redoing it by hand.</span></div>
+      <div class="fnode"><span class="n">04</span><b>Back it up</b><span>Save the lot to your own Google Drive so it's recoverable.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="extension">
+  <div class="wrap">
+    <div class="duo">
+      <div class="pan pan-kofi">
+        <span class="kicker">Support</span>
+        <h3>Numax is free, and one person builds it.</h3>
+        <p>No ads, no accounts sold, no servers charging you rent. If Numax saved you an evening of setup, a coffee goes a long way.</p>
+        <a class="btn btn-primary" href="https://ko-fi.com/numax" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5Z"/><path d="M17 9h1.8a2.7 2.7 0 0 1 0 5.4H17"/><path d="M6 4.5v1M10 4v1.5M14 4.5v1"/></svg>
+          Buy me a coffee
+        </a>
+      </div>
+
+      <div class="pan pan-ext">
+        <span class="kicker">Also available</span>
+        <h3>Prefer it in your browser bar?</h3>
+        <p>The Numax browser extension does the profile save-and-apply side of things from a popup, right next to Nuvio itself.</p>
+        <a class="btn" href="https://chromewebstore.google.com/detail/lgpnfdddpfhclcgmcdfabgpmfbadffig" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8h9M12 8 7.5 15.8M12 8a4 4 0 1 0 3.5 6M8 9 3.6 16"/></svg>
+          Access the extension here
+        </a>
       </div>
     </div>
   </div>
 </section>
 
-<section class="section" id="data">
-  <div class="wrap">
-    <div class="section-head">
-      <h2 class="section-title">Data &amp; access</h2>
-      <span class="section-note">short version</span>
-    </div>
-    <p class="lede" style="margin-bottom:0; font-size:15px;">
-      Numax reads and writes your own Nuvio profile data using your existing
-      Nuvio session — the same access you already have logged into nuvio.tv
-      directly. Google Drive backup is opt-in and limited to files Numax
-      creates itself. Numax doesn't run its own servers and doesn't sell or
-      share your data. Full details, including a permission-by-permission
-      breakdown, are in the <a href="/privacy/" style="color:var(--red); text-decoration:none;">privacy policy</a>.
-    </p>
-  </div>
-</section>
+<div class="wrap">
+  <p class="disclaim">Numax is an independent project and is not affiliated with, endorsed by, or supported by Nuvio.</p>
+</div>
 
 <footer>
   <div class="wrap">
-    <div class="footer-inner">
-      <span class="wordmark" style="font-size:14px;">NUM<span class="play">▸</span>X</span>
-      <div class="footer-links">
-        <a href="https://chromewebstore.google.com/detail/lgpnfdddpfhclcgmcdfabgpmfbadffig">Chrome Web Store</a>
+    <div class="foot-in">
+      <a href="/" class="wm">NUMAX<span class="for">for Nuvio</span></a>
+      <div class="foot-links">
+        <a href="/master/">Open Numax</a>
+        <a href="https://chromewebstore.google.com/detail/lgpnfdddpfhclcgmcdfabgpmfbadffig" target="_blank" rel="noopener">Chrome Web Store</a>
+        <a href="https://ko-fi.com/numax" target="_blank" rel="noopener">Support the project</a>
         <a href="/privacy/">Privacy policy</a>
-        <a href="https://ko-fi.com/numax">Support the project</a>
       </div>
     </div>
-    <p class="footer-note">
-      Numax is an independent, unofficial companion tool for Nuvio, built and
-      maintained by a single developer. It is not affiliated with, endorsed
-      by, or supported by Nuvio.
+    <p class="foot-note">
+      Numax reads and writes your own Nuvio profile data using your own Nuvio
+      sign-in. Google Drive backup is opt-in and limited to files Numax creates
+      itself. Numax runs no servers of its own and doesn't sell or share your
+      data — the full breakdown is in the <a href="/privacy/">privacy policy</a>.
     </p>
   </div>
 </footer>

@@ -2967,7 +2967,23 @@
   const WZ_STEPS = ['account', 'keys', 'streams', 'meta', 'done'];
   // Everything the wizard knows about the run in progress. Reset when the
   // target profile changes, so a summary can never describe a different profile.
-  let wz = { step: 'account', aid: null, idx: null, mode: null, host: null, route: null, debrid: null, done: [] };
+  //
+  // `undo` is what makes Exit honest. The target profile is a free choice right
+  // up until the wizard writes something to it; after that it is a commitment,
+  // because half a setup on one profile and half on another is worse than
+  // either. So the first successful write locks the picker, and the only way
+  // back out is Exit — which puts the profile back the way it was.
+  //
+  // The snapshot is taken PER SURFACE, immediately before that surface is first
+  // written, and never again. What Numax holds is therefore exactly the
+  // pre-run state of exactly the things the wizard touched — in particular it
+  // never holds the value of a credential the wizard did not go on to change.
+  const wzBlank = () => ({
+    step: 'account', aid: null, idx: null, mode: null, host: null, route: null, debrid: null,
+    done: [], entry: null, locked: false, madeProfile: null, madeAccount: null,
+    undo: { creds: new Map(), blobs: new Map(), addons: null },
+  });
+  let wz = wzBlank();
 
   const wzTarget = () => (wz.aid && wz.idx != null) ? { aid: wz.aid, idx: wz.idx, name: wzProfileName() } : null;
   function wzProfileName() {
@@ -2978,6 +2994,237 @@
     return c ? c.name : 'Profile ' + wz.idx;
   }
   function wzLog(what) { wz.done.push(what); }
+
+  // ---- lock ---------------------------------------------------------------
+  // Called by every path that has just written something. Repaints only the
+  // chrome that changes (the target strip and the step-1 pickers) rather than
+  // re-running wzShow, which would re-read the account mid-write.
+  function wzLock() {
+    if (wz.locked) return;
+    wz.locked = true;
+    wzPaintTarget();
+    wzPaintEntry();
+    logAct('Wizard: locked to profile ' + wzProfileName() + ' — first change written', 'info');
+  }
+
+  // ---- snapshots ----------------------------------------------------------
+  // Each of these records the pre-run state of one surface, once. They throw on
+  // failure, and every caller treats that as "do not write": a change that
+  // cannot be undone is not one the wizard is allowed to make.
+  // `specs` is [{ provider, field }]. The field matters as much as the value:
+  // a provider that had NOTHING before cannot be put back by writing an empty
+  // object — Nuvio rejects that outright with 22023 "Invalid credential payload
+  // for provider: x" (probed live 2026-09-11, and there is no delete-credential
+  // RPC and no table access either). Writing the provider's own field as an
+  // empty string is accepted, so that is what "clear it" has to mean, and the
+  // field name has to be remembered here to do it.
+  async function wzSnapCreds(c, idx, specs) {
+    const need = specs.filter(x => !wz.undo.creds.has(x.provider));
+    if (!need.length) return;
+    const live = await c.pullProviderCredentials(idx);
+    need.forEach(x => {
+      const row = live.find(r => r.provider === x.provider);
+      wz.undo.creds.set(x.provider, {
+        field: x.field,
+        prior: row ? JSON.parse(JSON.stringify(row.credential_json)) : null,
+      });
+    });
+  }
+  function wzSnapBlob(platform, row) {
+    if (wz.undo.blobs.has(platform)) return;
+    wz.undo.blobs.set(platform, (row && row.settings_json) ? JSON.parse(JSON.stringify(row.settings_json)) : null);
+  }
+  async function wzSnapAddons(t) {
+    if (wz.undo.addons) return;
+    const { backup } = await loadAccount(t.aid, true);
+    wz.undo.addons = JSON.parse(JSON.stringify(sliceProfile(backup, t.idx).addons || []));
+  }
+
+  // ---- exit = undo --------------------------------------------------------
+  // Spells out what will be put back BEFORE doing it, and asks separately about
+  // the one thing that cannot be taken back: deleting a profile the wizard
+  // created, which takes everything on it with it.
+  async function wzExitAndUndo() {
+    if (!wz.locked) { wzResetRun(); return; }
+    const name = wzProfileName();
+    const details = [];
+    if (wz.undo.addons) details.push('Add-ons go back to the <b>' + wz.undo.addons.length + '</b> this profile had before the wizard started.');
+    if (wz.undo.creds.size) {
+      const back = [...wz.undo.creds.values()].filter(v => v && v.prior).length;
+      const clear = wz.undo.creds.size - back;
+      if (back) details.push('<b>' + back + '</b> key(s) go back to the value they had.');
+      if (clear) details.push('<b>' + clear + '</b> key(s) are emptied — there was nothing stored for them before, and Nuvio has no way to remove a credential row entirely.');
+    }
+    if (wz.undo.blobs.size) details.push('Settings for <b>' + [...wz.undo.blobs.keys()].map(wzPlatLabel).join(', ') + '</b> go back to what they were.');
+    if (wz.madeAccount) details.push('The Nuvio account the wizard created <b>cannot be deleted</b> from here — it stays, and stays linked in Numax.');
+    if (!details.length) details.push('Nothing was written to Nuvio yet, so there is nothing to put back.');
+    if (!(await uiModal({
+      title: 'Undo everything the wizard wrote to “' + name + '”?',
+      message: 'This puts the profile back the way it was before this run, then starts the wizard over.',
+      details, okLabel: 'Undo and exit', danger: true,
+    }))) return;
+
+    let killProfile = false;
+    if (wz.madeProfile != null) {
+      killProfile = await uiModal({
+        title: 'Also delete the profile “' + name + '”?',
+        message: 'The wizard created this profile during this run. Deleting it removes the profile and everything on it from Nuvio, and that cannot be taken back.',
+        details: [
+          'Choosing <b>Keep it</b> leaves an empty profile behind, which is safe — you can delete it in Nuvio later.',
+          'Numax has no backup of this profile: it did not exist before this run.',
+        ],
+        okLabel: 'Delete the profile', danger: true,
+      });
+    }
+
+    const r = await wzRunUndo(killProfile);
+    await uiModal({
+      title: r.problems.length ? 'Undone, with problems' : 'Put back',
+      message: r.problems.length
+        ? 'Some of it went back; the rest is listed below and needs sorting out by hand.'
+        : 'Everything the wizard wrote to this profile has been put back.',
+      details: r.lines.concat(r.problems.map(x => '<b>Problem:</b> ' + esc(x))),
+      okLabel: 'Close', noCancel: true, danger: !!r.problems.length,
+    });
+    logAct('Wizard: exit — undo finished with ' + r.problems.length + ' problem(s)', r.problems.length ? 'err' : 'ok');
+    wzResetRun();
+  }
+
+  // Every restore reuses the path that made the change in the first place:
+  // add-ons through engine.planTarget + api.applyPlan (overwrite, so anything
+  // the wizard added comes back off), settings through the guarded blob RPC,
+  // keys through sync_push_provider_credentials. No new write mechanism.
+  async function wzRunUndo(killProfile) {
+    const t = { aid: wz.aid, idx: wz.idx, name: wzProfileName() };
+    const lines = [], problems = [];
+    if (!t.aid || t.idx == null) return { lines: ['Nothing to put back.'], problems };
+    const c = A.client(store, t.aid);
+
+    if (wz.undo.addons) {
+      try {
+        const { backup } = await loadAccount(t.aid, true);
+        // 'mirror' is the engine's word for "the target becomes exactly this
+        // list, extras deleted" — every other caller in the app maps the
+        // user-facing "Overwrite" onto it. Passing 'overwrite' through to the
+        // engine does NOT do that: anything that is not 'mirror' falls through
+        // to merge, so the add-on being undone quietly survived.
+        const plan = E.planTarget({ addons: wz.undo.addons }, sliceProfile(backup, t.idx), {
+          categories: { addons: true }, modes: { addons: 'mirror' },
+          profileId: t.idx, originClientId: 'numax-web',
+        });
+        if (!plan.hasChanges) lines.push('Add-ons were already back as they were.');
+        else {
+          const rr = await c.applyPlan(plan, { dryRun: false });
+          const bad = (rr.results || []).filter(x => !x.ok);
+          if (bad.length) problems.push('Add-ons: ' + bad.map(b => b.error).join('; '));
+          else {
+            // A push answers 204, so the list is read back and compared rather
+            // than assumed — the first version of this reported "put back" over
+            // a merge that had left the new add-on exactly where it was.
+            const fresh = await loadAccount(t.aid, true);
+            const now = (sliceProfile(fresh.backup, t.idx).addons || []).map(x => x.url).sort();
+            const want = wz.undo.addons.map(x => x.url).sort();
+            const same = now.length === want.length && now.every((u, i) => u === want[i]);
+            if (!same) {
+              const extra = now.filter(u => want.indexOf(u) < 0);
+              problems.push('Add-ons did not go back' + (extra.length ? ' — still on the profile: ' + extra.join(', ') : '') + '.');
+            } else lines.push('Add-ons put back — ' + wz.undo.addons.length + ' on the profile again, checked.');
+          }
+        }
+      } catch (e) { problems.push('Add-ons: ' + e.message); }
+    }
+
+    for (const [platform, prior] of wz.undo.blobs) {
+      try {
+        const row = await c.pullSettings(t.idx, platform);
+        const body = prior || { version: WZ_BLOB_VERSION[platform] || 1, features: {} };
+        if (row && row.settings_json) {
+          await c.rpc('sync_push_profile_settings_blob_guarded', {
+            p_profile_id: t.idx, p_settings_json: body, p_platform: platform,
+            p_expected_updated_at: row.updated_at || null,
+          });
+        } else {
+          await c.rpc('sync_push_profile_settings_blob', {
+            p_profile_id: t.idx, p_settings_json: body, p_platform: platform, p_origin_client_id: 'numax-web',
+          });
+        }
+        lines.push(prior
+          ? wzPlatLabel(platform) + ' settings put back.'
+          : wzPlatLabel(platform) + ' had no settings before — the switches are off again, but the (empty) row Nuvio created stays, because there is no way to remove one.');
+      } catch (e) { problems.push(wzPlatLabel(platform) + ' settings: ' + e.message); }
+    }
+
+    if (wz.undo.creds.size) {
+      // No delete-credential RPC exists and the table itself is permission-denied
+      // (both probed live 2026-09-11), so a provider that had nothing before is
+      // emptied rather than removed — said out loud below rather than glossed.
+      const entries = [...wz.undo.creds.entries()];
+      const creds = entries.map(([provider, rec]) => ({
+        provider, credential_json: rec.prior || { [rec.field || 'api_key']: '' },
+      }));
+      try {
+        await c.pushProviderCredentials(t.idx, creds, 'numax-web');
+        // A push answers 204, which proves nothing — read it back.
+        const live = await c.pullProviderCredentials(t.idx);
+        const stuck = [];
+        entries.forEach(([provider, rec]) => {
+          const want = rec.prior || { [rec.field || 'api_key']: '' };
+          const row = live.find(r => r.provider === provider);
+          const got = (row && row.credential_json) || {};
+          if (Object.keys(want).some(f => String(got[f] || '') !== String(want[f] || ''))) stuck.push(provider);
+        });
+        const back = entries.filter(([, rec]) => !!rec.prior).length;
+        if (back) lines.push(back + ' key(s) put back to their previous value.');
+        if (entries.length - back) lines.push((entries.length - back) + ' key(s) emptied — Nuvio has no way to remove a credential row, so an empty one stays where there was none.');
+        if (stuck.length) problems.push('These keys did not go back and are still set in Nuvio: ' + stuck.join(', '));
+      } catch (e) { problems.push('API keys: ' + e.message); }
+    }
+
+    if (killProfile && wz.madeProfile != null) {
+      try {
+        const read = await wzReadProfiles(t.aid);
+        if (!read.crossChecked) throw new Error('could not double-check the profile list against Nuvio, and removing a profile rewrites the whole list — not risking it');
+        if (!read.idx.includes(wz.madeProfile)) throw new Error('that profile is not on the account any more');
+        const keep = read.idx.filter(i => i !== wz.madeProfile);
+        const nextList = read.rows.map(normRow).filter(r => r.profile_index !== wz.madeProfile);
+        const missing = keep.filter(i => !nextList.some(x => x.profile_index === i));
+        if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost too');
+        await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
+        inval(t.aid);
+        const after = await wzReadProfiles(t.aid);
+        const lost = keep.filter(i => !after.idx.includes(i));
+        if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
+        if (after.idx.includes(wz.madeProfile)) throw new Error('Nuvio accepted the write but the profile is still there');
+        lines.push('Deleted the profile the wizard created.');
+      } catch (e) { problems.push('Profile delete: ' + e.message); }
+    } else if (wz.madeProfile != null) {
+      lines.push('Kept the profile the wizard created — it is empty now.');
+    }
+
+    inval(t.aid);
+    if (!lines.length) lines.push('Nothing had been written, so nothing needed putting back.');
+    return { lines, problems };
+  }
+
+  // Back to a clean run: wizard state, every built-in-place pane, every field.
+  function wzResetRun() {
+    wz = wzBlank();
+    wzSavedKeys.clear();
+    wzVerified.clear();
+    ['keys', 'streams', 'meta'].forEach(k => { wzPending[k].length = 0; });
+    ['wz-entry', 'wz-keys', 'wz-meta', 'wz-modes', 'wz-routes', 'wz-debrid', 'wz-instances',
+     'wz-native-debrid', 'wz-p2p', 'wz-aio-install', 'wz-p2p-install', 'wz-sim-preset', 'wz-sim-hosts',
+     'wz-sim-install', 'wz-sim-result', 'wz-native-res', 'wz-keys-res', 'wz-summary']
+      .forEach(id => { const n = $(id); if (n) { n.dataset.built = ''; clr(n); } });
+    ['wz-native-key', 'wz-sim-key', 'wz-prof-name', 'wz-new-email', 'wz-new-pass', 'wz-new-pass2', 'wz-new-label']
+      .forEach(id => { const n = $(id); if (n) n.value = ''; });
+    ['wz-keys-status', 'wz-native-status', 'wz-sim-status', 'wz-profile-status', 'wz-new-status',
+     'wz-inst-status', 'wz-sim-hosts-status'].forEach(id => { const n = $(id); if (n) status(n, ''); });
+    ['wz-sim-result', 'wz-sim-install', 'wz-mode-simple', 'wz-mode-advanced', 'wz-route-aiostreams',
+     'wz-route-native', 'wz-newprof'].forEach(id => { const n = $(id); if (n) n.style.display = 'none'; });
+    if ($('wz-account')) $('wz-account').disabled = false;
+    refreshWizard();
+  }
 
   // ---- reading the profile list -----------------------------------------
   // Deliberately NOT loadAccount(): that runs sync_export_account_backup, a
@@ -3015,18 +3262,84 @@
     if (!WZ) return;
     const signedIn = !!gAuth.token;
     if ($('wz-signin-card')) $('wz-signin-card').style.display = signedIn ? 'none' : '';
-    if ($('wz-account-cols')) $('wz-account-cols').style.display = signedIn ? '' : 'none';
-    if ($('wz-profile-card')) $('wz-profile-card').style.display = signedIn ? '' : 'none';
+    if ($('wz-account-body')) $('wz-account-body').style.display = signedIn ? '' : 'none';
     if (!signedIn) { wzShow('account'); return; }
+    wzRenderEntry();
     wzFillAccounts();
     wzShow(wz.step);
+  }
+
+  // ---- step 1: the one question this step opens with ----------------------
+  // Both branches existed before and still do; they just wait behind whichever
+  // of the two answers applies, instead of being two full columns of controls
+  // that only one of them will ever use.
+  const WZ_ENTRY = [
+    { id: 'have', name: 'I already have a Nuvio account',
+      one: 'Pick the account, then the profile you want set up from scratch.' },
+    { id: 'new', name: 'I need to make a Nuvio account',
+      one: 'Creates a real Nuvio account, links it here, and signs you straight in.' },
+  ];
+  function wzRenderEntry() {
+    const box = $('wz-entry'); if (!box) return;
+    if (box.dataset.built !== '1') {
+      clr(box);
+      WZ_ENTRY.forEach(e => {
+        const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); });
+        card.dataset.wzentry = e.id;
+        const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', e.name));
+        card.appendChild(h);
+        card.appendChild(el('div', 'wz-pick-one', e.one));
+        box.appendChild(card);
+      });
+      box.dataset.built = '1';
+    }
+    wzPaintEntry();
+  }
+  function wzPaintEntry() {
+    const box = $('wz-entry'); if (!box) return;
+    // A picked profile means the question is already answered; a locked run
+    // means it can no longer be asked at all.
+    if (wz.locked || wz.idx != null) wz.entry = 'have';
+    const on = wz.entry;
+    box.style.display = on ? 'none' : '';
+    if ($('wz-have')) $('wz-have').style.display = on === 'have' ? '' : 'none';
+    if ($('wz-new')) $('wz-new').style.display = on === 'new' ? '' : 'none';
+    document.querySelectorAll('.wz-entry-back').forEach(b => {
+      b.style.display = wz.locked ? 'none' : '';
+      b.onclick = () => { wz.entry = null; wzPaintEntry(); };
+    });
+    if ($('wz-account')) $('wz-account').disabled = !!wz.locked;
+    // The chips are normally already on screen when the first write happens, so
+    // the lock is applied to them in place rather than by re-reading the account.
+    document.querySelectorAll('#wz-profiles .pchip[data-wzidx]').forEach(ch => {
+      ch.disabled = !!wz.locked && Number(ch.dataset.wzidx) !== wz.idx;
+    });
+    if ($('wz-addprof')) $('wz-addprof').style.display = wz.locked ? 'none' : '';
+    if (wz.locked && $('wz-newprof')) $('wz-newprof').style.display = 'none';
+    // The locked notice sits above the pickers it is explaining.
+    let note = $('wz-lock-note');
+    if (wz.locked) {
+      if (!note) {
+        note = el('div', 'wz-lock'); note.id = 'wz-lock-note';
+        $('wz-account-body').insertBefore(note, $('wz-account-body').firstChild);
+      }
+      clr(note);
+      const tx = el('span');
+      tx.innerHTML = 'The wizard has already written to <b>' + esc(wzProfileName()) +
+        '</b>, so the profile is fixed for the rest of this run.';
+      note.appendChild(tx);
+      note.appendChild(el('span', 'spacer'));
+      const b = el('button', 'btn btn-ghost btn-xs', 'Exit and undo');
+      b.onclick = wzExitAndUndo;
+      note.appendChild(b);
+    } else if (note) note.remove();
   }
 
   function wzFillAccounts() {
     const list = store.list(), sel = $('wz-account'); if (!sel) return;
     const prev = sel.value;
     sel.innerHTML = list.map(r => `<option value="${esc(r.accountId)}">${esc(accountName(r.accountId))}</option>`).join('');
-    if (!list.length) { clr($('wz-profiles')); $('wz-profiles').appendChild(el('p', 'empty', 'Link a Nuvio account first, or create one on the right.')); return; }
+    if (!list.length) { clr($('wz-profiles')); $('wz-profiles').appendChild(el('p', 'empty', 'No Nuvio account is linked yet — go back and create one, or link it on the Nuvio accounts tab.')); return; }
     const keep = (prev && list.some(r => r.accountId === prev)) ? prev
       : (wz.aid && list.some(r => r.accountId === wz.aid) ? wz.aid : list[0].accountId);
     sel.value = keep;
@@ -3060,12 +3373,15 @@
     if (wz.idx != null && !wzProfiles.some(p => p.index === wz.idx)) wz.idx = null;
     wzProfiles.forEach(p => {
       const c = el('button', 'pchip' + (p.index === wz.idx ? ' on' : '')); c.type = 'button';
+      // Locked: the picked one still reads as picked, the rest are visibly out
+      // of reach rather than quietly doing nothing when clicked.
+      c.dataset.wzidx = String(p.index);
       c.appendChild(avatar(p, 42)); c.appendChild(el('span', 'pcn', p.name));
-      c.onclick = () => { wz.aid = aid; wz.idx = p.index; wz.done = []; wzRenderProfiles(aid); };
+      c.onclick = () => { if (wz.locked) return; wz.aid = aid; wz.idx = p.index; wz.done = []; wzRenderProfiles(aid); };
       box.appendChild(c);
     });
-    if (wzProfiles.length < 6) {
-      const add = el('button', 'pchip wz-add'); add.type = 'button';
+    if (wzProfiles.length < 6 && !wz.locked) {
+      const add = el('button', 'pchip wz-add'); add.type = 'button'; add.id = 'wz-addprof';
       add.appendChild(el('span', 'plus', '+'));
       add.appendChild(el('span', 'pcn', wzProfiles.length ? 'New profile' : 'Create the first profile'));
       add.onclick = () => {
@@ -3074,13 +3390,14 @@
         status($('wz-profile-status'), '');
       };
       box.appendChild(add);
-    } else {
+    } else if (!wz.locked) {
       box.appendChild(el('span', 'muted sm', 'All six profile slots are used.'));
     }
     // A brand-new Nuvio account normally arrives with one profile already made.
     // Say so when it does not, instead of showing an empty row with no
     // explanation, which reads as a failure.
     if (!wzProfiles.length) box.appendChild(el('p', 'empty', 'This account has no profiles yet — make the first one above.'));
+    wzPaintEntry();
     wzShow(wz.step);
   }
 
@@ -3128,6 +3445,10 @@
       const lost = read.idx.filter(i => !after.idx.includes(i));
       if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
       wz.aid = aid; wz.idx = next; wz.done = ['Created the profile “' + name + '”.'];
+      // Creating a profile IS a change to the account, so the run locks here
+      // too — and Exit can offer to delete exactly the profile it made.
+      wz.madeProfile = next;
+      wzLock();
       status(st, 'Created “' + name + '” and selected it.', 'ok');
       logAct('Wizard: created profile ' + name + ' (index ' + next + '); list ' + read.idx.join(',') + ' -> ' + after.idx.join(','), 'ok');
       $('wz-newprof').style.display = 'none';
@@ -3169,9 +3490,13 @@
       await saveRegistry();
       $('wz-new-email').value = ''; $('wz-new-pass').value = ''; $('wz-new-pass2').value = ''; $('wz-new-label').value = '';
       wz.aid = id; wz.idx = null; wz.done = ['Created the Nuvio account ' + email + '.'];
-      status(st, 'Created and linked ' + (label || email) + '. Now add a profile below.', 'ok');
+      wz.madeAccount = id;
+      // The account half of this branch is finished, so hand straight over to
+      // the other one rather than leaving a filled-in form on screen.
+      wz.entry = 'have';
+      status(st, 'Created and linked ' + (label || email) + '. Now pick a profile.', 'ok');
       logAct('Wizard: created Nuvio account ' + email, 'ok');
-      refreshAccounts(); wzFillAccounts();
+      refreshAccounts(); wzFillAccounts(); wzPaintEntry();
       if ($('wz-account')) { $('wz-account').value = id; wzRenderProfiles(id); }
     } catch (e) {
       status(st, "Couldn't create it: " + e.message, 'err');
@@ -3222,30 +3547,65 @@
       b.classList.toggle('did', k !== wz.step && ready && WZ_STEPS.indexOf(k) < WZ_STEPS.indexOf(wz.step));
       b.disabled = (k !== 'account') && !ready;
     });
-    // "Writing to X" strip — present from step 2 on, so there is never any doubt
-    // which profile a button on this page is about to change.
-    const t = $('wz-target');
-    if (t) {
-      if (ready && wz.step !== 'account') {
-        clr(t); t.style.display = '';
-        t.appendChild(avatar({ name: wzProfileName() }, 26));
-        const tx = el('span'); tx.innerHTML = 'Setting up <b>' + esc(wzProfileName()) + '</b> <span class="muted">on ' + esc(accountName(wz.aid)) + '</span>';
-        t.appendChild(tx);
-        t.appendChild(el('span', 'wz-pick-sp'));
-        const ch = el('button', 'btn btn-ghost btn-xs', 'Change'); ch.onclick = () => wzShow('account'); t.appendChild(ch);
-      } else t.style.display = 'none';
-    }
-    const i = WZ_STEPS.indexOf(wz.step);
-    $('wz-back').disabled = i === 0;
-    $('wz-next').disabled = (i === WZ_STEPS.length - 1) || !ready;
-    $('wz-next').textContent = i === WZ_STEPS.length - 2 ? 'Finish' : 'Next';
-    $('wz-foot-note').textContent = !ready ? 'Pick or create a profile to carry on.'
-      : (wz.step === 'done' ? '' : 'Next saves this step first.');
+    wzPaintTarget();
+    if (wz.step === 'account') wzPaintEntry();
+    $('wz-back').disabled = WZ_STEPS.indexOf(wz.step) === 0;
+    wzPaintNext();
     if (wz.step === 'keys') wzRenderKeys();
-    if (wz.step === 'meta') wzMarkMetaInstalled();
     if (wz.step === 'streams') wzRenderStreams();
     if (wz.step === 'meta') wzRenderMeta();
     if (wz.step === 'done') wzRenderDone();
+  }
+
+  // "Writing to X" strip — present from step 2 on, so there is never any doubt
+  // which profile a button on this page is about to change. Once the run is
+  // locked it also appears on step 1, because that is where the way out is.
+  function wzPaintTarget() {
+    const t = $('wz-target'); if (!t) return;
+    const ready = !!wzTarget();
+    if (!ready || (wz.step === 'account' && !wz.locked)) { t.style.display = 'none'; return; }
+    clr(t); t.style.display = ''; t.classList.toggle('locked', !!wz.locked);
+    t.appendChild(avatar({ name: wzProfileName() }, 26));
+    const tx = el('span');
+    tx.innerHTML = 'Setting up <b>' + esc(wzProfileName()) + '</b> <span class="muted">on ' + esc(accountName(wz.aid)) + '</span>';
+    t.appendChild(tx);
+    if (wz.locked) t.appendChild(wzTag('Locked in', 'plain'));
+    t.appendChild(el('span', 'wz-pick-sp'));
+    const b = el('button', 'btn btn-ghost btn-xs', wz.locked ? 'Exit and undo' : 'Change');
+    b.onclick = wz.locked ? wzExitAndUndo : () => wzShow('account');
+    t.appendChild(b);
+  }
+
+  // What Next would write if it were pressed right now, which is both its label
+  // and its colour: explicit and red when there is something to save, quiet grey
+  // when there is not. It is never disabled for having nothing to do — a step
+  // you legitimately want to skip has to stay walkable.
+  function wzStepDirty(step) {
+    if (!WZ) return false;
+    if (step === 'keys') {
+      return WZ.KEYS.some(k => {
+        const i = $('wz-key-' + k.id); const v = i ? i.value.trim() : '';
+        return !!v && wzSavedKeys.get(k.id) !== v;
+      });
+    }
+    if (step === 'streams' && wz.mode === 'advanced' && wz.route === 'native') {
+      const n = $('wz-native-key'); const v = n ? n.value.trim() : '';
+      if (v && wzSavedKeys.get('debrid') !== v) return true;
+    }
+    return (wzPending[step] || []).some(x => x.dirty());
+  }
+  function wzPaintNext() {
+    const b = $('wz-next'); if (!b) return;
+    const i = WZ_STEPS.indexOf(wz.step), ready = !!wzTarget(), last = i === WZ_STEPS.length - 1;
+    b.disabled = last || !ready;
+    const dirty = ready && !last && wzStepDirty(wz.step);
+    b.textContent = dirty ? 'Save and move to next step' : (i === WZ_STEPS.length - 2 ? 'Finish' : 'Next');
+    b.className = 'btn ' + (dirty ? 'btn-primary' : 'btn-ghost');
+    const note = $('wz-foot-note');
+    if (note) {
+      note.textContent = !ready ? 'Pick or create a profile to carry on.'
+        : (last ? '' : (dirty ? '' : 'Nothing to save on this step.'));
+    }
   }
   const wzGo = d => { const i = WZ_STEPS.indexOf(wz.step) + d; if (i >= 0 && i < WZ_STEPS.length) wzShow(WZ_STEPS[i]); };
 
@@ -3262,6 +3622,21 @@
     c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(); } };
     return c;
   }
+  // The round "?" in a card's header, and the only thing that opens its
+  // reasoning. Volunteering pros and cons on every card made the streams step a
+  // wall of text; opening them on hover made the page rearrange itself as the
+  // pointer crossed it. Asked for, then shown.
+  function wzWhyBtn(card, label) {
+    const q = el('button', 'wz-pick-q', '?'); q.type = 'button';
+    q.setAttribute('aria-label', 'Pros and cons for ' + label);
+    q.setAttribute('aria-expanded', 'false');
+    q.onclick = e => {
+      e.stopPropagation();
+      const on = card.classList.toggle('showpc');
+      q.setAttribute('aria-expanded', on ? 'true' : 'false');
+    };
+    return q;
+  }
   function wzProsCons(pros, cons) {
     const w = el('div', 'wz-pc');
     (pros || []).forEach(p => { const r = el('div', 'pro'); r.innerHTML = '<span class="s">+</span><span>' + p + '</span>'; w.appendChild(r); });
@@ -3277,9 +3652,10 @@
   function wzRenderKeys() {
     const box = $('wz-keys'); if (!box || box.dataset.built === '1') return;
     clr(box);
-    WZ.KEYS.forEach(k => {
-      const w = el('div', 'wz-key');
+    WZ.KEYS.forEach((k, n) => {
+      const w = el('div', 'wz-key'); w.dataset.wzkey = k.id;
       const h = el('div', 'wz-key-h');
+      h.appendChild(el('span', 'wz-n', String(n + 1)));
       h.appendChild(el('span', 'wz-key-n', k.name));
       if (k.tag) h.appendChild(wzTag(k.tag, k.required ? 'req' : (/optional/i.test(k.tag) ? 'plain' : '')));
       h.appendChild(el('span', 'wz-pick-sp'));
@@ -3287,24 +3663,118 @@
       get.onclick = () => wzOpen(k.getUrl);
       h.appendChild(get);
       w.appendChild(h);
+      // One line of copy. Everything else that used to sit here — why it is
+      // worth having, which platforms need it — was three more paragraphs per
+      // key on a step that is really just three boxes to paste into.
       w.appendChild(el('div', 'wz-key-b', k.blurb));
-      w.appendChild(el('div', 'wz-key-w', k.why));
-      if (k.note) w.appendChild(el('div', 'wz-key-w', k.note));
       const ol = el('ol', 'wz-steps');
-      k.steps.forEach(s => { const li = el('li'); li.innerHTML = s; ol.appendChild(li); });
+      k.steps.forEach(x => { const li = el('li'); li.innerHTML = x; ol.appendChild(li); });
       const disc = mkDisclosure('How to get it', k.steps.length + ' steps', false);
       disc.body.appendChild(ol);
       w.appendChild(disc.node);
+
+      const row = el('div', 'wz-key-row');
       const inp = el('input'); inp.type = 'password'; inp.id = 'wz-key-' + k.id;
-      inp.placeholder = k.placeholder; inp.autocomplete = 'off'; inp.className = 'wz-key-input';
+      inp.placeholder = k.placeholder; inp.autocomplete = 'off'; inp.spellcheck = false;
+      inp.className = 'wz-key-input';
       if (k.required) inp.setAttribute('aria-required', 'true');
-      // The "this is required" highlight is cleared the moment you start typing,
-      // rather than sitting there red while you fix it.
-      inp.addEventListener('input', () => inp.classList.remove('wz-need'));
-      w.appendChild(inp);
+      const chk = el('span', 'wz-chk idle'); chk.id = 'wz-chk-' + k.id;
+      row.appendChild(inp); row.appendChild(chk);
+      w.appendChild(row);
+      const v = el('div', 'wz-key-v'); v.id = 'wz-keyv-' + k.id; w.appendChild(v);
+
+      // A key is checked once it LOOKS finished (k.shape), not while it is half
+      // typed — a red cross after three characters is noise, not feedback. A box
+      // you leave with something unrecognisable in it still gets checked on blur,
+      // so a wrong-format paste is told rather than silently accepted.
+      let timer = null;
+      inp.addEventListener('input', () => {
+        inp.classList.remove('wz-need');
+        clearTimeout(timer);
+        const val = inp.value.trim();
+        if (!val) { wzChk(k, 'idle', ''); return; }
+        const seen = wzVerified.get(k.id);
+        if (seen && seen.value === val) { wzChk(k, seen.state, seen.msg); return; }
+        wzChk(k, 'idle', '');
+        if (k.shape && k.shape.test(val)) timer = setTimeout(() => wzVerifyKey(k), 350);
+      });
+      inp.addEventListener('blur', () => { clearTimeout(timer); if (inp.value.trim()) wzVerifyKey(k); });
+      wzChk(k, 'idle', '');
       box.appendChild(w);
     });
     box.dataset.built = '1';
+  }
+
+  // ---- is this key real? --------------------------------------------------
+  // Asked of the provider itself, because nothing else can answer it: a key is
+  // either recognised over there or it is not. The key goes to the provider it
+  // belongs to and nowhere else — the same request Nuvio will make with it a
+  // minute later — and a network failure resolves to "couldn't check", never to
+  // a cross, so a blocked corporate proxy can't make a good key look bad.
+  const wzVerified = new Map();          // key id -> { value, state, msg }
+  const wzVerifyGen = {};
+  const WZ_CHK = {
+    idle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+    good: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+    bad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    unknown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 7.5v6"/><path d="M12 17h.01"/></svg>',
+    busy: '',
+  };
+  function wzChk(k, state, msg) {
+    const chk = $('wz-chk-' + k.id); if (!chk) return;
+    chk.className = 'wz-chk ' + state;
+    chk.innerHTML = WZ_CHK[state] || '';
+    chk.title = msg || '';
+    const v = $('wz-keyv-' + k.id);
+    if (v) { v.textContent = msg || ''; v.className = 'wz-key-v' + (state === 'busy' || state === 'idle' ? '' : ' ' + state); }
+    const card = document.querySelector('#wz-keys [data-wzkey="' + k.id + '"]');
+    if (card) card.classList.toggle('ok', state === 'good');
+  }
+  async function wzVerifyKey(k) {
+    const inp = $('wz-key-' + k.id); if (!inp) return;
+    const val = inp.value.trim();
+    if (!val) { wzChk(k, 'idle', ''); return; }
+    const seen = wzVerified.get(k.id);
+    if (seen && seen.value === val) { wzChk(k, seen.state, seen.msg); return; }
+    const gen = wzVerifyGen[k.id] = (wzVerifyGen[k.id] || 0) + 1;
+    wzChk(k, 'busy', 'Checking it with ' + k.getLabel + '…');
+    let out;
+    try { out = await wzAskProvider(k.verify, val); }
+    catch (e) { out = { state: 'unknown', msg: "Couldn't reach " + k.getLabel + ' to check this one — save it anyway, Nuvio will tell you if it is wrong.' }; }
+    if (gen !== wzVerifyGen[k.id] || inp.value.trim() !== val) return;   // a newer keystroke won
+    wzVerified.set(k.id, { value: val, state: out.state, msg: out.msg });
+    wzChk(k, out.state, out.msg);
+  }
+  // Endpoints and status codes confirmed live 2026-09-11 with a deliberately
+  // wrong key: TMDB 401 + status_code 7, MDBList 403 {"error":"Invalid API key"},
+  // Anime Skip 200 with errors[0] "Invalid X-Client-ID header". All three send
+  // Access-Control-Allow-Origin: * so a browser can make the call at all.
+  async function wzAskProvider(kind, key) {
+    if (kind === 'tmdb') {
+      const r = await fetch('https://api.themoviedb.org/3/authentication?api_key=' + encodeURIComponent(key));
+      if (r.status === 200) return { state: 'good', msg: 'TMDB recognises this key.' };
+      if (r.status === 401) return { state: 'bad', msg: 'TMDB does not recognise this — check you copied the v3 key, not the v4 read access token.' };
+      throw new Error('TMDB answered ' + r.status);
+    }
+    if (kind === 'mdblist') {
+      const r = await fetch('https://api.mdblist.com/user?apikey=' + encodeURIComponent(key));
+      if (r.status === 200) return { state: 'good', msg: 'MDBList recognises this key.' };
+      if (r.status === 401 || r.status === 403) return { state: 'bad', msg: 'MDBList does not recognise this key.' };
+      throw new Error('MDBList answered ' + r.status);
+    }
+    if (kind === 'animeskip') {
+      const r = await fetch('https://api.anime-skip.com/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Client-ID': key },
+        body: JSON.stringify({ query: '{__typename}' }),
+      });
+      const j = await r.json().catch(() => null);
+      if (j && j.data && j.data.__typename) return { state: 'good', msg: 'Anime Skip accepted this Client ID.' };
+      const err = j && j.errors && j.errors[0] && String(j.errors[0].message || '');
+      if (err && /client.?id/i.test(err)) return { state: 'bad', msg: 'Anime Skip does not recognise this Client ID.' };
+      throw new Error('Anime Skip answered ' + r.status + (err ? ': ' + err : ''));
+    }
+    throw new Error('no check available');
   }
 
   // Keys go to provider_credentials (the only place Nuvio actually reads them
@@ -3313,7 +3783,7 @@
   // inventing one — the app writes its own on first sync.
   async function wzSaveKeys() {
     const t = wzTarget(); if (!t) return false;
-    const st = $('wz-keys-status'), res = $('wz-keys-res'), btn = $('wz-keys-save');
+    const st = $('wz-keys-status'), res = $('wz-keys-res'), btn = $('wz-next');
     clr(res);
     const entered = WZ.KEYS.map(k => ({ k, v: ($('wz-key-' + k.id).value || '').trim() })).filter(x => x.v);
     const missingRequired = WZ.KEYS.filter(k => k.required && !entered.some(x => x.k.id === k.id) && !wzSavedKeys.has(k.id));
@@ -3323,10 +3793,19 @@
       return false;
     }
     if (!entered.length) { status(st, 'Nothing typed in.', 'ok'); return true; }
-    btn.disabled = true; status(st, 'Saving keys…');
+    if (btn) btn.disabled = true;
+    status(st, 'Saving keys…');
     const lines = [], problems = [];
     try {
       const c = A.client(store, t.aid);
+      // Nothing is written until the previous state is safely recorded: Exit
+      // promises to put this profile back, and a write we cannot reverse would
+      // make that a lie.
+      try { await wzSnapCreds(c, t.idx, entered.map(x => ({ provider: x.k.provider, field: x.k.field }))); }
+      catch (e) {
+        status(st, "Couldn't read this profile's existing keys first, and without that this could not be undone — nothing was written: " + e.message, 'err');
+        return false;
+      }
       // 1. the keys themselves
       const creds = entered.map(x => ({ provider: x.k.provider, credential_json: { [x.k.field]: x.v } }));
       await c.pushProviderCredentials(t.idx, creds, 'numax-web');
@@ -3360,6 +3839,7 @@
         return false;
       } else {
         status(st, 'Saved ' + entered.length + ' key' + (entered.length === 1 ? '' : 's') + ' — checked and confirmed.', 'ok');
+        wzLock();
         wzLog('Saved ' + entered.map(x => x.k.name).join(', ') + ' to this profile.');
         logAct('Wizard: saved ' + entered.length + ' API key(s) to ' + t.name, 'ok');
         celebrate(res);
@@ -3370,7 +3850,7 @@
       status(st, "Couldn't save: " + e.message, 'err');
       logAct('Wizard: API key save failed — ' + e.message, 'err');
       return false;
-    } finally { btn.disabled = false; }
+    } finally { if (btn) btn.disabled = false; }
   }
 
   // Read-modify-write on each platform blob: pull the live one (with its
@@ -3403,6 +3883,7 @@
       let row;
       try { row = await c.pullSettings(t.idx, platform); }
       catch (e) { problems.push(wzPlatLabel(platform) + ' settings could not be read: ' + e.message); continue; }
+      wzSnapBlob(platform, row);
       const fresh = !(row && row.settings_json);
       const blob = fresh
         ? { version: WZ_BLOB_VERSION[platform] || 1, features: {} }
@@ -3459,9 +3940,12 @@
         c.dataset.wzmode = m.id;
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', m.name));
         if (m.tag) h.appendChild(wzTag(m.tag));
+        h.appendChild(el('span', 'wz-pick-sp'));
+        h.appendChild(wzWhyBtn(c, m.name));
         c.appendChild(h);
         c.appendChild(el('div', 'wz-pick-one', m.oneLiner));
-        c.appendChild(wzProsCons(m.pros, m.cons));
+        const wrap = el('div', 'wz-pc-wrap'); wrap.appendChild(wzProsCons(m.pros, m.cons));
+        c.appendChild(wrap);
         modes.appendChild(c);
       });
       modes.dataset.built = '1';
@@ -3478,9 +3962,12 @@
         c.dataset.wzroute = r.id;
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', r.name));
         if (r.tag) h.appendChild(wzTag(r.tag));
+        h.appendChild(el('span', 'wz-pick-sp'));
+        h.appendChild(wzWhyBtn(c, r.name));
         c.appendChild(h);
         c.appendChild(el('div', 'wz-pick-one', r.oneLiner));
-        c.appendChild(wzProsCons(r.pros, r.cons));
+        const wrap = el('div', 'wz-pc-wrap'); wrap.appendChild(wzProsCons(r.pros, r.cons));
+        c.appendChild(wrap);
         box.appendChild(c);
       });
       box.dataset.built = '1';
@@ -3760,20 +4247,6 @@
     wzMarkDebrid();
     // instances
     if ($('wz-instances').dataset.built !== '1') wzLoadInstances();
-    // guide
-    const g = $('wz-guide');
-    if (g.dataset.built !== '1') {
-      clr(g);
-      WZ.AIO_GUIDE.forEach((s, i) => {
-        const w = el('div', 'wz-guide-step');
-        w.appendChild(el('span', 'gn', String(i + 1)));
-        const tx = el('div');
-        tx.appendChild(el('div', 'gt', s.title));
-        const b = el('div', 'gb'); b.innerHTML = s.body; tx.appendChild(b);
-        w.appendChild(tx); g.appendChild(w);
-      });
-      g.dataset.built = '1';
-    }
     // paste-back
     if ($('wz-aio-install').dataset.built !== '1') {
       wzInstallBox($('wz-aio-install'), {
@@ -3785,6 +4258,20 @@
     }
   }
 
+  // The seven-step guide used to be a card sat permanently between "pick an
+  // instance" and "paste the link back", which is most of a screen of reading
+  // for people who have done this before. It is the same guide, on request.
+  // `details` entries are authored copy from wizard.js, which is what uiModal's
+  // HTML pass expects — nothing user-supplied goes through it.
+  function wzShowGuide() {
+    return uiModal({
+      title: 'Setting up AIOStreams',
+      message: 'All of this happens on the instance you opened. Come back here with one link at the end.',
+      details: WZ.AIO_GUIDE.map((x, i) => '<b>' + (i + 1) + '. ' + esc(x.title) + '</b><br>' + x.body),
+      okLabel: 'Close', noCancel: true,
+    });
+  }
+
   function wzDebridCard(d, nativeOnly) {
     const c = wzCard('', () => { wz.debrid = d.id; nativeOnly ? wzMarkNativeDebrid() : wzMarkDebrid(); });
     c.dataset.wzdebrid = d.id;
@@ -3793,21 +4280,17 @@
     if (d.tag) h.appendChild(wzTag(d.tag));
     if (!nativeOnly && d.native) h.appendChild(wzTag('Nuvio drives this too', 'plain'));
     h.appendChild(el('span', 'wz-pick-sp'));
+    h.appendChild(wzWhyBtn(c, d.name));
     const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
     open.onclick = e => { e.stopPropagation(); wzOpen(d.url); };
     h.appendChild(open);
     c.appendChild(h);
     if (d.price) c.appendChild(el('div', 'wz-pick-price', d.price));
     // Seven of these side by side, each with its own reasoning, was a wall of
-    // text. The detail folds away and opens on hover, keyboard focus, or once
-    // the card is the picked one — see .wz-pc-wrap. Route cards keep theirs
-    // open: there are only two and the reasoning IS the choice.
+    // text — so the detail folds away and only the "?" in the header opens it.
     const wrap = el('div', 'wz-pc-wrap');
     wrap.appendChild(wzProsCons(d.pros, d.cons));
     c.appendChild(wrap);
-    const hint = el('div', 'wz-pick-more');
-    hint.appendChild(el('span', null, 'Pros and cons'));
-    c.appendChild(hint);
     return c;
   }
   function wzMarkDebrid() {
@@ -3951,6 +4434,11 @@
     const problems = [];
     try {
       const c = A.client(store, t.aid);
+      try { await wzSnapCreds(c, t.idx, [{ provider: 'debrid:' + d.id, field: 'api_key' }]); }
+      catch (e) {
+        status(st, "Couldn't read what this profile already had first, and without that this could not be undone — nothing was written: " + e.message, 'err');
+        return false;
+      }
       await c.pushProviderCredentials(t.idx, [{ provider: 'debrid:' + d.id, credential_json: { api_key: key } }], 'numax-web');
       let live = [];
       try { live = await c.pullProviderCredentials(t.idx); } catch (e) { problems.push("Couldn't read it back to confirm: " + e.message); }
@@ -3977,6 +4465,7 @@
       } else {
         status(st, d.name + ' connected and link resolving is on. If Nuvio still shows it unlinked, use its own Connected Services screen — some builds only accept the key through their device-code flow.', 'ok');
         wzSavedKeys.set('debrid', key);
+        wzLock();
         wzLog('Connected ' + d.name + ' and turned on link resolving.');
         logAct('Wizard: connected ' + d.name + ' on ' + t.name, 'ok');
         celebrate(res);
@@ -3999,17 +4488,23 @@
     if (box.dataset.built !== '1') {
       clr(box);
       WZ.METADATA.forEach(m => {
-        const w = el('div', 'wz-key'); w.dataset.wzmeta = m.id;
-        const h = el('div', 'wz-key-h');
-        h.appendChild(el('span', 'wz-key-n', m.name));
-        h.appendChild(el('span', 'wz-meta-tag'));
-        h.appendChild(el('span', 'wz-pick-sp'));
+        const w = el('div', 'wz-meta-card'); w.dataset.wzmeta = m.id;
+        const top = el('div', 'wz-meta-top');
+        top.appendChild(wzLogo(m));
+        const hd = el('div', 'wz-meta-hd');
+        const nm = el('div', 'nm');
+        nm.appendChild(el('span', '', m.name));
+        nm.appendChild(el('span', 'wz-meta-tag'));
+        hd.appendChild(nm);
+        top.appendChild(hd);
+        w.appendChild(top);
+        w.appendChild(el('div', 'wz-meta-b', m.blurb));
+        w.appendChild(el('div', 'wz-meta-w', m.body));
+        const act = el('div', 'wz-meta-act');
         const b = el('button', 'btn btn-ghost btn-xs', m.instances ? 'Pick an instance' : 'Open site');
         b.onclick = () => m.instances ? wzMetaInstances(w, m) : wzOpen(m.url);
-        h.appendChild(b);
-        w.appendChild(h);
-        w.appendChild(el('div', 'wz-key-b', m.blurb));
-        w.appendChild(el('div', 'wz-key-w', m.body));
+        act.appendChild(b);
+        w.appendChild(act);
         const slot = el('div', 'wz-meta-slot'); w.appendChild(slot);
         wzInstallBox(slot, {
           step: 'meta', label: m.name,
@@ -4023,6 +4518,22 @@
       box.dataset.built = '1';
     }
     wzMarkMetaInstalled();
+  }
+
+  // The tile's artwork. It is decoration with a job — it is how you recognise
+  // the add-on you already know — so a host that has gone away degrades to the
+  // monogram sitting underneath it, never to a broken-image icon.
+  function wzLogo(m) {
+    const t = el('span', 'wz-meta-logo');
+    t.appendChild(el('span', 'mono', m.mono || ((m.name || '?').trim()[0] || '?').toUpperCase()));
+    if (m.logo) {
+      const i = document.createElement('img');
+      i.alt = ''; i.loading = 'lazy'; i.referrerPolicy = 'no-referrer';
+      i.onerror = () => i.remove();
+      i.src = m.logo;
+      t.appendChild(i);
+    }
+    return t;
   }
 
   // Whether each metadata add-on is ACTUALLY on the profile, read live rather
@@ -4050,6 +4561,7 @@
       const card = document.querySelector('#wz-meta [data-wzmeta="' + m.id + '"]'); if (!card) return;
       const pats = m.matches || [];
       const on = urls.some(u => pats.some(re => re.test(u)) || (m.check && u === m.check));
+      card.classList.toggle('on', on);
       const slot = card.querySelector('.wz-meta-tag'); clr(slot);
       // Installed is a fact worth stating; "not installed" is not, because the
       // open box below already says so. Otherwise just show what it is good for.
@@ -4112,13 +4624,26 @@
       const lab = el('label', 'switch-row');
       const cb = el('input'); cb.type = 'checkbox'; cb.checked = true;
       cb.onchange = () => { atTop = cb.checked; };
+      // The reason lives once in the step header (#wz-order-tip); repeating it
+      // under every tile put the same sentence on screen four times.
       const tx = el('div', 'tx'); tx.appendChild(el('b', '', 'Put it at the top of the add-on list'));
-      tx.appendChild(el('span', '', WZ.ORDER_TIP));
       lab.appendChild(cb); lab.appendChild(tx); w.appendChild(lab);
     }
+    // With no button of its own, the box has to say where its save button went.
+    const go = el('div', 'muted sm mk-hint');
+    go.textContent = 'Filled in? “Save and move to next step” at the bottom writes it in.';
+    w.appendChild(go);
     const st = el('div', 'inline-status');
     const res = el('div', 'mk-res');
+    // The box has no button of its own any more: Next is the one thing that
+    // writes, on every step, so there is never a question of which control
+    // saves. mkWrite still needs a button to drive — it rewrites the label and
+    // the handler as part of its preview-then-confirm protocol — so one exists,
+    // hidden. That is safe here because the wizard only ever MERGES a single
+    // add-on, so mkWrite's removal gate (the only path that genuinely needs a
+    // visible second click) is never reached.
     const btn = el('button', 'btn btn-primary', 'Add to this profile');
+    btn.style.display = 'none';
     let saved = '';                                   // the url this box last wrote
     // mkWrite is preview-then-confirm: it rewrites this button's label and
     // handler. Editing either field afterwards has to put the button back, or a
@@ -4131,7 +4656,7 @@
       url, nm, btn, st, res, label: opts.label, top: () => atTop, rearm: arm, auto,
       onSaved: u => { saved = u; },
     });
-    [url, nm].forEach(i => i.addEventListener('input', () => { clr(res); status(st, ''); arm(); }));
+    [url, nm].forEach(i => i.addEventListener('input', () => { clr(res); status(st, ''); arm(); wzPaintNext(); }));
     arm();
     w.appendChild(btn); w.appendChild(st); w.appendChild(res);
     host_.appendChild(w);
@@ -4158,6 +4683,11 @@
     if (!u) { status(o.st, 'Paste the link first.', 'err'); return { written: false, ok: false }; }
     if (!/^https?:\/\//i.test(u)) { status(o.st, 'That does not look like a link \u2014 it should start with https://', 'err'); return { written: false, ok: false }; }
     const name = (o.nm.value || '').trim() || o.label;
+    try { await wzSnapAddons(t); }
+    catch (e) {
+      status(o.st, "Couldn't read this profile's add-ons first, and without that this could not be undone — nothing was written: " + e.message, 'err');
+      return { written: false, ok: false };
+    }
     const master = [{ url: u, name, enabled: true }];
     let keepOrder = false;
     // "Put it at the top" cannot be expressed by mkWrite's append arithmetic, so
@@ -4178,7 +4708,7 @@
     const r = (await mkWrite({
       kind: 'addons', master, targets: [{ aid: t.aid, idx: t.idx, name: t.name }],
       mode: 'merge', st: o.st, res: o.res, btn: o.btn, label: name, aid: t.aid, keepOrder, auto: o.auto,
-      onDone: ok => { if (ok) wzLog('Added ' + name + ' to this profile.'); else o.rearm(); },
+      onDone: ok => { if (ok) { wzLock(); wzLog('Added ' + name + ' to this profile.'); } else o.rearm(); },
     })) || { written: false, ok: true };
     if (r.ok) o.onSaved(u);
     if (r.ok && r.written) wzMarkMetaInstalled();
@@ -4222,7 +4752,7 @@
     try { ok = await wzCommitStep(wz.step); }
     catch (e) { ok = false; logAct('Wizard: could not save this step \u2014 ' + e.message, 'err'); }
     btn.textContent = label; btn.disabled = false;
-    if (ok) wzGo(1);
+    if (ok) wzGo(1); else wzPaintNext();
   }
 
   function wzRenderDone() {
@@ -4265,8 +4795,8 @@
       $('wz-prof-create').onclick = wzCreateProfile;
       $('wz-prof-name').addEventListener('keydown', e => { if (e.key === 'Enter') wzCreateProfile(); });
       $('wz-prof-cancel').onclick = () => { $('wz-newprof').style.display = 'none'; status($('wz-profile-status'), ''); };
-      $('wz-keys-save').onclick = wzSaveKeys;
       $('wz-nodebrid-btn').onclick = wzNoDebrid;
+      $('wz-guide-btn').onclick = wzShowGuide;
       $('wz-inst-refresh').onclick = wzLoadInstances;
       $('wz-native-save').onclick = wzSaveNativeKey;
       $('wz-sim-run').onclick = wzSimRun;
@@ -4283,6 +4813,10 @@
         $('wz-sim-install').style.display = 'none';
       });
       $('wz-sim-key').addEventListener('keydown', e => { if (e.key === 'Enter') wzSimRun(); });
+      // One listener for the whole panel: every field on every step feeds the
+      // same question — is there anything for Next to save right now.
+      const wzPanel = document.querySelector('.panel[data-panel="wizard"]');
+      if (wzPanel) wzPanel.addEventListener('input', () => wzPaintNext());
     } else {
       const b = document.querySelector('.navbtn[data-nav="wizard"]'); if (b) b.style.display = 'none';
     }
