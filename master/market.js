@@ -42,12 +42,30 @@
   // of AIOStreams / AIOMetadata with its real configure URL and 30-day uptime.
   const UPTIME_API = 'https://uptime.ibbylabs.dev/v1/status';
 
+  // ---- the optional live relay -----------------------------------------
+  // Nuvio's community-collections API lives on nuvio.tv (not api.nuvio.tv),
+  // needs a real Nuvio login, and sends NO CORS headers — re-verified from a
+  // neutral origin. A browser tab therefore can never read it directly, which
+  // is why the snapshot below exists at all.
+  //
+  // Deploying relay/collections.js (one Cloudflare Worker, ~2 minutes — see
+  // relay/README.md) and pasting its URL here switches the Collections tab to
+  // live data: the Worker forwards exactly two GETs, carrying the caller's own
+  // Nuvio session token, and adds the CORS header the browser needs. Leave it
+  // empty and everything below still works from the captured snapshot — the
+  // tab says which of the two it is showing, either way.
+  //
+  // Deployed and live-verified 2026-09-13 against the real API: 104
+  // collections, five more than the September snapshot holds.
+  const COLLECTIONS_RELAY = 'https://crimson-field-2118.nuviobaymax.workers.dev/';
+
   const COLLECTIONS = {
-    // No longer "blocked" — install works from a manually-refreshed capture,
-    // not a relay. Kept as an honest caveat string, not a hard gate.
-    why: 'Browsing and installing use a manually-refreshed snapshot, not a live read of Nuvio’s community-collections API (it sends no CORS headers, so Numax’s own tab can never reach it directly). New or edited community collections won’t show up until the snapshot is refreshed.',
+    // Not "blocked": install works from a manually-refreshed capture even with
+    // no relay. Kept as an honest caveat string, not a hard gate.
+    why: 'Browsing and installing use a manually-refreshed snapshot, not a live read of Nuvio’s community-collections API (it sends no CORS headers, so Numax’s own tab can never reach it directly). New or edited community collections won’t show up until the snapshot is refreshed — or until the collections relay is deployed, which makes this tab live.',
     site: 'https://nuvio.tv/community-collections',
     detailUrl: id => 'https://nuvio.tv/community-collections/' + encodeURIComponent(id),
+    relayReady: () => !!COLLECTIONS_RELAY,
   };
   // Lightweight browse-only capture — title/description/image/tags/stats and
   // required-addon list, with the heavy folders/sources payload stripped out.
@@ -214,6 +232,183 @@
     if (!doc || !Array.isArray(doc.items)) throw new Error('snapshot file is missing or malformed');
     _collectionsSnapshot = doc;
     return doc;
+  }
+
+  // ---- live read through the relay (only when one is configured) --------
+  // The Worker is a forwarder, not a store: it keeps nothing, and the token it
+  // is handed is the caller's own Nuvio session access token — the same one
+  // this browser already sends to api.nuvio.tv on every other call. Every
+  // failure throws, so the caller can fall back to the snapshot and SAY it fell
+  // back, rather than showing stale data as though it were live.
+  async function relayCall(body, ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms || 15000);
+    try {
+      const r = await fetch(COLLECTIONS_RELAY, {
+        method: 'POST', signal: ctl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const txt = await r.text();
+      let j = null; try { j = JSON.parse(txt); } catch (e) {}
+      if (!r.ok) throw new Error((j && (j.error || j.message)) || ('relay HTTP ' + r.status));
+      if (!j) throw new Error('relay sent something that is not JSON');
+      return j;
+    } catch (e) {
+      if (e && e.name === 'AbortError') throw new Error('timed out');
+      if (e instanceof TypeError) throw new Error('relay unreachable');
+      throw e;
+    } finally { clearTimeout(t); }
+  }
+  let _liveSnapshot = null;
+  // Returns the SAME shape loadCollectionsSnapshot does — {live, capturedAt,
+  // total, items:[...]} — so nothing downstream needs to know which it got.
+  async function loadCollectionsLive(token, force) {
+    if (!COLLECTIONS_RELAY) throw new Error('no relay configured');
+    if (!token) throw new Error('no Nuvio account linked');
+    if (_liveSnapshot && !force) return _liveSnapshot;
+    const items = [];
+    const seen = new Set();
+    // Paged, because the API caps a page at 60 however much is asked for
+    // (live-checked: limit=100 comes back as 60). The page cap here is a
+    // runaway guard, not an expected stopping point — the loop ends on
+    // hasNextPage, and a partial read must never pass as the whole catalogue.
+    let total = null;
+    for (let page = 1; page <= 20; page++) {
+      const j = await relayCall({ op: 'list', token, page, limit: 60, sort: 'installs' });
+      const rows = (j && (j.items || j.collections || j.data)) || [];
+      if (!Array.isArray(rows) || !rows.length) break;
+      rows.forEach(r => {
+        const v = normalizeLiveItem(r);
+        // The API pages by offset, so an edit between two page reads can shift
+        // a row across the boundary and hand it back twice.
+        if (v.public_id != null && seen.has(v.public_id)) return;
+        if (v.public_id != null) seen.add(v.public_id);
+        items.push(v);
+      });
+      const pg = j && j.pagination;
+      if (pg && pg.total != null) total = pg.total;
+      if (!pg || !pg.hasNextPage) break;
+    }
+    if (!items.length) throw new Error('relay returned no collections');
+    // If the API told us how many there are and we have fewer, say so rather
+    // than quietly presenting a short read as the full list.
+    const short = (total != null && items.length < total) ? total : null;
+    _liveSnapshot = { live: true, capturedAt: new Date().toISOString(), total: items.length, short, items };
+    return _liveSnapshot;
+  }
+  // The list endpoint and the captured snapshot name a few fields differently.
+  // Normalizing here means renderMkCollCard never has to branch on the source.
+  // Live-checked 2026-09-13: the API's own browse fields are named exactly as
+  // the captured snapshot's are (public_id / title / description / image_url /
+  // tags / likes_count / installs_count / stats{folderCount,sourceCount,
+  // addonCount}), so a live row and a snapshot row render through the same
+  // card with no branching. The ONE difference is the required-addon list: the
+  // snapshot lifts it to the top level, while the API buries it inside each
+  // row's install envelope at envelope.requirements.addons. The relay already
+  // lifts it when it projects the list; both spellings are read here anyway, so
+  // a raw (unprojected) response still renders correctly.
+  function normalizeLiveItem(r) {
+    const o = r || {};
+    const stats = o.stats || {};
+    const env = o.envelope || {};
+    const fromEnvelope = (env.requirements && Array.isArray(env.requirements.addons)) ? env.requirements.addons : null;
+    return {
+      public_id: o.public_id != null ? o.public_id : (o.publicId != null ? o.publicId : o.slug),
+      title: o.title || o.name || 'Untitled',
+      description: o.description || '',
+      image_url: o.image_url || o.imageUrl || (env.community && env.community.coverImageUrl) || null,
+      tags: Array.isArray(o.tags) ? o.tags : [],
+      likes_count: o.likes_count != null ? o.likes_count : (o.likesCount || 0),
+      installs_count: o.installs_count != null ? o.installs_count : (o.installsCount || 0),
+      requiredAddons: Array.isArray(o.requiredAddons) && o.requiredAddons.length ? o.requiredAddons
+        : (fromEnvelope || (o.requirements && Array.isArray(o.requirements.addons) ? o.requirements.addons : [])),
+      stats: {
+        folderCount: stats.folderCount != null ? stats.folderCount : o.folder_count,
+        sourceCount: stats.sourceCount != null ? stats.sourceCount : o.source_count,
+        addonCount: stats.addonCount != null ? stats.addonCount : o.addon_count,
+      },
+    };
+  }
+  // One collection's full install payload, live. Same normalized return as
+  // loadCollectionInstall, so the install dialog is source-blind.
+  // Live-checked: detail answers with the row at the top level and the install
+  // payload under `envelope` — `envelope.collection` plus
+  // `envelope.requirements.addons`, the same shape the captured files hold, so
+  // the install transformation and write path below are identical either way.
+  async function loadCollectionInstallLive(publicId, token) {
+    const j = await relayCall({ op: 'detail', token, slug: String(publicId) }, 20000);
+    const envelope = (j && (j.envelope || (j.data && j.data.envelope) || j.data || j)) || null;
+    let collections = null;
+    if (envelope && Array.isArray(envelope.collections)) collections = envelope.collections;
+    else if (envelope && envelope.collection) collections = [envelope.collection];
+    if (!collections || !collections.length) throw new Error('relay sent no collection payload');
+    return {
+      collections,
+      requiredAddons: (envelope.requirements && envelope.requirements.addons) || [],
+      resources: Array.isArray(envelope.resources) ? envelope.resources : [],
+    };
+  }
+
+  // ======================================================================
+  // what the user actually pastes
+  // ======================================================================
+  // Nuvio stores an add-on as its manifest URL. What an add-on's own site
+  // hands you is almost never that — it is the /configure page, a stremio://
+  // deep link, or just the site root. Writing any of those produces a row
+  // Nuvio accepts and then cannot load: the exact "it said it added but
+  // nothing happened" report.
+  //
+  // resolveManifestUrl turns whatever was pasted into the candidates worth
+  // trying, in order; probeManifest asks the network which one is real.
+  function resolveManifestUrl(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return [];
+    s = s.replace(/^stremio:\/\//i, 'https://');          // same URL, different scheme
+    if (!/^https?:\/\//i.test(s)) s = 'https://' + s.replace(/^\/+/, '');
+    let u;
+    try { u = new URL(s); } catch (e) { return []; }
+    let path = u.pathname.replace(/\/+$/, '');
+    const out = [];
+    const push = p => {
+      const c = new URL(u.toString());
+      c.pathname = p || '/'; c.search = ''; c.hash = '';
+      const str = c.toString();
+      if (out.indexOf(str) < 0) out.push(str);
+    };
+    if (/\/manifest\.json$/i.test(path)) { push(path); return out; }
+    if (/\/configure$/i.test(path)) path = path.replace(/\/configure$/i, '');
+    push(path + '/manifest.json');
+    // Some hosts put the configure page one level below the add-on root
+    // (e.g. /u/<id>/configure). Try the parent rather than give up.
+    const parent = path.replace(/\/[^/]*$/, '');
+    if (parent && parent !== path) push(parent + '/manifest.json');
+    push('/manifest.json');
+    return out;
+  }
+  // Resolves to {ok:true, url, manifest} for the first candidate that answers
+  // with something manifest-shaped; {ok:false, reason:'notfound'} when every
+  // candidate answered but none was a manifest; {ok:false, reason:'blocked'}
+  // when this browser could not see the answer at all. 'blocked' must NOT stop
+  // the user: Nuvio's own Add Plugin dialog never validates either, and plenty
+  // of add-ons refuse cross-origin reads while working perfectly in the app.
+  async function probeManifest(raw) {
+    const cands = resolveManifestUrl(raw);
+    if (!cands.length) return { ok: false, reason: 'invalid' };
+    let blocked = false;
+    for (const u of cands) {
+      try {
+        const j = await fetchJson(u, 8000);
+        // Every Stremio-protocol manifest carries an id plus at least one of
+        // resources/types/name; anything else is just JSON that sits there.
+        if (j && typeof j === 'object' && j.id && (j.resources || j.types || j.name)) {
+          return { ok: true, url: u, manifest: j };
+        }
+      } catch (e) {
+        if (/unreachable|timed out/.test(e.message)) blocked = true;
+      }
+    }
+    return { ok: false, reason: blocked ? 'blocked' : 'notfound', tried: cands };
   }
 
   // Full per-collection install payload (folders/sources + required addons),
@@ -455,6 +650,8 @@
     PLUGIN_INDEX_SITE, UPTIME_SITE: 'https://uptime.ibbylabs.dev/',
     loadPluginIndex, loadManifest, loadInstances, isConfigurable,
     configureUrl, normalizeManifestUrl, loadCollectionsSnapshot, loadCollectionInstall,
+    loadCollectionsLive, loadCollectionInstallLive,
     toInstalledCollection, installedCollectionId, isInstalledForm,
+    resolveManifestUrl, probeManifest,
   };
 })();

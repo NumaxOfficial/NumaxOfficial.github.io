@@ -46,3 +46,50 @@ proves the Worker is live, parsing JSON, and enforcing its allowlist.
 Add a route for `numaxofficial.website/relay/aio-create` pointing at the Worker,
 and set `RELAY` to that path. Keep it outside whatever Cloudflare Access rule
 covers `/master`, or Access will intercept the call before the Worker sees it.
+
+
+---
+
+# The community-collections relay
+
+A second Worker, the same shape as the one above and just as small. It exists
+because Nuvio's community-collections API lives on `nuvio.tv` (not
+`api.nuvio.tv`), needs a real Nuvio login, and sends **no CORS headers** — a
+cross-origin request fails before it even reaches the auth check. Numax's own
+tab therefore cannot read it, which is why the Collections tab browses a
+snapshot that was captured by hand and has to be re-captured by hand.
+
+Deploying this makes that tab **live**.
+
+## Deploy it (about two minutes, once)
+
+1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Start with Hello
+   World** → **Deploy**. Name it something like `numax-collections`.
+2. Press **Edit code**, select everything in the editor, paste in the whole of
+   [`collections.js`](collections.js), and **Deploy**.
+3. Copy the URL it gives you.
+4. Put that URL into `COLLECTIONS_RELAY` near the top of
+   [`../market.js`](../market.js), then commit and push.
+
+Until step 4 is done the Collections tab behaves exactly as it does today: it
+browses the captured snapshot and says so on screen. Nothing fails, and nothing
+pretends to be live that isn't.
+
+## What it does, and what it does not
+
+It forwards two GETs and nothing else — the collection list, and one
+collection's detail. It has no KV, no database, no secrets and no
+configuration. It keeps nothing between requests and never logs a request body,
+because that body carries the caller's own Nuvio session token — the same token
+this browser already sends to `api.nuvio.tv` on every other call. Every reply
+goes out with `Cache-Control: no-store` and Cloudflare caching explicitly off,
+because every reply is scoped to one person's login.
+
+## Check it is working
+
+    curl -i -X POST https://numax-collections.<your-subdomain>.workers.dev \
+      -H 'Content-Type: application/json' -d '{"op":"list","token":"x"}'
+
+A correct deployment answers **400** with `Missing or malformed Nuvio session
+token.` — that single reply proves the Worker is live, parsing JSON, and
+validating its input before it forwards anything.

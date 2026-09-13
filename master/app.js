@@ -504,12 +504,44 @@
     const keysIncluded = accountKeysIncluded(id);
     const cl = A.client(store, id); const backup = await cl.exportBackup();
     if (!keysIncluded && Array.isArray(backup.profile_settings_blobs)) backup.profile_settings_blobs = backup.profile_settings_blobs.map(b => b && b.settings_json ? { ...b, settings_json: stripKeys(b.settings_json) } : b);
-    const rec = { backup, profiles: normProfiles(backup.profiles) }; cache[id] = rec; return rec;
+    const rec = { backup, profiles: normProfiles(backup.profiles) };
+    cache[id] = rec; profileCache[id] = rec.profiles; return rec;
   }
+
+  // ---- the cheap read: profile names only ----
+  // Every picker in the app needs nothing but each profile's name and index,
+  // but they all used to get that from loadAccount() — a WHOLE-ACCOUNT export.
+  // Measured live against the test account: 244 KB / ~1.0 s for the export
+  // versus 1.9 KB / ~0.4 s for sync_pull_profiles, and the gap only widens with
+  // watch history. That is the whole reason "Reading profiles…" sat there for
+  // a beat even on a second visit. This read is cached on its own, is satisfied
+  // for free when a full export already happens to be in hand, and is dropped
+  // by the same inval()/invalAll() as everything else.
+  const profileCache = {};
+  const profileInflight = {};
+  const profileStamp = {};
+  const PROFILE_FRESH_MS = 60000;   // how long a cached name list is trusted outright
+  async function loadProfiles(id, force) {
+    if (!force && profileCache[id]) return profileCache[id];
+    if (!force && cache[id]) { profileCache[id] = cache[id].profiles; profileStamp[id] = profileStamp[id] || Date.now(); return profileCache[id]; }
+    if (!force && profileInflight[id]) return profileInflight[id];
+    const p = withTimeout(A.client(store, id).pullProfiles(), READ_TIMEOUT, 'Reading profiles')
+      .then(raw => { const list = normProfiles(raw); profileCache[id] = list; profileStamp[id] = Date.now(); return list; })
+      .finally(() => { if (profileInflight[id] === p) delete profileInflight[id]; });
+    profileInflight[id] = p;
+    return p;
+  }
+  // True when every linked account's name list was read recently enough that
+  // re-reading it behind the picker would be pure noise.
+  const profilesFresh = () => store.list().every(r => (Date.now() - (profileStamp[r.accountId] || 0)) < PROFILE_FRESH_MS);
+  // What is already known, with no network call and no promise — so a picker
+  // can paint its real contents on the first frame instead of shimmering.
+  const profilesCached = id => profileCache[id] || (cache[id] && cache[id].profiles) || null;
+
   // Invalidating drops in-flight reads too: a read that started before the
   // invalidation describes the old state, so it must not be handed out after.
-  const inval = id => { delete cache[id]; delete membershipCache[id]; delete inflight[id]; };
-  const invalAll = () => { Object.keys(cache).forEach(k => delete cache[k]); Object.keys(membershipCache).forEach(k => delete membershipCache[k]); Object.keys(inflight).forEach(k => delete inflight[k]); };
+  const inval = id => { delete cache[id]; delete membershipCache[id]; delete inflight[id]; delete profileCache[id]; delete profileInflight[id]; delete profileStamp[id]; };
+  const invalAll = () => { [cache, membershipCache, inflight, profileCache, profileInflight, profileStamp].forEach(m => Object.keys(m).forEach(k => delete m[k])); };
   // whether an account has an active Nuvio Supporter / Supporter Plus membership —
   // gates the supporter-only theme colors the same way Nuvio's own client does.
   async function getMembership(id) {
@@ -1569,28 +1601,54 @@
   // ======================================================================
   let sySecOpen = 'source';
   function sySecs() { return [...document.querySelectorAll('.sy-sec[data-systep]')]; }
+  // An open section rests at height:auto so a chooser opening inside it can
+  // still grow it. Two things follow from that, and both were wrong before:
+  //   - CSS cannot transition FROM auto, so a close straight off 'auto' snapped
+  //     shut. Pin the real height and commit the frame first.
+  //   - When content arrives while the section is already at auto, the box is
+  //     ALREADY the new size, so setting it to that same size animates nothing
+  //     and the content pops in. Pin the height the box is showing, commit, and
+  //     only then set the new one.
   function syMeasure(sec) {
     const w = sec.querySelector('.sy-sec-w'), b = sec.querySelector('.sy-sec-b');
     if (!w || !b) return;
-    if (!sec.classList.contains('open')) { w.style.height = '0px'; return; }
-    // 'auto' while idle so a chooser opening inside the section can still grow it
-    w.style.height = b.offsetHeight + 'px';
     clearTimeout(w.__t);
+    const anim = !((M.reduced && M.reduced()) || document.hidden);
+    if (!sec.classList.contains('open')) {
+      if (anim && w.style.height === 'auto') { w.style.height = w.offsetHeight + 'px'; void w.offsetHeight; }
+      w.style.height = '0px';
+      return;
+    }
+    const next = b.offsetHeight;
+    if (!anim) { w.style.height = 'auto'; return; }
+    if (w.style.height === 'auto') {
+      const shown = w.offsetHeight;
+      if (shown === next) return;                 // nothing moved; leave it at auto
+      w.style.height = shown + 'px'; void w.offsetHeight;
+    }
+    w.style.height = next + 'px';
     w.__t = setTimeout(() => { if (sec.classList.contains('open')) w.style.height = 'auto'; }, 320);
   }
   function syOpenSec(key, opts) {
     sySecOpen = key;
     sySecs().forEach(sec => {
-      const on = sec.dataset.systep === key;
-      const w = sec.querySelector('.sy-sec-w');
-      if (w && w.style.height === 'auto') { w.style.height = sec.querySelector('.sy-sec-b').offsetHeight + 'px'; void w.offsetHeight; }
-      sec.classList.toggle('open', on);
+      sec.classList.toggle('open', sec.dataset.systep === key);
       syMeasure(sec);
     });
     syncSteps();
     if (opts && opts.scroll) {
       const sec = sySecs().find(x => x.dataset.systep === key);
-      if (sec) sec.scrollIntoView({ block: 'nearest', behavior: ((M.reduced && M.reduced()) || document.hidden) ? 'auto' : 'smooth' });
+      // The section is growing for the next ~260 ms. A smooth scroll aimed at a
+      // target whose height is changing under it overshoots and then crawls
+      // back, which is most of what read as jank here. Aim at the section's
+      // HEADER, which does not move, and only scroll when it is actually out of
+      // view — a scroll that had nothing to do never looks smooth.
+      const head = sec && sec.querySelector('.sy-sec-h');
+      if (head) requestAnimationFrame(() => {
+        const r = head.getBoundingClientRect();
+        if (r.top >= 0 && r.bottom <= (window.innerHeight || 0)) return;
+        head.scrollIntoView({ block: 'nearest', behavior: ((M.reduced && M.reduced()) || document.hidden) ? 'auto' : 'smooth' });
+      });
     }
   }
   // Re-measure whenever something inside a section changes its height (a carry
@@ -2099,47 +2157,51 @@
     if (kind === 'collections') renderMkCollections();
   }
 
-  // ---- popover (own mechanism; deliberately not ui-motion's carry-chooser) ----
+  // ---- the marketplace dialog ----
+  // This was an anchored popover. It had to guess a position, re-measure after
+  // every async load, re-place on scroll and resize, and could still land
+  // somewhere awkward on a short window — and the plugins tab did not use it at
+  // all: its install controls sat at the bottom of a detail card, so "install
+  // this repo" meant scrolling past a 200-row scraper list to reach them. One
+  // centred dialog for all three tabs replaces the lot: fixed height, its own
+  // scroll, nothing to position.
+  //
+  // It carries the app's own .modal-root / .modal-card classes, so it gets the
+  // same open/close motion, focus trap and focus restore as every other dialog
+  // here, straight from ui-motion, with no new mechanism.
+  //
+  // The returned object keeps the old shape — {bg, box, body, foot, place} —
+  // so every existing caller works unchanged; place() is simply a no-op now,
+  // because a centred dialog has nowhere to be placed.
   let mkPop = null;
-  function mkPopKey(e) { if (e.key === 'Escape') closeMkPop(); }
-  function mkPopReplace() { if (mkPop) mkPop.place(); }
+  function mkPopKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeMkPop(); } }
   function closeMkPop() {
     if (!mkPop) return;
-    mkPop.bg.remove(); mkPop.box.remove(); mkPop = null;
-    document.removeEventListener('keydown', mkPopKey);
-    window.removeEventListener('resize', mkPopReplace);
-    window.removeEventListener('scroll', mkPopReplace, true);
+    const root = mkPop.root; mkPop = null;
+    document.removeEventListener('keydown', mkPopKey, true);
+    // Hand the exit animation to ui-motion (it watches display on .modal-root),
+    // then take the node out once that animation has had its 130 ms.
+    root.style.display = 'none';
+    setTimeout(() => root.remove(), 260);
   }
   function openMkPop(anchor, title, sub) {
     closeMkPop();
-    const bg = el('div', 'mk-pop-bg'), box = el('div', 'mk-pop');
-    const h = el('div', 'mk-pop-h'); h.appendChild(el('b', '', title)); if (sub) h.appendChild(el('span', '', sub));
-    const body = el('div', 'mk-pop-b'), foot = el('div', 'mk-pop-f');
+    const root = el('div', 'modal-root mk-dlg-root');
+    const bg = el('div', 'modal-bg');
+    const box = el('div', 'modal-card mk-dlg');
+    const h = el('div', 'mk-dlg-h modal-msg');
+    h.appendChild(el('b', '', title)); if (sub) h.appendChild(el('span', '', sub));
+    const x = el('button', 'mk-dlg-x'); x.type = 'button'; x.setAttribute('aria-label', 'Close');
+    x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+    x.onclick = closeMkPop;
+    h.appendChild(x);
+    const body = el('div', 'mk-dlg-b'), foot = el('div', 'mk-dlg-f');
     box.appendChild(h); box.appendChild(body); box.appendChild(foot);
-    document.body.appendChild(bg); document.body.appendChild(box);
+    root.appendChild(bg); root.appendChild(box);
+    document.body.appendChild(root);
     bg.onclick = closeMkPop;
-    document.addEventListener('keydown', mkPopKey);
-    // Resizing used to close the popover outright, throwing away whatever the
-    // user had part-filled. Re-place it instead; only Escape or a click on the
-    // backdrop closes it.
-    window.addEventListener('resize', mkPopReplace);
-    window.addEventListener('scroll', mkPopReplace, true);
-    // The box is measured, not guessed — and re-measured by place() once async
-    // content has filled it, or a list loaded later would hang off-screen.
-    const place = () => {
-      const r = anchor.getBoundingClientRect(), w = box.offsetWidth, ht = box.offsetHeight;
-      const left = Math.min(Math.max(8, r.left), Math.max(8, window.innerWidth - w - 8));
-      let top = r.bottom + 8;
-      if (top + ht > window.innerHeight - 8) top = (r.top - ht - 8 >= 8) ? r.top - ht - 8 : window.innerHeight - ht - 8;
-      // Final clamp: the flip-above branch above is only correct while the
-      // anchor is on screen. Clamping unconditionally means the popover can
-      // never be drawn outside the viewport whatever the anchor is doing.
-      top = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - ht - 8));
-      box.style.left = Math.round(left) + 'px';
-      box.style.top = Math.round(top) + 'px';
-    };
-    place();
-    mkPop = { bg, box, body, foot, place };
+    document.addEventListener('keydown', mkPopKey, true);
+    mkPop = { root, bg, box, body, foot, place: () => {} };
     return mkPop;
   }
   const openTab = url => window.open(url, '_blank', 'noopener,noreferrer');
@@ -2178,8 +2240,11 @@
         b.onclick = () => { openTab(s.url); logAct('Opened ' + s.name, 'info'); };
         acts.appendChild(b);
       }
-      const add = el('button', 'btn btn-ghost btn-xs', 'Add'); add.title = 'Paste this add-on’s manifest URL into profiles';
-      add.onclick = () => openAddToProfile(add, s.name);
+      const add = el('button', 'btn btn-ghost btn-xs', 'Add'); add.title = 'Put this add-on on one or more profiles';
+      // The catalogue link goes in prefilled, so the common case ("I just want
+      // the default setup") is one click and a tick rather than a copy-paste
+      // round trip. Configure first and paste over it when you need settings.
+      add.onclick = () => openAddToProfile(add, s.name, s.url || '');
       acts.appendChild(add);
       c.appendChild(acts); sbox.appendChild(c);
     });
@@ -2192,10 +2257,16 @@
   // across all of them — typing opens exactly the groups that still match, so
   // nothing can hide behind a closed header.
   const mkAddonOpen = new Set();
+  // An open group rests at height:auto so it can grow with its content. CSS
+  // cannot transition FROM auto, though, so closing one straight from 'auto' to
+  // '0px' snapped shut with no animation at all — every group in the add-on
+  // list did this. Pin the real height first and force the frame to commit, and
+  // the close animates like the open does.
   function mkDisc(sec, w, inner, open) {
+    clearTimeout(w.__t);
+    if (!open && w.style.height === 'auto') { w.style.height = inner.offsetHeight + 'px'; void w.offsetHeight; }
     sec.classList.toggle('open', open);
     w.style.height = open ? inner.offsetHeight + 'px' : '0px';
-    clearTimeout(w.__t);
     if (open) w.__t = setTimeout(() => { if (sec.classList.contains('open')) w.style.height = 'auto'; }, 320);
   }
   function renderMkAddonGroups() {
@@ -2235,7 +2306,7 @@
         const site = el('button', 'btn btn-ghost btn-xs', 'Open');
         site.onclick = () => { openTab(it.url); logAct('Opened ' + it.name, 'info'); };
         const add = el('button', 'btn btn-ghost btn-xs', 'Add');
-        add.onclick = () => openAddToProfile(add, it.name);
+        add.onclick = () => openAddToProfile(add, it.name, it.url);
         r.appendChild(ic); r.appendChild(b); r.appendChild(site); r.appendChild(add);
         rows.appendChild(r);
       });
@@ -2294,72 +2365,242 @@
   // An account that fails to read is REPORTED, never skipped in silence: the
   // old version swallowed the error and an unreadable account was then
   // indistinguishable from "you have no accounts linked".
-  async function mkAllProfiles() {
+  //
+  // Reads run in PARALLEL and go through loadProfiles — the ~2 KB
+  // sync_pull_profiles read — rather than one whole-account export after
+  // another. On the test account that is the difference between roughly a
+  // second per account in series and roughly a third of a second for all of
+  // them at once, and the second visit costs nothing at all.
+  async function mkAllProfiles(force) {
+    const recs = store.list();
+    const settled = await Promise.all(recs.map(rec =>
+      loadProfiles(rec.accountId, force)
+        .then(profiles => ({ rec, profiles }))
+        .catch(e => ({ rec, error: e.message }))));
     const targets = [], failed = [];
-    for (const rec of store.list()) {
-      try {
-        const { profiles } = await loadAccount(rec.accountId);
-        profiles.forEach(p => targets.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId) }));
-      } catch (e) { failed.push(accountName(rec.accountId) + ' — ' + e.message); }
-    }
+    settled.forEach(({ rec, profiles, error }) => {
+      if (error) { failed.push(accountName(rec.accountId) + ' — ' + error); return; }
+      profiles.forEach(p => targets.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId), profile: p }));
+    });
     return { targets, failed };
   }
-  // Shared "pick some profiles" body: renders the list, any per-account read
-  // failure, and the empty state, and returns the usable targets.
-  async function mkFillTargets(box, chosen, onChange, stale) {
-    const got = await loadInto(box, 'Reading profiles…', mkAllProfiles, { stale });
-    if (!got) return null;
-    const { targets, failed } = got.value;
-    // mkTargetList clears the box, so it has to run before the failure lines.
-    if (targets.length) mkTargetList(box, targets, chosen);
-    failed.forEach(f => box.appendChild(el('p', 'empty sm err-text', f)));
-    if (!targets.length) {
-      box.appendChild(el('p', 'empty sm', failed.length
-        ? 'No profiles could be read from the accounts above.'
-        : 'No linked accounts yet — link one on the Nuvio accounts tab.'));
-      return null;
+  // Everything already in memory, shaped exactly like mkAllProfiles' result, or
+  // null when nothing is cached yet. This is what lets the picker paint real
+  // rows on the first frame instead of a shimmer that resolves into the same
+  // thing a moment later.
+  function mkCachedProfiles() {
+    const recs = store.list();
+    if (!recs.length) return null;
+    const targets = [];
+    for (const rec of recs) {
+      const ps = profilesCached(rec.accountId);
+      if (!ps) return null;   // partial is worse than honest: shimmer instead
+      ps.forEach(p => targets.push({ aid: rec.accountId, idx: p.index, name: p.name, account: accountName(rec.accountId), profile: p }));
     }
-    if (onChange) box.addEventListener('mkchange', onChange);
-    return targets;
-  }
-  function mkTargetList(box, targets, chosen) {
-    clr(box);
-    targets.forEach(t => {
-      const key = t.aid + ':' + t.idx;
-      const row = el('label', 'mk-tgt');
-      const cb = el('button', 'mk-cb' + (chosen.has(key) ? ' on' : ''));
-      cb.type = 'button';
-      cb.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
-      cb.onclick = e => { e.preventDefault(); if (chosen.has(key)) chosen.delete(key); else chosen.add(key); cb.classList.toggle('on', chosen.has(key)); box.dispatchEvent(new CustomEvent('mkchange')); };
-      const tx = el('div'); tx.style.minWidth = '0';
-      tx.appendChild(el('div', 'mk-tn', t.name));
-      tx.appendChild(el('div', 'mk-tm', t.account + ' · profile ' + t.idx));
-      row.appendChild(cb); row.appendChild(tx);
-      box.appendChild(row);
-    });
+    return { targets, failed: [] };
   }
 
-  async function openAddToProfile(anchor, name) {
-    const pop = openMkPop(anchor, 'Add ' + name, 'Paste the manifest URL its site gave you.');
+  // ---- "which profiles?" — one picker, organised by account ----
+  // The old list was every profile from every account in one flat column of
+  // checkboxes. This groups them the way people actually hold it in their head:
+  // an account is a row you open, it carries its own Select all and its own
+  // "2 of 4" count, and its profiles are chips inside it. One account linked
+  // means one section, already open, and the grouping costs nothing.
+  //
+  // `single` (collections) turns the chips into a one-of choice and hides the
+  // Select all, because installing one collection into eight profiles at once
+  // is not a thing the install path does.
+  async function mkFillTargets(box, chosen, onChange, stale, opts) {
+    const o = opts || {};
+    const paint = got => {
+      const { targets, failed } = got;
+      clr(box);
+      if (targets.length) mkTargetList(box, targets, chosen, o);
+      failed.forEach(m => box.appendChild(el('p', 'empty sm err-text', m)));
+      if (!targets.length) {
+        box.appendChild(el('p', 'empty sm', failed.length
+          ? 'No profiles could be read from the accounts above.'
+          : 'No linked accounts yet — link one on the Nuvio accounts tab.'));
+      }
+      return targets.length ? targets : null;
+    };
+    const cached = mkCachedProfiles();
+    if (cached) {
+      // Paint from memory now, then quietly confirm against the server. A
+      // refresh only repaints when the profile set actually changed, so the
+      // ticks the user has already made are never wiped out underneath them.
+      const shown = paint(cached);
+      if (onChange) box.addEventListener('mkchange', onChange);
+      if (profilesFresh()) return shown;   // read moments ago; nothing to confirm
+      const key = cached.targets.map(t => t.aid + ':' + t.idx + ':' + t.name).join('|');
+      mkAllProfiles(true).then(fresh => {
+        if (stale && stale()) return;
+        if (fresh.targets.map(t => t.aid + ':' + t.idx + ':' + t.name).join('|') === key && !fresh.failed.length) return;
+        paint(fresh);
+        box.dispatchEvent(new CustomEvent('mkchange'));
+      }).catch(() => {});
+      return shown;
+    }
+    const got = await loadInto(box, 'Reading profiles…', () => mkAllProfiles(), { stale });
+    if (!got) return null;
+    const shown = paint(got.value);
+    if (onChange) box.addEventListener('mkchange', onChange);
+    return shown;
+  }
+  function mkTargetList(box, targets, chosen, opts) {
+    const o = opts || {};
+    clr(box);
+    // Group order follows store.list(), so the picker matches the Accounts tab.
+    const byAcct = [];
+    targets.forEach(t => {
+      let g = byAcct.find(x => x.aid === t.aid);
+      if (!g) { g = { aid: t.aid, name: t.account, items: [] }; byAcct.push(g); }
+      g.items.push(t);
+    });
+    const wrap = el('div', 'mk-pick');
+    const fire = () => box.dispatchEvent(new CustomEvent('mkchange'));
+
+    byAcct.forEach((g, gi) => {
+      const sec = el('div', 'mk-pick-acct');
+      const head = el('button', 'mk-pick-h'); head.type = 'button';
+      const av = el('span', 'mk-pick-ic'); av.textContent = (g.name || '?')[0].toUpperCase();
+      head.appendChild(av);
+      const tx = el('span', 'mk-pick-htx');
+      tx.appendChild(el('span', 'mk-pick-hn', g.name));
+      const cnt = el('span', 'mk-pick-hc');
+      tx.appendChild(cnt);
+      head.appendChild(tx);
+      const car = el('span', 'mk-pick-car');
+      car.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+      head.appendChild(car);
+      sec.appendChild(head);
+
+      const w = el('div', 'mk-pick-w'), inner = el('div', 'mk-pick-b');
+      let all = null;
+      if (!o.single) {
+        const bar = el('div', 'mk-pick-bar');
+        all = el('button', 'mk-pick-all', 'Select all'); all.type = 'button';
+        bar.appendChild(all); inner.appendChild(bar);
+      }
+      const chips = el('div', 'mk-pick-chips');
+      const nodes = [];
+      g.items.forEach(t => {
+        const key = t.aid + ':' + t.idx;
+        const c = el('button', 'pchip multi mk-pick-chip' + (chosen.has(key) ? ' on' : ''));
+        c.type = 'button'; c.dataset.tid = key;
+        c.appendChild(avatar(t.profile || { name: t.name }, 30));
+        c.appendChild(el('span', 'pcn', t.name));
+        const ck = el('span', 'chk'); ck.textContent = '\u2713'; c.appendChild(ck);
+        c.onclick = () => {
+          if (o.single) { chosen.clear(); chosen.add(key); }
+          else if (chosen.has(key)) chosen.delete(key);
+          else chosen.add(key);
+          sync(); fire();
+        };
+        chips.appendChild(c); nodes.push({ key, node: c });
+      });
+      inner.appendChild(chips); w.appendChild(inner); sec.appendChild(w);
+
+      const sync = () => {
+        // Every group re-reads `chosen`, so single-select correctly clears a
+        // chip that lives in a different account's group.
+        wrap.querySelectorAll('.mk-pick-chip').forEach(n => n.classList.toggle('on', chosen.has(n.dataset.tid)));
+        wrap.querySelectorAll('.mk-pick-acct').forEach(s => { if (s.__sync) s.__sync(); });
+      };
+      sec.__sync = () => {
+        const on = nodes.filter(n => chosen.has(n.key)).length;
+        cnt.textContent = on ? on + ' of ' + nodes.length + ' selected' : nodes.length + ' profile' + (nodes.length === 1 ? '' : 's');
+        cnt.classList.toggle('on', !!on);
+        if (all) all.textContent = on === nodes.length ? 'Clear all' : 'Select all';
+      };
+      if (all) all.onclick = () => {
+        const every = nodes.every(n => chosen.has(n.key));
+        nodes.forEach(n => { if (every) chosen.delete(n.key); else chosen.add(n.key); });
+        sync(); fire();
+      };
+      // One account: open, and the header is a label rather than a control.
+      const open = byAcct.length === 1 || gi === 0;
+      sec.classList.toggle('open', open);
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      head.onclick = () => {
+        const next = !sec.classList.contains('open');
+        head.setAttribute('aria-expanded', next ? 'true' : 'false');
+        mkDisc(sec, w, inner, next);
+      };
+      sec.__sync();
+      // Set synchronously, not in a rAF: a backgrounded tab never runs the
+      // callback, and the group would then paint at its CSS height of 0 — an
+      // empty picker. A fresh render should not animate anyway.
+      if (open) w.style.height = 'auto';
+      wrap.appendChild(sec);
+    });
+    box.appendChild(wrap);
+  }
+
+  // Merge / Overwrite as a two-button segment rather than a dropdown. It stays
+  // an explicit choice on every write surface — that rule is not negotiable —
+  // but it stops being a full labelled form row inside a dialog whose whole
+  // point is to be short.
+  function mkModeSeg(kindLabel, onChange) {
+    const wrap = el('div', 'mk-seg-wrap');
+    const seg = el('div', 'mk-seg');
+    let value = 'merge';
+    const opts = [
+      { v: 'merge', t: 'Merge', d: 'Add it and keep everything already on the profile.' },
+      { v: 'mirror', t: 'Overwrite', d: 'Replace every ' + kindLabel + ' on the profile with just this one.' },
+    ];
+    const desc = el('div', 'mk-seg-d', opts[0].d);
+    const btns = opts.map(o => {
+      const b = el('button', 'mk-seg-b' + (o.v === value ? ' on' : ''), o.t);
+      b.type = 'button';
+      b.onclick = () => {
+        if (value === o.v) return;
+        value = o.v;
+        btns.forEach((x, i) => x.classList.toggle('on', opts[i].v === value));
+        desc.textContent = o.d;
+        wrap.classList.toggle('danger', value === 'mirror');
+        if (onChange) onChange();
+      };
+      seg.appendChild(b); return b;
+    });
+    wrap.appendChild(seg); wrap.appendChild(desc);
+    return { node: wrap, value: () => value, onChange: fn => { onChange = fn; } };
+  }
+
+  // Add-ons are the one surface where what the user has in their clipboard is
+  // usually NOT what Nuvio needs. An add-on site hands you its /configure page,
+  // or a stremio:// link, or just its home page — and Nuvio stores whatever
+  // string it is given without checking, so all three write a row that looks
+  // added and then never loads. That is the "it says it added but it doesn't"
+  // report, and this is the fix: resolve what was pasted to a real manifest
+  // URL, prove it over the network, and show which URL is actually going to be
+  // saved before anything is written.
+  //
+  // A manifest we cannot READ is not an error — plenty of working add-ons
+  // refuse cross-origin reads, and Nuvio's own Add Plugin dialog never checks
+  // either — so that case warns and still lets the write through. Only an
+  // address that answers and is definitely not a manifest is called out.
+  async function openAddToProfile(anchor, name, presetUrl) {
+    const pop = openMkPop(anchor, 'Add ' + name, 'Paste the link its site gave you — Numax works out the manifest URL.');
     const mine = pop;
     const stale = () => mkPop !== mine;
-    const inp = el('input'); inp.type = 'url'; inp.placeholder = 'https://…/manifest.json';
-    inp.style.cssText = 'width:100%;margin-bottom:10px';
-    pop.body.appendChild(inp);
+
+    const f1 = el('label', 'mk-f'); f1.appendChild(el('span', '', 'Link from the add-on’s site'));
+    const inp = el('input', 'modal-input'); inp.type = 'url'; inp.placeholder = 'https://…/configure';
+    if (presetUrl) inp.value = presetUrl;
+    f1.appendChild(inp); pop.body.appendChild(f1);
+    const chk = el('div', 'mk-chk'); pop.body.appendChild(chk);
+
+    const f2 = el('label', 'mk-f'); f2.appendChild(el('span', '', 'Name in Nuvio'));
     const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name in Nuvio'; nm.value = name;
-    nm.style.cssText = 'width:100%;margin-bottom:12px';
-    pop.body.appendChild(nm);
+    f2.appendChild(nm); pop.body.appendChild(f2);
 
     pop.body.appendChild(el('div', 'mk-sec-t', 'Add to'));
     const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
 
-    const modeW = el('label', 'fld mk-mode');
-    modeW.appendChild(el('span', '', 'How to write it'));
-    const msel = mkSelect([
-      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
-      { value: 'mirror', label: 'Overwrite', hint: 'replace all add-ons with just this' },
-    ]);
-    modeW.appendChild(msel.node); pop.body.appendChild(modeW);
+    pop.body.appendChild(el('div', 'mk-sec-t', 'How to write it'));
+    const msel = mkModeSeg('add-on');
+    pop.body.appendChild(msel.node);
 
     const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
     const res = el('div', 'mk-res'); pop.body.appendChild(res);
@@ -2368,10 +2609,53 @@
     pop.foot.appendChild(go);
 
     let targets = [];
+    let resolved = null;       // the checked manifest URL, when we have one
+    let probeSeq = 0;
     const chosen = new Set();
-    const ready = () => chosen.size > 0 && !!inp.value.trim();
+    const typed = () => inp.value.trim();
+    // The URL that will actually be written: the proven one when the probe
+    // found it, otherwise the best-guess rewrite of what was typed.
+    const finalUrl = () => resolved || (MK.resolveManifestUrl(typed())[0] || typed());
+    const ready = () => chosen.size > 0 && !!typed();
+
+    const note = (cls, text, sub) => {
+      clr(chk);
+      chk.className = 'mk-chk ' + cls;
+      const line = el('div', 'mk-chk-l', text);
+      chk.appendChild(line);
+      if (sub) chk.appendChild(el('div', 'mk-chk-s', sub));
+    };
+    const probe = async () => {
+      const seq = ++probeSeq;
+      const raw = typed();
+      resolved = null;
+      if (!raw) { clr(chk); chk.className = 'mk-chk'; reset(); return; }
+      if (MK.resolveManifestUrl(raw).length === 0) { note('bad', 'That is not a web address.'); reset(); return; }
+      note('wait', 'Checking that link…');
+      let r;
+      try { r = await MK.probeManifest(raw); } catch (e) { r = { ok: false, reason: 'blocked' }; }
+      if (stale() || seq !== probeSeq) return;
+      if (r.ok) {
+        resolved = r.url;
+        const v = r.manifest.version ? ' v' + r.manifest.version : '';
+        note('ok', 'Found ' + (r.manifest.name || 'this add-on') + v, 'Saving: ' + r.url);
+        // Only fill the name if it is still the catalogue's generic one — a
+        // name the user typed themselves is never overwritten.
+        if (r.manifest.name && (nm.value === name || !nm.value.trim())) nm.value = r.manifest.name;
+      } else if (r.reason === 'blocked') {
+        note('warn', 'Could not check this from here.',
+          'That is normal — many add-ons block outside reads. Saving: ' + finalUrl());
+      } else {
+        note('bad', 'No add-on manifest at that address.',
+          'Open the add-on’s site, configure it, and copy the install link it gives you. You can still add it as-is.');
+      }
+      reset();
+    };
+    let probeT = null;
+    const schedule = () => { clearTimeout(probeT); probeT = setTimeout(probe, 450); };
+
     const run = () => {
-      const url = inp.value.trim();
+      const url = finalUrl();
       if (!/^https?:\/\//i.test(url)) { status(st, 'That doesn’t look like a URL.', 'err'); return; }
       mkWrite({
         kind: 'addons', master: [{ url, name: nm.value.trim() || name, enabled: true }],
@@ -2381,14 +2665,59 @@
     };
     const reset = mkBindApply(go, res, st, 'Add', run, ready);
     msel.onChange(reset);
-    inp.addEventListener('input', reset);
+    inp.addEventListener('input', () => { resolved = null; reset(); schedule(); });
+    inp.addEventListener('blur', () => { clearTimeout(probeT); probe(); });
+    inp.addEventListener('paste', () => setTimeout(probe, 0));
 
     const got = await mkFillTargets(tbox, chosen, reset, stale);
     if (stale()) return;
-    if (!got) { go.disabled = true; pop.place(); return; }
+    if (!got) { go.disabled = true; return; }
     targets = got;
     reset();
-    pop.place();
+    if (presetUrl) probe(); else setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60);
+  }
+
+  // Plugins get the same dialog add-ons do. They used to install from a block
+  // at the bottom of the repo detail card, underneath as many as 200 scraper
+  // rows — so "install this" meant scrolling to the end of the page to find the
+  // profile list. Nothing about the write changes; only where the controls are.
+  async function openInstallPlugin(anchor, p, manifestName) {
+    const label = manifestName || p.name;
+    const pop = openMkPop(anchor, 'Install ' + label, 'Nuvio installs the whole repo — all of its scrapers.');
+    const mine = pop;
+    const stale = () => mkPop !== mine;
+
+    const u = el('div', 'mk-chk ok');
+    u.appendChild(el('div', 'mk-chk-l', 'Saving: ' + p.manifestUrl));
+    pop.body.appendChild(u);
+
+    pop.body.appendChild(el('div', 'mk-sec-t', 'Install to'));
+    const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
+
+    pop.body.appendChild(el('div', 'mk-sec-t', 'How to write it'));
+    const msel = mkModeSeg('plugin');
+    pop.body.appendChild(msel.node);
+
+    const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
+    const res = el('div', 'mk-res'); pop.body.appendChild(res);
+    const go = el('button', 'btn btn-primary', 'Install'); go.style.width = '100%';
+    pop.foot.appendChild(go);
+
+    let targets = [];
+    const chosen = new Set();
+    const run = () => mkWrite({
+      kind: 'plugins',
+      master: [{ url: p.manifestUrl, name: label, enabled: true }],
+      targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
+      mode: msel.value(), st, res, btn: go, label,
+    });
+    const reset = mkBindApply(go, res, st, 'Install', run, () => chosen.size > 0);
+    msel.onChange(reset);
+    const got = await mkFillTargets(tbox, chosen, reset, stale);
+    if (stale()) return;
+    if (!got) { go.disabled = true; return; }
+    targets = got;
+    reset();
   }
 
   // Shared writer for add-ons and plugins. Reads each target fresh, plans with
@@ -2411,8 +2740,14 @@
     btn.disabled = true; clr(res); status(st, 'Reading target profiles…');
     const plans = [];
     try {
+      // One fresh export PER ACCOUNT, not per target. Ticking four profiles on
+      // one account used to fire four whole-account exports back to back, each
+      // of them a quarter-megabyte, behind a 120 ms throttle — which is most of
+      // what made "Reading target profiles…" feel slow.
+      const reads = new Map();
       for (const t of targets) {
-        const { backup } = await loadAccount(t.aid, true);
+        if (!reads.has(t.aid)) reads.set(t.aid, (await loadAccount(t.aid, true)).backup);
+        const backup = reads.get(t.aid);
         const state = sliceProfile(backup, t.idx);
         // Append after whatever is already there rather than jumping to the top —
         // but if this URL is already on the profile keep its existing position,
@@ -2556,7 +2891,9 @@
       const lang = el('span', 'mk-lang', p.lang.replace(/ language$/i, ''));
       const open = el('button', 'btn btn-ghost btn-xs', 'View');
       open.onclick = () => openProvider(p);
-      row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open);
+      const inst = el('button', 'btn btn-primary btn-xs', 'Install');
+      inst.onclick = () => openInstallPlugin(inst, p);
+      row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open); row.appendChild(inst);
       grid.appendChild(row);
       // Reachability is a fact worth showing: the community index currently
       // lists several dead manifests as though they were healthy.
@@ -2634,23 +2971,15 @@
       body.appendChild(note);
     }
 
-    // ---- install controls, above the fold ----
+    // ---- install, above the fold ----
+    // One button that opens the shared dialog. The profile list, the
+    // merge/overwrite choice and the report used to be rendered inline here,
+    // which put them below however many scrapers this repo has.
     const inst = el('div', 'mk-install');
-    inst.appendChild(el('div', 'mk-sec-t', 'Install to'));
-    const tbox = el('div', 'mk-tgts'); inst.appendChild(tbox);
-
-    const modeW = el('label', 'fld mk-mode'); modeW.appendChild(el('span', '', 'How to write it'));
-    const msel = mkSelect([
-      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
-      { value: 'mirror', label: 'Overwrite', hint: 'replace all plugins with just this' },
-    ]);
-    modeW.appendChild(msel.node); inst.appendChild(modeW);
-
-    const bar = el('div', 'actbar');
-    const go = el('button', 'btn btn-primary', 'Install');
-    const st = el('div', 'inline-status');
-    bar.appendChild(go); bar.appendChild(st); inst.appendChild(bar);
-    const res = el('div', 'mk-res'); inst.appendChild(res);
+    const go = el('button', 'btn btn-primary', 'Install to profiles…');
+    go.onclick = () => openInstallPlugin(go, p, m && m.name);
+    inst.appendChild(go);
+    inst.appendChild(el('p', 'muted sm', 'Pick the profiles, and merge or overwrite, in the next step.'));
     body.appendChild(inst);
 
     // ---- scrapers, collapsed: context, not the main event ----
@@ -2676,18 +3005,6 @@
       body.appendChild(d.node);
     }
 
-    const chosen = new Set();
-    const run = () => mkWrite({
-      kind: 'plugins',
-      master: [{ url: p.manifestUrl, name: (m && m.name) || p.name, enabled: true }],
-      targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
-      mode: msel.value(), st, res, btn: go, label: p.name,
-    });
-    const reset = mkBindApply(go, res, st, 'Install', run, () => chosen.size > 0);
-    msel.onChange(reset);
-    const targets = await mkFillTargets(tbox, chosen, reset, stale);
-    if (!targets) { go.disabled = true; return; }
-    reset();
   }
 
   // ---- collections ----
@@ -2697,30 +3014,83 @@
   // engine.planTarget + api.applyPlan path as everything else — see market.js
   // for why a once-captured snapshot is as good as a live read here.
   let mkCollectionsCache = null;
+  let mkCollectionsFellBack = '';   // why we are on the snapshot, when a relay exists
+
+  // A usable Nuvio session access token from any linked account — what the
+  // collections relay forwards. api.js already rotates and persists a refreshed
+  // token; this only has to make sure the one we hand over is not about to
+  // expire. Nothing here is a new credential: it is the same token this browser
+  // already sends to api.nuvio.tv on every other call.
+  async function nuvioToken() {
+    const recs = store.list();
+    for (const rec of recs) {
+      const s = rec.session; if (!s || !s.access_token) continue;
+      const nowSec = Math.floor(Date.now() / 1000);
+      if (s.expires_at && s.expires_at - nowSec <= 60) {
+        if (!s.refresh_token) continue;
+        try {
+          const fresh = await A.refresh(s.refresh_token);
+          store.updateSession(rec.accountId, fresh);
+          return fresh.access_token;
+        } catch (e) { continue; }
+      }
+      return s.access_token;
+    }
+    return null;
+  }
+
   async function renderMkCollections(force) {
     const box = $('mk-collections');
+    const live = MK.COLLECTIONS.relayReady && MK.COLLECTIONS.relayReady();
     if (!mkCollectionsCache || force) {
-      clr(box); box.appendChild(el('p', 'muted sm shimmer', 'Reading the collections snapshot…'));
-      try { mkCollectionsCache = await MK.loadCollectionsSnapshot(force); }
-      catch (e) {
-        clr(box); box.appendChild(el('p', 'empty sm err-text', 'Could not read the collections snapshot: ' + e.message));
-        return;
+      clr(box); box.appendChild(el('p', 'muted sm shimmer', live ? 'Reading community collections…' : 'Reading the collections snapshot…'));
+      mkCollectionsFellBack = '';
+      if (live) {
+        // Live first when a relay is deployed; the snapshot is the fallback,
+        // and the banner always names which of the two is on screen.
+        try { mkCollectionsCache = await MK.loadCollectionsLive(await nuvioToken(), force); }
+        catch (e) { mkCollectionsFellBack = e.message; }
+      }
+      if (!mkCollectionsCache) {
+        try { mkCollectionsCache = await MK.loadCollectionsSnapshot(force); }
+        catch (e) {
+          clr(box);
+          // A same-origin fetch that comes back as anything but JSON is nearly
+          // always a sign-in wall in front of the site, not a missing file —
+          // say so, because "malformed" sends you looking in the wrong place.
+          const wall = /JSON|Unexpected token|malformed|unreachable/i.test(e.message);
+          box.appendChild(el('p', 'empty sm err-text', 'Could not read the collections list: ' + e.message));
+          if (wall) box.appendChild(el('p', 'muted sm', 'If this page has been open a long time, its sign-in may have expired — reload the page and try again.'));
+          const again = el('button', 'btn btn-ghost btn-xs', 'Try again');
+          again.onclick = () => renderMkCollections(true);
+          box.appendChild(again);
+          return;
+        }
       }
     }
     clr(box);
 
+    const isLive = !!mkCollectionsCache.live;
     const when = mkCollectionsCache.capturedAt ? new Date(mkCollectionsCache.capturedAt).toLocaleString() : 'unknown time';
     // The caveat is real and must stay readable, but it was a four-line wall of
     // text sitting above every visit. One line now, with the detail a click away.
     const n = el('div', 'mk-note mk-note-row');
     n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
-      + '<span class="mk-note-line"><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.</span>';
+      + (isLive
+        ? '<span class="mk-note-line"><b>Live from Nuvio</b> — ' + mkCollectionsCache.total + ' collections, read just now.'
+        // A short read is stated, never smoothed over: the API pages, and
+        // a page that failed halfway must not look like the whole catalogue.
+        + (mkCollectionsCache.short ? ' Nuvio lists ' + mkCollectionsCache.short + ' — the rest did not come back, so this is incomplete.' : '') + '</span>'
+        : '<span class="mk-note-line"><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.'
+          + (mkCollectionsFellBack ? ' The live read failed (' + esc(mkCollectionsFellBack) + ').' : '') + '</span>');
     const why = el('div', 'mk-note-why', MK.COLLECTIONS.why);
     const more = el('button', 'link', 'Why?');
     more.onclick = () => { const on = n.classList.toggle('open'); more.textContent = on ? 'Hide' : 'Why?'; };
     const brw = el('button', 'link', 'Browse on Nuvio');
     brw.onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
-    const acts = el('span', 'mk-note-acts'); acts.appendChild(more); acts.appendChild(brw);
+    const acts = el('span', 'mk-note-acts');
+    if (!isLive) acts.appendChild(more);
+    acts.appendChild(brw);
     n.appendChild(acts); n.appendChild(why);
     box.appendChild(n);
 
@@ -2734,6 +3104,7 @@
   // sort are pure view state: nothing is fetched again and the install path is
   // untouched.
   let mkCollGrid = null;
+  let mkCollLastQ = '';
   function renderMkCollGrid() {
     const grid = mkCollGrid; if (!grid || !mkCollectionsCache) return;
     clr(grid);
@@ -2743,6 +3114,9 @@
     if (find) find.classList.toggle('has-q', !!q);
     const sort = ($('mk-coll-sort') && $('mk-coll-sort').value) || 'installs';
     const all = mkCollectionsCache.items || [];
+    // A new query is a new list; carrying "show all" across it would defeat
+    // the point of narrowing.
+    if (q !== mkCollLastQ) { mkCollShowAll = false; mkCollLastQ = q; }
     const hit = c => {
       if (!q) return true;
       const tags = Array.isArray(c.tags) ? c.tags.join(' ') : '';
@@ -2757,8 +3131,19 @@
     const cnt = $('mk-coll-count');
     if (cnt) cnt.textContent = q ? items.length + ' of ' + all.length : all.length + ' collections';
     if (!items.length) { grid.appendChild(el('p', 'mk-find-none', 'No collection matches \u201c' + q + '\u201d.')); return; }
-    items.forEach(c => grid.appendChild(renderMkCollCard(c)));
+    // Ninety-nine cards at once is a wall, and it is also ninety-nine remote
+    // images. Show a page; the search box above is the real way through the
+    // list, and "Show all" is one click for anyone who would rather scroll.
+    const page = mkCollShowAll ? items.length : Math.min(items.length, MK_COLL_PAGE);
+    items.slice(0, page).forEach(c => grid.appendChild(renderMkCollCard(c)));
+    if (page < items.length) {
+      const more = el('button', 'btn btn-ghost mk-coll-more-btn', 'Show all ' + items.length + ' collections');
+      more.onclick = () => { mkCollShowAll = true; renderMkCollGrid(); };
+      grid.appendChild(more);
+    }
   }
+  const MK_COLL_PAGE = 36;
+  let mkCollShowAll = false;
 
   // Descriptions come from creators as raw markdown; there's no renderer here,
   // so strip the syntax rather than show literal ### and ** on a plain card.
@@ -2800,7 +3185,10 @@
     ].filter(Boolean).join(' · ');
     if (statsText) body.appendChild(el('div', 'mk-coll-stats', statsText));
     if (Array.isArray(c.requiredAddons) && c.requiredAddons.length) {
-      body.appendChild(el('div', 'mk-coll-req', 'Needs: ' + c.requiredAddons.map(a => a.addonName || a.addonId).join(', ')));
+      const names = c.requiredAddons.map(a => a.addonName || a.addonId);
+      const req = el('div', 'mk-coll-req', 'Needs: ' + names.join(', '));
+      req.title = names.join(', ');   // the full list is a hover away, not a paragraph
+      body.appendChild(req);
     }
     const foot = el('div', 'mk-coll-foot');
     foot.appendChild(el('span', 'muted sm', (c.likes_count || 0) + ' likes · ' + (c.installs_count || 0) + ' installs'));
@@ -2835,8 +3223,15 @@
     const mine = pop;
     const stale = () => mkPop !== mine;
 
-    const got = await loadInto(pop.body, 'Reading collection…', () => MK.loadCollectionInstall(c.public_id),
-      { stale, prefix: 'Could not read this collection: ' });
+    const got = await loadInto(pop.body, 'Reading collection…', async () => {
+      // Live when a relay is deployed, the captured file otherwise — and if
+      // live fails, fall through rather than dead-end on a working fallback.
+      if (MK.COLLECTIONS.relayReady && MK.COLLECTIONS.relayReady()) {
+        try { return await MK.loadCollectionInstallLive(c.public_id, await nuvioToken()); }
+        catch (e) { /* fall through to the captured payload */ }
+      }
+      return MK.loadCollectionInstall(c.public_id);
+    }, { stale, prefix: 'Could not read this collection: ' });
     if (!got) { if (!stale()) pop.place(); return; }
     const doc = got.value;
 
@@ -2859,47 +3254,40 @@
       pop.body.appendChild(rn);
     }
 
-    const tw = el('label', 'fld'); tw.appendChild(el('span', '', 'Install to profile'));
-    const tsel = el('select', 'sel'); tw.appendChild(tsel); pop.body.appendChild(tw);
+    pop.body.appendChild(el('div', 'mk-sec-t', 'Install to'));
+    const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
 
-    const modeW = el('label', 'fld mk-mode');
-    modeW.appendChild(el('span', '', 'How to add the collection'));
-    const msel = mkSelect([
-      { value: 'merge', label: 'Merge', hint: 'add it, keep everything else' },
-      { value: 'mirror', label: 'Overwrite', hint: 'replace all collections with just this' },
-    ]);
-    modeW.appendChild(msel.node); pop.body.appendChild(modeW);
+    pop.body.appendChild(el('div', 'mk-sec-t', 'How to add the collection'));
+    const msel = mkModeSeg('collection');
+    pop.body.appendChild(msel.node);
 
     const already = el('div'); pop.body.appendChild(already);
-    const bar = el('div', 'actbar'); bar.style.marginTop = '12px';
-    const btn = el('button', 'btn btn-primary', 'Preview'); const st = el('div', 'inline-status');
-    bar.appendChild(btn); bar.appendChild(st); pop.body.appendChild(bar);
+    const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
     const res = el('div', 'mk-res'); pop.body.appendChild(res);
+    // Pinned to the dialog footer rather than sitting at the end of a body that
+    // scrolls — the action must never be the thing you have to scroll to find.
+    const btn = el('button', 'btn btn-primary', 'Preview'); btn.style.width = '100%';
+    pop.foot.appendChild(btn);
 
-    const tgot = await loadInto(el('div'), 'Reading profiles…', mkAllProfiles, { stale });
-    if (stale()) return;
-    if (!tgot) { status(st, 'Could not read your profiles.', 'err'); btn.disabled = true; pop.place(); return; }
-    const { targets, failed } = tgot.value;
-    failed.forEach(f => already.appendChild(el('p', 'empty sm err-text', f)));
-    if (!targets.length) {
-      already.appendChild(el('p', 'empty sm', failed.length
-        ? 'No profiles could be read.' : 'No linked accounts yet — link one on the Nuvio accounts tab.'));
-      btn.disabled = true; pop.place(); return;
-    }
-    targets.forEach(t => {
-      const o = document.createElement('option');
-      o.value = t.aid + ':' + t.idx; o.textContent = t.name + ' · ' + t.account;
-      tsel.appendChild(o);
-    });
-    enhanceSelect(tsel);
-
+    // Same account-grouped picker the other two tabs use, in single-select
+    // mode: the install path plans and applies one profile at a time.
+    const chosen = new Set();
     // Any change to the target or the mode invalidates a previous preview.
-    const reset = () => { btn.textContent = 'Preview'; btn.onclick = preview; btn.disabled = false; clr(res); status(st, ''); };
-    tsel.addEventListener('change', reset);
+    const reset = () => { btn.textContent = 'Preview'; btn.onclick = preview; btn.disabled = !chosen.size; clr(res); status(st, ''); };
     msel.onChange(reset);
+    const targets = await mkFillTargets(tbox, chosen, reset, stale, { single: true });
+    if (stale()) return;
+    if (!targets) { btn.disabled = true; return; }
+    // Nothing is preselected when there is real ambiguity; with one profile
+    // linked, preselecting it saves a pointless click.
+    if (targets.length === 1) chosen.add(targets[0].aid + ':' + targets[0].idx);
+    mkTargetList(tbox, targets, chosen, { single: true });
+    reset();
 
     async function preview() {
-      const [aid, iStr] = tsel.value.split(':'); const idx = parseInt(iStr, 10);
+      const pick = [...chosen][0];
+      if (!pick) { status(st, 'Pick a profile first.', 'err'); return; }
+      const [aid, iStr] = pick.split(':'); const idx = parseInt(iStr, 10);
       const mode = msel.value();
       status(st, 'Reading target profile…'); clr(res);
       try {
@@ -2921,11 +3309,8 @@
         renderApplyPlan(res, st, plan, aid, 'Collection installed', {
           verify: () => verifyCollections(aid, idx, collections),
         });
-        pop.place();
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
     }
-    reset();
-    pop.place();
   }
 
   // Reads a profile's collections back and confirms each installed id is
