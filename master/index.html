@@ -173,7 +173,10 @@
   .sy-sec-car{ flex:none; color:var(--t45); display:grid; place-items:center; transition:transform var(--mo-expand,.26s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
   .sy-sec-car svg{ width:15px; height:15px; }
   .sy-sec.open .sy-sec-car{ transform:rotate(180deg); }
-  .sy-sec-w{ height:0; overflow:hidden; transition:height var(--mo-expand,.28s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  /* contain:paint keeps the growing section's repaint inside its own box, so a
+     section opening does not repaint every card below it in the column. */
+  .sy-sec-w{ height:0; overflow:hidden; contain:paint;
+    transition:height var(--mo-expand,.28s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
   .sy-sec-b{ padding:0 20px 18px; }
   .sy-sec-bar{ display:flex; align-items:center; gap:6px; margin-bottom:10px; }
   .sy-sec-bar .spacer{ flex:1; }
@@ -200,7 +203,12 @@
   .sy-ct-group-selall{ font-size:11px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; padding:1px 2px; margin-left:auto; }
   .sy-ct-group-selall:hover{ text-decoration:underline; color:#ff8a80; }
   .sy-ct-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-  .sy-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 10px 4px 4px; cursor:pointer; transition:.14s; }
+  .sy-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 10px 4px 4px; cursor:pointer;
+    /* named properties, not the `transition:.14s` shorthand this was: that is
+       `all`, so every layout property animated too and each chip re-laid itself
+       out on hover. */
+    transition:background var(--mo-micro) var(--mo-ease), border-color var(--mo-micro) var(--mo-ease), transform var(--mo-press) var(--mo-ease); }
+  .sy-chip:active{ transform:scale(.97); }
   .sy-chip:hover{ border-color:rgba(255,255,255,.28); }
   .sy-chip.on{ border-color:var(--accent); background:rgba(229,57,53,.1); }
   .sy-chip .av{ width:22px; height:22px; font-size:10px; }
@@ -313,7 +321,8 @@
   .pf-editor-tab.on{ color:var(--t); border-bottom-color:var(--accent); }
   .pf-editor-body{ padding:18px; }
   .modal-root{ position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center; padding:16px; }
-  .modal-bg{ position:absolute; inset:0; background:rgba(0,0,0,.66); backdrop-filter:blur(2px); }
+  .modal-bg{ position:absolute; inset:0; background:rgba(6,8,14,.58);
+    backdrop-filter:blur(16px) saturate(.8); -webkit-backdrop-filter:blur(16px) saturate(.8); }
   .modal-card{ position:relative; background:var(--glass-bg-2); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border:1px solid var(--glass-border); border-radius:16px; padding:22px 24px; width:min(440px,92vw); box-shadow:var(--glass-glow), 0 24px 70px rgba(0,0,0,.6); max-height:min(88dvh, 100% - 32px); display:flex; flex-direction:column; overflow:hidden; }
   /* everything scrolls except the title and the buttons */
   .modal-card > *{ flex:none; }
@@ -1131,13 +1140,48 @@
      each extra account made the page itself taller. It scrolls in place now;
      the file name, the API-key switch and the Back up button stay reachable
      however many accounts are linked. */
-  #dr-backup-picker{ max-height:clamp(200px,46vh,360px); overflow-y:auto; padding-right:5px; }
-  #dr-restore-list{ max-height:clamp(180px,40vh,320px); overflow-y:auto; padding-right:5px; }
-  #dr-backup-picker::-webkit-scrollbar, #dr-restore-list::-webkit-scrollbar{ width:5px; }
-  #dr-backup-picker::-webkit-scrollbar-thumb, #dr-restore-list::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
-  /* the per-account heading stays put while its profiles scroll under it */
-  #dr-backup-picker .tgt-acct-row{ position:sticky; top:0; z-index:2; background:var(--surface); padding:6px 0 5px; }
-  #dr-backup-picker > .selall-pill{ position:sticky; top:0; z-index:3; }
+  /* These used to carry their own max-height so the PAGE would not grow; the
+     card is the scroller now, so a fixed cap here would just be a second
+     scrollbar inside the first. */
+  #dr-backup-picker{ padding-right:2px; }
+  /* Drive is viewport-fit like Accounts, Profiles and Sync Desk: the page never
+     scrolls, and each card scrolls its own contents. The two cards share the
+     height left under the header, so the Back up button and the Restore list
+     are both always on screen however many accounts are linked. */
+  .panel[data-panel="drive"]{ display:flex; flex-direction:column; overflow:hidden; max-width:1800px; gap:0; }
+  .panel[data-panel="drive"] .phead{ flex:none; }
+  .panel[data-panel="drive"] > .card{ flex:none; }
+  /* grid-auto-rows, not just align-items: the row would otherwise size itself
+     to its content and the cards would grow the page again. */
+  /* flex-basis 0, not auto. .panel itself is flex:1 0 auto — it never shrinks —
+     so a growing child whose basis is its own content simply pushes the panel
+     past the viewport and main scrolls. Every other viewport-fit tab here uses
+     basis 0 on the child that takes the remaining height; this is the same. */
+  .panel[data-panel="drive"] .panel-cols{ flex:1 1 0; min-height:0; align-items:stretch; grid-auto-rows:minmax(0,1fr);
+    /* The shared track is minmax(430px,1fr), which needs 878px of content width
+       before it will sit two cards side by side — inside the sidebar that is a
+       ~1200px window. 360px puts them side by side from ~1060px, which is the
+       same width the stacked escape below takes over at, so the two never
+       disagree. */
+    grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); }
+  .panel[data-panel="drive"] .panel-cols > .card{ display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .panel[data-panel="drive"] .panel-cols > .card > .chead{ flex:none; }
+  /* everything under each card's heading is the scroller */
+  .panel[data-panel="drive"] .panel-cols > .card > :not(.chead):not(.dr-scroll){ flex:none; }
+  .panel[data-panel="drive"] .dr-scroll{ flex:1 1 0; min-height:0; overflow-y:auto; padding-right:6px; }
+  .panel[data-panel="drive"] .dr-scroll::-webkit-scrollbar{ width:5px; }
+  .panel[data-panel="drive"] .dr-scroll::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+  /* One column is too tall to fit two full cards, so below that the page goes
+     back to scrolling normally rather than squeezing both into nothing. */
+  @media (max-width:1100px), (max-height:620px){
+    /* Every part of the viewport-fit arrangement has to come off together. The
+       flex-basis-0 children are the ones that matter: left in place with the
+       height cap removed they collapse to nothing and the content spills. */
+    .panel[data-panel="drive"]{ flex:1 0 auto; overflow:visible; }
+    .panel[data-panel="drive"] .panel-cols{ flex:none; min-height:auto; grid-auto-rows:auto; align-items:start; }
+    .panel[data-panel="drive"] .panel-cols > .card{ display:block; min-height:auto; overflow:visible; }
+    .panel[data-panel="drive"] .dr-scroll{ flex:none; min-height:auto; overflow:visible; padding-right:0; }
+  }
 
   .mk-scroll{ max-height:340px; overflow-y:auto; padding-right:4px; }
   .mk-scroll::-webkit-scrollbar{ width:5px; }
@@ -1150,7 +1194,10 @@
      scrolls away, and reuses .modal-root/.modal-card so ui-motion gives it the
      same entry/exit motion and focus trap as every other dialog here. */
   .mk-dlg-root{ z-index:120; }
-  .mk-dlg{ width:min(520px,94vw); padding:0; gap:0; }
+  /* Wide enough to lay every account out with its profiles as chips, and tall
+     enough that the common case needs no scrolling at all. It was 520px, which
+     forced a two-account picker into a 480px scroller inside the dialog. */
+  .mk-dlg{ width:min(760px,94vw); padding:0; gap:0; max-height:min(90dvh, 100% - 32px); }
   .mk-dlg-h{ position:relative; padding:15px 46px 13px 18px; border-bottom:1px solid var(--line-2); flex:none; }
   .mk-dlg-h b{ font-size:14.5px; display:block; font-weight:700; }
   .mk-dlg-h span{ font-size:11.5px; color:var(--t35); display:block; margin-top:3px; line-height:1.45; }
@@ -1196,6 +1243,24 @@
      One account is one section: its own Select all, its own count, its
      profiles as chips inside. A single linked account is simply open. */
   .mk-pick{ display:flex; flex-direction:column; gap:6px; }
+  .mk-pick-top{ display:flex; align-items:center; gap:12px; padding:2px 2px 8px; }
+  .mk-pick-top-tx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .mk-pick-top-t{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--t55); }
+  .mk-pick-top-c{ font-size:11.5px; color:var(--t35); font-family:ui-monospace,monospace; }
+  .mk-pick-top-c.on{ color:#ff8a80; }
+  .mk-pick-topall{ flex:none; font-size:11.5px; font-weight:600; font-family:inherit; cursor:pointer;
+    color:var(--t70); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:6px 14px;
+    transition:color var(--mo-micro) var(--mo-ease), background var(--mo-micro) var(--mo-ease),
+               border-color var(--mo-micro) var(--mo-ease), transform var(--mo-press) var(--mo-ease); }
+  .mk-pick-topall:hover{ color:var(--t); background:var(--surface-3); border-color:rgba(255,255,255,.2); }
+  .mk-pick-topall:active{ transform:scale(.96); }
+  .mk-pick-topall.on{ color:#ff8a80; border-color:rgba(229,57,53,.38); background:rgba(229,57,53,.1); }
+  /* Two accounts side by side once there is room, so a second account is not a
+     scroll away. */
+  @media (min-width:760px){
+    .mk-dlg .mk-pick.multi{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); align-items:start; gap:8px; }
+    .mk-dlg .mk-pick.multi .mk-pick-top{ grid-column:1/-1; }
+  }
   .mk-pick-acct{ border:1px solid var(--line); border-radius:12px; background:var(--surface); overflow:hidden;
     transition:border-color var(--mo-micro,.14s) var(--mo-ease,ease); }
   .mk-pick-acct.open{ border-color:rgba(255,255,255,.16); }
@@ -1271,8 +1336,11 @@
     --mo-expand:260ms;     /* expansion / avatar spread        */
     --mo-dialog:240ms;     /* dialog                           */
     --mo-page:280ms;       /* page + pane content              */
-    --mo-ease:cubic-bezier(.22,.61,.36,1);      /* ease-out    */
-    --mo-spring:cubic-bezier(.34,1.28,.56,1);   /* small settle */
+    /* iOS's own decelerate curve: leaves fast, lands slowly, never overshoots.
+       Every var(--mo-ease, …) fallback in this file already named it; the
+       variable itself was a shallower ease-out, so nothing actually used it. */
+    --mo-ease:cubic-bezier(.32,.72,0,1);        /* ease-out    */
+    --mo-spring:cubic-bezier(.34,1.24,.56,1);   /* small settle */
   }
 
   /* ---- focus is never communicated by motion alone ---- */
@@ -1289,8 +1357,11 @@
   /* ---- sliding active indicators ---- */
   .mo-bar{ position:relative; }
   .mo-ind{
-    position:absolute; z-index:0; pointer-events:none; opacity:0; border-radius:10px;
-    transition:left var(--mo-tab) var(--mo-ease), top var(--mo-tab) var(--mo-ease),
+    position:absolute; left:0; top:0; z-index:0; pointer-events:none; opacity:0; border-radius:10px;
+    /* The slide is a transform, so it runs on the compositor. It used to animate
+       left/top, which re-laid-out the bar on every frame of every move. */
+    will-change:transform, width, height;
+    transition:transform var(--mo-tab) var(--mo-ease),
                width var(--mo-tab) var(--mo-ease), height var(--mo-tab) var(--mo-ease),
                opacity var(--mo-micro) linear;
   }
@@ -1431,7 +1502,13 @@
   }
 
   /* ---- dialogs ---- */
-  @keyframes mo-dlg-bg{ from{ opacity:0; } to{ opacity:1; } }
+  /* The blur itself animates. It was a flat 2px that was simply there from the
+     first frame, so opening a dialog read as a black sheet dropping in rather
+     than the page softening behind it. */
+  @keyframes mo-dlg-bg{
+    from{ opacity:0; backdrop-filter:blur(0px); -webkit-backdrop-filter:blur(0px); }
+    to{ opacity:1; backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); }
+  }
   @keyframes mo-dlg-card{ from{ opacity:0; transform:scale(.94) translateY(12px); } to{ opacity:1; transform:none; } }
   .modal-root .modal-bg{ animation:mo-dlg-bg var(--mo-dialog) var(--mo-ease) both; }
   .modal-root .modal-card{ animation:mo-dlg-card var(--mo-dialog) var(--mo-spring) both; }
@@ -2133,17 +2210,21 @@
       <div class="card"><div class="chead"><h3>Connection</h3><span class="spacer"></span><span class="inline-status" id="dr-status">Connected via sign-in.</span></div></div>
       <div class="panel-cols">
       <div class="card"><div class="chead"><h3>Back up</h3></div>
-        <p class="muted sm" style="margin-bottom:12px">Pick the profiles to include, then name the file. Backing up to the same name updates that file.</p>
-        <div id="dr-backup-picker"></div>
-        <label class="fld" style="max-width:440px;margin-top:14px"><span>File name</span><input id="dr-name" type="text" placeholder="numax-backup"></label>
-        <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
+        <div class="dr-scroll">
+          <p class="muted sm" style="margin-bottom:12px">Pick the profiles to include, then name the file. Backing up to the same name updates that file.</p>
+          <div id="dr-backup-picker"></div>
+          <label class="fld" style="max-width:440px;margin-top:14px"><span>File name</span><input id="dr-name" type="text" placeholder="numax-backup"></label>
+          <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
+        </div>
         <div class="actbar"><button class="btn btn-primary" id="dr-backup-btn">Back up to Drive</button><div class="inline-status" id="dr-backup-log"></div></div></div>
       <div class="card"><div class="chead"><h3>Restore</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="dr-restore-refresh">Refresh list</button></div>
-        <!-- Resting state, not a shimmer: nothing is loading until the tab is
-             opened and refreshRestore() runs, and a shimmer that starts at page
-             load reads as a task that never finishes. -->
-        <div id="dr-restore-list"><p class="empty sm">Open this tab to list your backups.</p></div>
-        <div id="dr-restore-config" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px"></div></div>
+        <div class="dr-scroll">
+          <!-- Resting state, not a shimmer: nothing is loading until the tab is
+               opened and refreshRestore() runs, and a shimmer that starts at page
+               load reads as a task that never finishes. -->
+          <div id="dr-restore-list"><p class="empty sm">Open this tab to list your backups.</p></div>
+          <div id="dr-restore-config" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px"></div>
+        </div></div>
       </div>
     </section>
 

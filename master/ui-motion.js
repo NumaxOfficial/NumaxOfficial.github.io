@@ -27,9 +27,21 @@
   // nodes still costs exactly one layout read.
   // ---------------------------------------------------------------
   var pending = false, syncers = [];
+  // Everything this file writes carries data-mo-own, and the observer at the
+  // bottom drops those records. Without that the loop feeds itself: a sync pass
+  // writes the indicator's inline style, the observer sees a 'style' mutation
+  // and schedules another pass, and the page runs a full measure-and-write on
+  // every frame for the rest of its life. Measured before this fix, on a page
+  // where nothing was moving: 60 style writes in 60 frames, ~6 forced layout
+  // reads per frame, ~31fps. That was the jerkiness.
   function schedule() { if (pending) return; pending = true; raf(function () { pending = false; runSync(); }); }
   function onSync(fn) { syncers.push(fn); }
   function runSync() { for (var i = 0; i < syncers.length; i++) { try { syncers[i](); } catch (e) {} } }
+  // Reads first, then writes. Interleaving them per bar forced a fresh layout
+  // for every bar in the list; batching costs one layout for the whole pass.
+  var writeQ = [];
+  function defer(fn) { writeQ.push(fn); }
+  function flushWrites() { var q = writeQ; writeQ = []; for (var i = 0; i < q.length; i++) { try { q[i](); } catch (e) {} } }
 
   // ===============================================================
   // 1. Sliding active indicators
@@ -66,13 +78,17 @@
       ind = D.createElement('span');
       ind.className = 'mo-ind mo-ind-' + spec.kind;
       ind.setAttribute('aria-hidden', 'true');
+      ind.setAttribute('data-mo-own', '');
       host.classList.add('mo-bar');
       host.insertBefore(ind, host.firstChild);
       host.__moInd = ind;
       host.__moFresh = true;
     }
     var on = host.querySelector(spec.item + '.on');
-    if (!on) { ind.classList.remove('mo-ind-live'); return; }
+    if (!on) {
+      if (ind.classList.contains('mo-ind-live')) defer(function () { ind.classList.remove('mo-ind-live'); });
+      return;
+    }
     var hr = host.getBoundingClientRect(), ir = on.getBoundingClientRect();
     var box = {
       left: Math.round(ir.left - hr.left + host.scrollLeft),
@@ -81,21 +97,31 @@
     };
     if (!box.w && !box.h) return; // bar not laid out yet (hidden panel)
 
-    if (host.__moFresh) {
-      host.__moFresh = false;
-      var prev = lastBox[spec.key];
-      // rebuilt bar: start where the old one was so the move still reads as a slide
-      ind.style.transition = 'none';
-      place(ind, (prev && prev.w) ? prev : box);
-      void ind.offsetWidth; // force the "no transition" frame to commit
-      ind.style.transition = '';
-    }
-    place(ind, box);
-    ind.classList.add('mo-ind-live');
+    var fresh = host.__moFresh;
+    host.__moFresh = false;
+    var prev = lastBox[spec.key];
     lastBox[spec.key] = box;
+    // Nothing moved: write nothing. This is the check that stops a sync pass
+    // from re-triggering itself through the observer on every idle frame.
+    if (!fresh && same(ind.__moBox, box) && ind.classList.contains('mo-ind-live')) return;
+    defer(function () {
+      if (fresh) {
+        // rebuilt bar: start where the old one was so the move still reads as a slide
+        ind.style.transition = 'none';
+        place(ind, (prev && prev.w) ? prev : box);
+        void ind.offsetWidth; // force the "no transition" frame to commit
+        ind.style.transition = '';
+      }
+      place(ind, box);
+      ind.classList.add('mo-ind-live');
+    });
   }
+  function same(a, b) { return !!a && a.left === b.left && a.top === b.top && a.w === b.w && a.h === b.h; }
+  // translate3d rather than left/top, so the slide itself runs on the
+  // compositor instead of re-laying out the bar on every frame of the move.
   function place(ind, b) {
-    ind.style.left = b.left + 'px'; ind.style.top = b.top + 'px';
+    ind.__moBox = b;
+    ind.style.transform = 'translate3d(' + b.left + 'px,' + b.top + 'px,0)';
     ind.style.width = b.w + 'px'; ind.style.height = b.h + 'px';
   }
   onSync(syncBars);
@@ -286,7 +312,9 @@
     var openEl = null, i;
     for (i = 0; i < list.length; i++) if (list[i].classList.contains('open')) { openEl = openEl || list[i]; }
     // popover semantics: only one open at a time
-    for (i = 0; i < list.length; i++) if (list[i] !== openEl) list[i].classList.remove('open');
+    for (i = 0; i < list.length; i++) {
+      if (list[i] !== openEl && list[i].classList.contains('open')) list[i].classList.remove('open');
+    }
     if (openEl && (!pop || pop.chooser !== openEl)) openPop(openEl);
     else if (!openEl && pop) teardownPop(false);
   }
@@ -331,6 +359,7 @@
       b.type = 'button'; b.className = 'mo-rail-btn mo-rail-' + dir;
       b.setAttribute('aria-label', dir === 'prev' ? 'Scroll left' : 'Scroll right');
       b.textContent = dir === 'prev' ? '‹' : '›';
+      b.setAttribute('data-mo-own', '');
       b.onclick = function () {
         scroller.scrollBy({ left: (dir === 'prev' ? -1 : 1) * Math.max(140, scroller.clientWidth * 0.7), behavior: scrollEase() });
       };
@@ -361,14 +390,27 @@
       var r = rails[i], s = r.s;
       var over = s.scrollWidth - s.clientWidth > 4;
       var l = s.offsetLeft, t = s.offsetTop, w = s.offsetWidth, h = s.offsetHeight;
-      r.prev.style.display = r.next.style.display = over ? '' : 'none';
-      r.prev.style.top = r.next.style.top = (t + h / 2) + 'px';
-      r.prev.style.left = l + 'px';
-      r.next.style.left = (l + w) + 'px';
-      r.prev.classList.toggle('mo-rail-off', s.scrollLeft <= 2);
-      r.next.classList.toggle('mo-rail-off', s.scrollLeft >= s.scrollWidth - s.clientWidth - 2);
-      s.classList.toggle('mo-rail-fade-l', s.scrollLeft > 2);
-      s.classList.toggle('mo-rail-fade-r', over && s.scrollLeft < s.scrollWidth - s.clientWidth - 2);
+      // Re-assigning the same inline value still counts as an attribute
+      // mutation, which would wake the observer and schedule another pass; the
+      // signature check keeps an unchanged rail silent.
+      var sig = (over ? 1 : 0) + ':' + l + ':' + t + ':' + w + ':' + h;
+      var off = [s.scrollLeft <= 2, s.scrollLeft >= s.scrollWidth - s.clientWidth - 2,
+                 s.scrollLeft > 2, over && s.scrollLeft < s.scrollWidth - s.clientWidth - 2];
+      if (r.sig !== sig) {
+        r.sig = sig;
+        (function (r, over, l, t, w, h) {
+          defer(function () {
+            r.prev.style.display = r.next.style.display = over ? '' : 'none';
+            r.prev.style.top = r.next.style.top = (t + h / 2) + 'px';
+            r.prev.style.left = l + 'px';
+            r.next.style.left = (l + w) + 'px';
+          });
+        })(r, over, l, t, w, h);
+      }
+      r.prev.classList.toggle('mo-rail-off', off[0]);
+      r.next.classList.toggle('mo-rail-off', off[1]);
+      s.classList.toggle('mo-rail-fade-l', off[2]);
+      s.classList.toggle('mo-rail-fade-r', off[3]);
     }
   }
   onSync(syncRails);
@@ -435,7 +477,7 @@
     host.__moBg = true;
     host.classList.add('mo-bg-host');
     var c = D.createElement('canvas');
-    c.className = 'mo-bg'; c.setAttribute('aria-hidden', 'true');
+    c.className = 'mo-bg'; c.setAttribute('aria-hidden', 'true'); c.setAttribute('data-mo-own', '');
     host.insertBefore(c, host.firstChild);
     var ctx = c.getContext('2d');
     if (!ctx) return;
@@ -562,7 +604,7 @@
     if (r.width < 40 || r.height < 40) return;
     celebrating = true;
     var c = D.createElement('canvas');
-    c.className = 'mo-fw'; c.setAttribute('aria-hidden', 'true');
+    c.className = 'mo-fw'; c.setAttribute('aria-hidden', 'true'); c.setAttribute('data-mo-own', '');
     var dpr = Math.min(2, W.devicePixelRatio || 1);
     var w = Math.round(r.width), h = Math.round(r.height);
     c.width = w * dpr; c.height = h * dpr; c.style.width = w + 'px'; c.style.height = h + 'px';
@@ -635,9 +677,17 @@
   // ===============================================================
   // 10. Observers — the only inputs to everything above
   // ===============================================================
+  onSync(flushWrites);
+
   var mo = new MutationObserver(function (recs) {
+    var real = false;
     for (var i = 0; i < recs.length; i++) {
       var r = recs[i];
+      // A node this file owns and writes to itself (the sliding indicator, the
+      // background canvas) is not news. Reacting to it is what made the sync
+      // pass run on every frame of the page's life.
+      if (r.target && r.target.nodeType === 1 && r.target.hasAttribute && r.target.hasAttribute('data-mo-own')) continue;
+      real = true;
       if (r.type === 'childList') {
         for (var j = 0; j < r.addedNodes.length; j++) {
           var n = r.addedNodes[j];
@@ -645,7 +695,7 @@
         }
       }
     }
-    schedule();
+    if (real) schedule();
   });
 
   function boot() {

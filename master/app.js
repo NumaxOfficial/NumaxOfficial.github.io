@@ -2067,25 +2067,21 @@
   // ======================================================================
   async function refreshDrive() {
     status($('dr-status'), gAuth.token ? (gAuth.user && gAuth.user.email ? 'Connected as ' + gAuth.user.email : 'Connected.') : 'Not connected.', gAuth.token ? 'ok' : 'err');
-    const box = $('dr-backup-picker'); clr(box); const list = store.list();
+    const box = $('dr-backup-picker'); const list = store.list();
     // refreshRestore() must run on EVERY path: it owns the restore list, whose
     // placeholder is static markup in index.html. The old early return here
     // left that placeholder shimmering "Loading backups…" forever.
-    if (!list.length) { box.appendChild(el('p', 'empty sm', 'Link an account to choose what to back up.')); refreshRestore(); return; }
-    const allBtn = el('button', 'selall-pill', 'Select all');
-    allBtn.onclick = () => { const chips = box.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); allBtn.textContent = allOn ? 'Select all' : 'Deselect all'; };
-    box.appendChild(allBtn);
-    for (const rec of list) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; }
-      const acctRow = el('div', 'tgt-acct-row'); acctRow.appendChild(el('div', 'tgt-acct', accountName(rec.accountId)));
-      const acctSelAll = el('button', 'selall-pill sm', 'Select all');
-      acctRow.appendChild(acctSelAll); box.appendChild(acctRow);
-      const grid = el('div', 'tgt-grid'); profiles.forEach(p => { const tid = rec.accountId + ':' + p.index; const c = el('button', 'pchip multi'); c.type = 'button'; c.dataset.tid = tid; c.appendChild(avatar(p, 38)); c.appendChild(el('span', 'pcn', p.name)); c.appendChild(el('span', 'chk', '✓')); c.onclick = () => c.classList.toggle('on'); grid.appendChild(c); }); box.appendChild(grid);
-      acctSelAll.onclick = () => { const chips = grid.querySelectorAll('.pchip.multi'); const allOn = [...chips].every(c => c.classList.contains('on')); chips.forEach(c => c.classList.toggle('on', !allOn)); acctSelAll.textContent = allOn ? 'Select all' : 'Deselect all'; };
-    }
+    if (!list.length) { clr(box); box.appendChild(el('p', 'empty sm', 'Link an account to choose what to back up.')); refreshRestore(); return; }
+    // Selection survives a refresh: the chips are rebuilt, the set is not.
+    drPicked.forEach(k => { if (!list.some(r => k.indexOf(r.accountId + ':') === 0)) drPicked.delete(k); });
+    await mkFillTargets(box, drPicked, null, null, { label: 'Profiles to back up' });
     refreshRestore();
   }
+  // The Drive picker's own selection, held apart from the DOM so a background
+  // profile refresh cannot silently drop a tick the user has already made.
+  const drPicked = new Set();
   async function backupNow() {
-    const log = $('dr-backup-log'); const picked = [...document.querySelectorAll('#dr-backup-picker .pchip.on')].map(c => c.dataset.tid); if (!picked.length) { status(log, 'Pick at least one profile.', 'err'); return; }
+    const log = $('dr-backup-log'); const picked = [...drPicked]; if (!picked.length) { status(log, 'Pick at least one profile.', 'err'); return; }
     const name = $('dr-name').value.trim() || ('numax-backup-' + new Date().toISOString().slice(0, 10)); const keys = $('dr-keys').classList.contains('on');
     $('dr-backup-btn').disabled = true; status(log, 'Building backup…');
     try {
@@ -2458,7 +2454,29 @@
       g.items.push(t);
     });
     const wrap = el('div', 'mk-pick');
+    // Two columns only when there is a second account to put in one. auto-fit
+    // cannot work this out on its own here: the select-all row spans both
+    // tracks, so the empty track never collapses and a lone account would sit
+    // in half the dialog with nothing beside it.
+    if (byAcct.length > 1) wrap.classList.add('multi');
     const fire = () => box.dispatchEvent(new CustomEvent('mkchange'));
+    const allKeys = targets.map(t => t.aid + ':' + t.idx);
+
+    // One control above everything: every profile of every account. The
+    // per-account Select all stays where it is — this is the row above it, not
+    // a replacement for it.
+    let topAll = null, topCnt = null;
+    if (!o.single) {
+      const top = el('div', 'mk-pick-top');
+      const tx = el('div', 'mk-pick-top-tx');
+      tx.appendChild(el('span', 'mk-pick-top-t', o.label || 'Add to'));
+      topCnt = el('span', 'mk-pick-top-c');
+      tx.appendChild(topCnt);
+      top.appendChild(tx);
+      topAll = el('button', 'mk-pick-topall', 'Select all'); topAll.type = 'button';
+      top.appendChild(topAll);
+      wrap.appendChild(top);
+    }
 
     byAcct.forEach((g, gi) => {
       const sec = el('div', 'mk-pick-acct');
@@ -2506,7 +2524,17 @@
         // chip that lives in a different account's group.
         wrap.querySelectorAll('.mk-pick-chip').forEach(n => n.classList.toggle('on', chosen.has(n.dataset.tid)));
         wrap.querySelectorAll('.mk-pick-acct').forEach(s => { if (s.__sync) s.__sync(); });
+        if (topCnt) {
+          const on = allKeys.filter(k => chosen.has(k)).length;
+          topCnt.textContent = on
+            ? on + ' of ' + allKeys.length + ' profile' + (allKeys.length === 1 ? '' : 's') + ' selected'
+            : allKeys.length + ' profile' + (allKeys.length === 1 ? '' : 's') + ' across ' + byAcct.length + ' account' + (byAcct.length === 1 ? '' : 's');
+          topCnt.classList.toggle('on', !!on);
+          topAll.textContent = on === allKeys.length ? 'Clear all' : 'Select all';
+          topAll.classList.toggle('on', on === allKeys.length);
+        }
       };
+      sec.__syncTop = sync;
       sec.__sync = () => {
         const on = nodes.filter(n => chosen.has(n.key)).length;
         cnt.textContent = on ? on + ' of ' + nodes.length + ' selected' : nodes.length + ' profile' + (nodes.length === 1 ? '' : 's');
@@ -2518,8 +2546,10 @@
         nodes.forEach(n => { if (every) chosen.delete(n.key); else chosen.add(n.key); });
         sync(); fire();
       };
-      // One account: open, and the header is a label rather than a control.
-      const open = byAcct.length === 1 || gi === 0;
+      // Every account starts open. The dialog is sized to show them, and a
+      // closed account is a profile you cannot see you have — which was most of
+      // what made this picker feel like guesswork.
+      const open = true;
       sec.classList.toggle('open', open);
       head.setAttribute('aria-expanded', open ? 'true' : 'false');
       head.onclick = () => {
@@ -2534,7 +2564,20 @@
       if (open) w.style.height = 'auto';
       wrap.appendChild(sec);
     });
+    if (topAll) {
+      topAll.onclick = () => {
+        const every = allKeys.every(k => chosen.has(k));
+        allKeys.forEach(k => { if (every) chosen.delete(k); else chosen.add(k); });
+        wrap.querySelectorAll('.mk-pick-chip').forEach(n => n.classList.toggle('on', chosen.has(n.dataset.tid)));
+        wrap.querySelectorAll('.mk-pick-acct').forEach(x => { if (x.__sync) x.__sync(); });
+        wrap.querySelectorAll('.mk-pick-acct').forEach(x => { if (x.__syncTop) x.__syncTop(); });
+        box.dispatchEvent(new CustomEvent('mkchange'));
+      };
+    }
     box.appendChild(wrap);
+    // paint the counts once everything is in the document
+    const firstSec = wrap.querySelector('.mk-pick-acct');
+    if (firstSec && firstSec.__syncTop) firstSec.__syncTop();
   }
 
   // Merge / Overwrite as a two-button segment rather than a dropdown. It stays
@@ -2595,7 +2638,6 @@
     const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name in Nuvio'; nm.value = name;
     f2.appendChild(nm); pop.body.appendChild(f2);
 
-    pop.body.appendChild(el('div', 'mk-sec-t', 'Add to'));
     const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
 
     pop.body.appendChild(el('div', 'mk-sec-t', 'How to write it'));
@@ -2669,7 +2711,7 @@
     inp.addEventListener('blur', () => { clearTimeout(probeT); probe(); });
     inp.addEventListener('paste', () => setTimeout(probe, 0));
 
-    const got = await mkFillTargets(tbox, chosen, reset, stale);
+    const got = await mkFillTargets(tbox, chosen, reset, stale, { label: 'Add to' });
     if (stale()) return;
     if (!got) { go.disabled = true; return; }
     targets = got;
@@ -2691,7 +2733,6 @@
     u.appendChild(el('div', 'mk-chk-l', 'Saving: ' + p.manifestUrl));
     pop.body.appendChild(u);
 
-    pop.body.appendChild(el('div', 'mk-sec-t', 'Install to'));
     const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
 
     pop.body.appendChild(el('div', 'mk-sec-t', 'How to write it'));
@@ -2713,7 +2754,7 @@
     });
     const reset = mkBindApply(go, res, st, 'Install', run, () => chosen.size > 0);
     msel.onChange(reset);
-    const got = await mkFillTargets(tbox, chosen, reset, stale);
+    const got = await mkFillTargets(tbox, chosen, reset, stale, { label: 'Install to' });
     if (stale()) return;
     if (!got) { go.disabled = true; return; }
     targets = got;
