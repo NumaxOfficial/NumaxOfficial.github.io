@@ -113,3 +113,78 @@ because every reply is scoped to one person's login.
 A correct deployment answers **400** with `Missing or malformed Nuvio session
 token.` — that single reply proves the Worker is live, parsing JSON, and
 validating its input before it forwards anything.
+
+# The plugin-provider filter
+
+A third Worker, and the only one that carries an ongoing cost worth
+understanding before you deploy it. **Read this section before pasting the URL
+in.**
+
+## Why it has to exist
+
+Nuvio syncs a plugin repository as one row — `{url, name, enabled, …}` — with
+no per-provider field of any kind, and the per-provider switches live on the
+device and never reach the account. So "install only 6 of these 61 providers"
+cannot be written to Nuvio directly. The only thing that can carry a selection
+is the manifest itself, because the manifest is the only thing the stored row
+points at.
+
+This Worker serves a copy of a public repository's manifest with the providers
+you did not tick removed. Nuvio sees a repository that simply contains 6
+providers.
+
+## The cost, stated plainly
+
+A provider's `filename` in a manifest is **relative** (`providers/4khdhub.js`),
+so whoever serves the manifest must also serve the provider code sitting next
+to it. That means: **a device using a filtered repository downloads that
+repository's JavaScript through your Cloudflare account.** It is a
+pass-through — nothing is rewritten and nothing is stored — but it is your
+bandwidth and your account's name on the request.
+
+Two things keep that bounded, and both are deliberate:
+
+- Numax writes a filtered URL **only when the user picks a subset**. Tick every
+  provider and it writes the plain upstream URL, and this Worker is not in the
+  path at all.
+- The Worker only fetches from an allowlist of forges (`raw.githubusercontent.com`,
+  `codeberg.org`, `gitlab.com` and a few more). It is not a general proxy, and
+  a request for anything outside a repository's own directory is refused.
+
+## Deploy it (about two minutes, once)
+
+1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Start with Hello
+   World** → **Deploy**. Name it something like `numax-plugin-filter`.
+2. Press **Edit code**, select everything in the editor, paste in the whole of
+   [`plugins.js`](plugins.js), and **Deploy**.
+3. Copy the URL it gives you.
+4. Put that URL into `PLUGIN_FILTER_RELAY` near the top of
+   [`../market.js`](../market.js), then commit and push.
+
+Until step 4 is done, the provider tick-boxes **do not appear at all** —
+neither in the Setup Wizard nor in the Marketplace. Repositories install whole,
+exactly as they do today. A tick Numax cannot honour is worse than no tick, so
+the picker hides itself rather than offering one.
+
+## Check it is working
+
+    curl -i https://numax-plugin-filter.<your-subdomain>.workers.dev/
+
+A correct deployment answers **404** with `This Worker serves filtered Nuvio
+plugin manifests.` — that proves it is live and routing. For a real end-to-end
+check, tick two providers of a repository in Numax, add it to a test profile,
+open the stored URL in a browser, and confirm the manifest that comes back
+lists exactly those two.
+
+## The one thing only the Nuvio app can confirm
+
+Numax cannot verify how Nuvio resolves a provider's relative `filename` — that
+happens inside the app. Everything points one way (the filenames are relative,
+and both plausible resolutions land back on this Worker), but the proof is:
+add a filtered repository to a profile, open Nuvio, enable one of its providers
+under **Settings → Content & Discovery → Plugins**, and play something. If the
+provider returns results, the whole path works.
+
+**Note that adding a repository still does not switch its providers on.** The
+filter changes which providers Nuvio can see, not whether they run — that
+switch is on the device either way.

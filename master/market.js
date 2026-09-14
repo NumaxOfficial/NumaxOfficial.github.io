@@ -59,6 +59,67 @@
   // collections, five more than the September snapshot holds.
   const COLLECTIONS_RELAY = 'https://crimson-field-2118.nuviobaymax.workers.dev/';
 
+  // ---- the plugin-provider filter (relay/plugins.js) --------------------
+  // Nuvio stores ONE row per plugin repository — {url, name, enabled, ...} —
+  // and nothing in it can say "only these providers". The per-provider
+  // switches live on the device and never reach the account, so a tick in
+  // Numax has nothing to travel in. That is measured, not assumed: it is the
+  // shape of a real sync_export_account_backup row.
+  //
+  // The only thing that CAN carry a selection is the manifest itself, because
+  // the manifest is the one thing the repository row points at. So a filtered
+  // repository is a manifest URL that serves the same manifest with the
+  // unwanted `scrapers` removed — which is what relay/plugins.js does.
+  //
+  // A provider's `filename` is RELATIVE ("providers/4khdhub.js", checked live
+  // against every indexed repo), so whoever serves the manifest also has to
+  // serve the provider code next to it. That is the real cost of this feature
+  // and the reason it is opt-in per install rather than always on: the plain
+  // upstream URL is still what gets written whenever every provider is picked,
+  // so the relay is only ever in the path for someone who asked for a subset.
+  //
+  // Empty means "not deployed" and the whole picker hides itself — a tick that
+  // cannot be honoured is worse than no tick. Paste the Worker's URL here to
+  // switch it on everywhere at once.
+  const PLUGIN_FILTER_RELAY = '';
+
+  // base64url, because the payload rides in a PATH segment: it has to survive
+  // Nuvio storing it, and `+` and `/` do not.
+  function b64url(str) {
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    bytes.forEach(b => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  // The selection is self-contained: the Worker keeps no state, so it can be
+  // redeployed or moved without breaking a repository somebody already has on
+  // a profile. `/manifest.json` is the last segment on purpose — Nuvio resolves
+  // a provider's relative filename against it and lands back on the Worker.
+  function filteredManifestUrl(manifestUrl, ids) {
+    if (!PLUGIN_FILTER_RELAY) return null;
+    const u = normalizeManifestUrl(manifestUrl);
+    const list = (ids || []).map(String).filter(Boolean);
+    if (!list.length) return null;
+    const payload = b64url(JSON.stringify({ u, s: list }));
+    return PLUGIN_FILTER_RELAY.replace(/\/+$/, '') + '/f/' + payload + '/manifest.json';
+  }
+  // Reading one back, so an already-filtered repository can be recognised and
+  // re-edited rather than treated as somebody else's URL.
+  function readFilteredUrl(url) {
+    const s = String(url || '');
+    if (!PLUGIN_FILTER_RELAY || s.indexOf(PLUGIN_FILTER_RELAY.replace(/\/+$/, '') + '/f/') !== 0) return null;
+    const seg = s.split('/f/')[1];
+    const payload = seg ? seg.split('/')[0] : '';
+    if (!payload) return null;
+    try {
+      const bin = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+      const j = JSON.parse(new TextDecoder().decode(bytes));
+      return (j && j.u && Array.isArray(j.s)) ? { url: j.u, ids: j.s } : null;
+    } catch (e) { return null; }
+  }
+  const pluginFilterReady = () => !!PLUGIN_FILTER_RELAY;
+
   const COLLECTIONS = {
     // Not "blocked": install works from a manually-refreshed capture even with
     // no relay. Kept as an honest caveat string, not a hard gate.
@@ -689,5 +750,6 @@
     loadCollectionsLive, loadCollectionInstallLive,
     toInstalledCollection, installedCollectionId, isInstalledForm,
     resolveManifestUrl, probeManifest, pluginOwner,
+    filteredManifestUrl, readFilteredUrl, pluginFilterReady,
   };
 })();

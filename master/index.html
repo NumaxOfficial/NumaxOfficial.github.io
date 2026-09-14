@@ -793,13 +793,36 @@
     box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 18px 46px rgba(0,0,0,.42); }
   /* Step 1's front door has nothing to read from yet - no profile, no
      account - so the frosted block behind it is just an empty frame with
-     two cards in the corner. Drop the glass there only; the cards carry
-     their own shape, and the pane grows to center them in the space that
-     freed up. */
-  .wz-main:has(> .wz-pane[data-wzpane="account"].on){
+     two cards in the corner. Drop the glass on THAT screen only (app.js
+     marks it `.front`); both branches underneath keep it, because by then
+     there is a real account and a real list of profiles inside it. */
+  .wz-main:has(> .wz-pane[data-wzpane="account"].on.front){
     background:none; backdrop-filter:none; -webkit-backdrop-filter:none;
     border-color:transparent; box-shadow:none; }
-  .wz-pane[data-wzpane="account"]{ flex:1 1 auto; justify-content:center; }
+  .wz-pane[data-wzpane="account"]{ flex:1 1 auto; }
+  .wz-pane[data-wzpane="account"].front{ justify-content:center; }
+  /* A branch fills the block instead of floating in the middle of it: the
+     question and its controls start at the top, at a size that owns the
+     screen, and the way back to the other front door sits on the bottom
+     edge - it is the least important thing here and it was the first. */
+  /* Only a branch fills the pane. On the front door the body has to stay its
+     own height, or there is nothing left for justify-content to centre. */
+  .wz-pane[data-wzpane="account"]:not(.front) > #wz-account-body{ flex:1 1 auto; min-height:0; }
+  .wz-branch{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:0; }
+  .wz-branch > .wz-acc, .wz-branch > .wz-sec{ flex:0 0 auto; order:1; }
+  .wz-branch-bar{ order:2; margin-top:auto; padding-top:20px; margin-bottom:0;
+    border-top:1px solid rgba(255,255,255,.07); }
+  /* At size. The account select and the profile chips ARE the question on
+     this screen, and they were sitting at the top of a mostly empty block
+     reading like a footnote to the headline above them. Every rule here is
+     scoped to .wz-branch so it cannot reach the same controls elsewhere. */
+  .wz-branch .wz-acc-sel{ max-width:520px; }
+  .wz-branch .wz-acc-sel .nsel-btn, .wz-branch .wz-acc-sel select{ font-size:15.5px; padding:14px 16px; }
+  .wz-branch .wz-chips-big .pchip{ min-width:124px; padding:18px 20px; border-radius:19px; }
+  .wz-branch .wz-chips-big .pchip .pcn{ font-size:13.5px; }
+  .wz-branch .wz-chips-big .pchip.wz-add .plus{ width:52px; height:52px; font-size:23px; }
+  .wz-branch .field-col{ max-width:520px; }
+  .wz-branch .field-col input{ font-size:15px; padding:14px 16px; }
   .wz-main{ min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
     display:flex; flex-direction:column; gap:20px;
     padding:clamp(16px,1.6vw,24px);
@@ -854,9 +877,12 @@
   .wz-pnl-who .sub{ font-size:11px; color:var(--t45); margin-top:1px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wz-pnl-body{ min-width:0; }
+  /* The panel's section labels are the only thing telling you which part of
+     the profile you are looking at, and at 9.5px in --t35 they read as
+     disabled text. Accent-coloured and a size up, they do that job. */
   .wz-pnl-h{
-    font-family:ui-monospace,monospace; font-size:9.5px; letter-spacing:.15em;
-    text-transform:uppercase; color:var(--t35); margin:18px 0 8px;
+    font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent); margin:18px 0 8px;
     padding-bottom:7px; border-bottom:1px solid var(--line-2); }
   .wz-pnl-body > .wz-pnl-h:first-child{ margin-top:0; }
   .wz-pnl-row{ display:flex; align-items:center; gap:9px; padding:5px 0; min-width:0; }
@@ -1423,6 +1449,16 @@
   .mk-scr{ display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:10px; border:1px solid var(--line-2); background:rgba(255,255,255,.02); }
   .mk-scr + .mk-scr{ margin-top:6px; }
   .mk-scr.dup{ border-color:rgba(240,160,32,.28); background:rgba(240,160,32,.05); }
+  /* A provider row you can tick. It is a <label>, so the whole row is the
+     target — a 13px checkbox is not something to ask anyone to aim at. */
+  .mk-scr-pick{ cursor:pointer; }
+  .mk-scr-pick:hover{ border-color:rgba(255,255,255,.2); background:rgba(255,255,255,.045); }
+  .mk-scr-pick input[type=checkbox]{ flex:none; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; margin:0; }
+  .mk-scr-pick:has(input:checked){ border-color:rgba(229,57,53,.35); background:rgba(229,57,53,.06); }
+  .mk-scr-pick:has(input:disabled){ cursor:default; opacity:.5; }
+  /* All / None, above whichever list is being picked from. */
+  .wz-scr-bar{ display:flex; align-items:center; gap:8px; margin:12px 0 10px; flex-wrap:wrap; }
+  .wz-scr-bar .btn{ flex:none; }
   .mk-scr .mk-sn{ font-size:12.5px; font-weight:600; }
   .mk-scr .mk-sd{ font-size:11px; color:var(--t35); margin-top:1px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mk-cb{ width:16px; height:16px; border-radius:5px; border:1.5px solid rgba(255,255,255,.25); flex:none; display:grid; place-items:center; cursor:pointer; background:transparent; padding:0; }
@@ -1634,6 +1670,19 @@
   .wz-plug-scr::-webkit-scrollbar{ width:5px; }
   .wz-plug-scr::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
   .wz-plug-note{ margin-top:14px; }
+  /* The one recommended stream add-on, above the community's own ordering.
+     Its reason is a sentence rather than a stat line, so it wraps where every
+     other .wz-plug-m is a single ellipsised line. */
+  .wz-plug-top{ border-color:rgba(229,57,53,.4); background:rgba(229,57,53,.06); }
+  .wz-plug-top .wz-plug-m{ white-space:normal; overflow:visible; font-family:inherit;
+    font-size:12px; color:var(--t55); line-height:1.5; margin-top:4px; }
+  /* Group headings inside the stream-add-on list — the community's own
+     ranking is the signal, so its groups have to stay visible. */
+  .wz-grp-h{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap;
+    font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--accent); margin:18px 0 2px; }
+  .wz-grp-h:first-child{ margin-top:4px; }
+  .wz-grp-n{ font-size:11px; font-weight:400; letter-spacing:0; text-transform:none; color:var(--t35); }
   .mk-dlg-f .inline-status:empty, .mk-dlg-f .mk-res:empty{ display:none; }
 
   /* community collections grid */
@@ -2179,6 +2228,17 @@
             <div class="chead"><h3>Pick a route</h3><span class="spacer"></span>
               <span class="muted sm">Both routes need a source add-on &mdash; the difference is where your debrid key lives.</span></div>
             <div class="wz-routes" id="wz-routes"></div>
+          </div>
+
+          <!-- Any Stremio-protocol add-on that returns streams works alongside
+               whichever route is chosen above, and the community list is far
+               longer than three cards. Browse opens the marketplace's own
+               curated list in a dialog; the box underneath is where a link
+               from one of their configure pages comes back to. -->
+          <div class="wz-sec">
+            <div class="chead"><h3>Other stream add-ons</h3><span class="spacer"></span>
+              <span class="wz-tag plain">Optional</span></div>
+            <div id="wz-stream-addons"></div>
           </div>
         </div>
 

@@ -424,16 +424,55 @@
   //   - The per-provider switches are device-local. Nuvio's sync stores one
   //     row per REPOSITORY — { url, name, enabled, sort_order, repo_type } and
   //     nothing else — so there is no field for them to travel in.
+  //
+  // The step itself is now the sideload caveat and one button, on Furqan's
+  // instruction (2026-09-14): everything else that was on it was explanation
+  // nobody reads standing between somebody and the only control there. The
+  // strings below are still used \u2014 `ondevice` in both install dialogs, `pick`
+  // inside the provider picker \u2014 they are just no longer a wall on the step.
   const PLUGINS = {
-    lead: 'A plugin repository is one manifest file listing many providers. Nuvio downloads each enabled provider\u2019s code and runs it on the device, so nothing here needs a server, a key or a subscription.',
     caveat: '<b>Sideloaded builds only.</b> App-store copies of Nuvio have no plugins section, so a repository added here would never show up on them.',
-    ondevice: 'Adding a repository is all Numax can do, and it is all it claims to do. <b>Turning the individual providers on happens on the device</b>, under Settings \u2192 Content &amp; Discovery \u2192 Plugins \u2014 those switches are not part of what a Nuvio account syncs, so nothing on this page can reach them.',
-    trust: 'A plugin runs code on your device rather than returning data like an add-on does. Only add repositories from a source you trust.',
+    // True whether or not the provider filter is deployed: choosing which
+    // providers a repository CONTAINS is a different thing from switching them
+    // on, and only the first of those is something Numax can do.
+    ondevice: 'Adding a repository does not switch its providers on. <b>That happens on the device</b>, under Settings \u2192 Content &amp; Discovery \u2192 Plugins \u2014 those switches are not part of what a Nuvio account syncs, so nothing on this page can reach them.',
+    // Only ever shown when the filter Worker is deployed (market.js
+    // PLUGIN_FILTER_RELAY), because otherwise there is no picker to explain.
+    pick: 'Tick the providers you want and Numax gives Nuvio a copy of this repository containing only those. Leave them all ticked and it stores the repository\u2019s own address, untouched.',
     browse: 'Browse plugin repositories',
     dlgTitle: 'Plugin repositories',
     dlgSub: 'The community index, read live. Open one to see what is inside it before adding it.',
     empty: 'The community plugin index returned nothing.',
     added: 'Repository added to this profile.',
+  };
+
+  // ======================================================================
+  // Step 3 — every other stream add-on
+  // ======================================================================
+  // The three route cards are the three SHAPES a stream setup takes; they are
+  // not the list of add-ons, and the curated list in market.js is far longer.
+  // This is the way into that list from the step where it is relevant, and it
+  // sits alongside a route rather than replacing one — an HTTP add-on and a
+  // debrid route are a normal thing to have at the same time.
+  //
+  // `topName` is looked up in market.js's ADDON_GROUPS rather than carrying its
+  // own URL, so there is exactly one hand-checked address for it in the repo.
+  // PenguPlay is the pick because it is the only one on the list that needs
+  // nothing at all — no debrid service, no subscription, no configuring.
+  const STREAM_ADDONS = {
+    lead: 'Any add-on that returns streams works alongside the route above — most people end up with two or three.',
+    browse: 'Browse stream add-ons',
+    boxLabel: 'Stream add-on',
+    hint: 'Set one up on its own site, then paste the manifest link it gives you here.',
+    dlgTitle: 'Stream add-ons',
+    dlgSub: 'The community list, in the order the community ranks it. Open one, set it up there, and bring its link back.',
+    topName: 'PenguPlay',
+    topTag: 'Start here',
+    topWhy: 'HTTP streaming: no debrid service, no subscription and nothing to configure. The fastest way to have something that plays.',
+    // Its manifest answers without any configuration at all, which is why this
+    // one row can offer a direct Add and the rest cannot.
+    addHint: 'Adds it straight to this profile — it needs no setting up first.',
+    openHint: 'Opens its own site. Configure it there, then paste the link it gives you into the box on the step behind this.',
   };
 
   // ======================================================================
@@ -645,6 +684,7 @@
   window.NumaxWizard = {
     KEYS, DEBRID, NO_DEBRID, MODES, RELAY, TEMPLATE_URL, PRESET, SIMPLE,
     ROUTES, P2P_ADDONS, PLUGINS, AIO_GUIDE, METADATA, COLLECTIONS_STEP, ORDER_TIP,
+    STREAM_ADDONS,
     STEP_HEADS, ADDON_KINDS, PANEL_SECTIONS,
   };
 })();

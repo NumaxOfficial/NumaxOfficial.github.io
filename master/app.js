@@ -2142,6 +2142,8 @@
   // optional in exactly the way market.js is), hence the fallback.
   const WZ_PLUGIN_ONDEVICE = (window.NumaxWizard && window.NumaxWizard.PLUGINS && window.NumaxWizard.PLUGINS.ondevice)
     || 'Adding a repository is all Numax can do. Turning the individual providers on happens on the device, under Settings → Content &amp; Discovery → Plugins — those switches are not part of what a Nuvio account syncs.';
+  const WZ_PLUGIN_PICK = (window.NumaxWizard && window.NumaxWizard.PLUGINS && window.NumaxWizard.PLUGINS.pick)
+    || 'Tick the providers you want and Numax gives Nuvio a copy of this repository containing only those.';
   let mkProviders = null;      // cached index rows
   const mkManifest = {};       // manifestUrl -> {ok,value} | {ok:false,error}
 
@@ -2759,13 +2761,20 @@
   // rows — so "install this" meant scrolling to the end of the page to find the
   // profile list. Nothing about the write changes; only where the controls are.
   async function openInstallPlugin(anchor, p, manifestName) {
-    const label = manifestName || p.name;
-    const pop = openMkPop(anchor, 'Install ' + label, 'Nuvio stores the whole repository; which providers inside it run is chosen on the device.');
+    // One decision, made once, by the same function the wizard uses: the
+    // repository's own address, or a filtered copy of it when the detail card's
+    // picker left some providers out.
+    const c = wzPlugChoice(p);
+    const some = c.picked < c.total;
+    const label = some ? (manifestName || p.name) + ' (' + c.picked + ' of ' + c.total + ')' : (manifestName || p.name);
+    const pop = openMkPop(anchor, 'Install ' + label, some
+      ? 'A copy of this repository containing only the providers you picked.'
+      : 'Nuvio stores the whole repository; which providers inside it run is chosen on the device.');
     const mine = pop;
     const stale = () => mkPop !== mine;
 
     const u = el('div', 'mk-chk ok');
-    u.appendChild(el('div', 'mk-chk-l', 'Saving: ' + p.manifestUrl));
+    u.appendChild(el('div', 'mk-chk-l', 'Saving: ' + c.url));
     pop.body.appendChild(u);
     const dn = el('div', 'mk-note');
     dn.innerHTML = MK_INFO_SVG + '<div>' + WZ_PLUGIN_ONDEVICE + '</div>';
@@ -2786,7 +2795,7 @@
     const chosen = new Set();
     const run = () => mkWrite({
       kind: 'plugins',
-      master: [{ url: p.manifestUrl, name: label, enabled: true }],
+      master: [{ url: c.url, name: label, enabled: true }],
       targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
       mode: msel.value(), st, res, btn: go, label,
     });
@@ -2978,6 +2987,9 @@
       // Reachability is a fact worth showing: the community index currently
       // lists several dead manifests as though they were healthy.
       MK.loadManifest(p.manifestUrl).then(m => {
+        // Kept on the row so the detail card's picker and this row's Install
+        // button are talking about the same manifest.
+        p._m = m;
         meta.textContent = m.scrapers.length + ' scraper' + (m.scrapers.length === 1 ? '' : 's') + (m.version ? ' · v' + m.version : '');
       }).catch(e => {
         // Unreachable from Numax's own browser tab is still worth flagging —
@@ -3063,17 +3075,63 @@
     inst.appendChild(el('p', 'muted sm', 'Pick the profiles, and merge or overwrite, in the next step.'));
     body.appendChild(inst);
 
-    // ---- scrapers, collapsed: context, not the main event ----
+    // ---- the providers inside it ----
+    // A picker when relay/plugins.js is deployed, the read-only list it has
+    // always been when it is not. Same rule as the wizard's dialog, and the
+    // same single source of truth for what would be written (wzPlugChoice), so
+    // the two surfaces cannot drift apart.
     if (m) {
-      const d = mkDisclosure('What you get',
-        m.scrapers.length + ' scraper' + (m.scrapers.length === 1 ? '' : 's') + ' — Nuvio installs the whole repo');
+      p._m = m;
+      const pickable = wzPickReady();
+      const total = m.scrapers.length;
+      const d = mkDisclosure(pickable ? 'Choose providers' : 'What you get',
+        total + ' provider' + (total === 1 ? '' : 's') + (pickable ? '' : ' — Nuvio installs the whole repo'));
       const note = el('div', 'mk-note');
-      note.innerHTML = MK_INFO_SVG
-        + '<div>Nuvio stores a plugin as the whole repository, so all ' + m.scrapers.length + ' of these come with it. <b>Which of them actually run is chosen on the device</b> — Settings → Content &amp; Discovery → Plugins. Those switches are not part of what a Nuvio account syncs, so nothing here can set them.</div>';
+      note.innerHTML = MK_INFO_SVG + '<div>'
+        + (pickable ? WZ_PLUGIN_PICK : 'Nuvio stores a plugin as the whole repository, so all ' + total + ' of these come with it.')
+        + ' ' + WZ_PLUGIN_ONDEVICE + '</div>';
       d.body.appendChild(note);
+
+      let count = null;
+      const say = () => {
+        if (!count) return;
+        const n = p._sel ? p._sel.size : total;
+        count.textContent = n + ' of ' + total + ' picked';
+        go.disabled = n === 0;
+        go.textContent = n < total ? 'Install ' + n + ' of ' + total + '…' : 'Install to profiles…';
+      };
+      if (pickable) {
+        const bar = el('div', 'wz-scr-bar');
+        count = el('span', 'pill-count');
+        const allB = el('button', 'btn btn-ghost btn-xs', 'All');
+        const noneB = el('button', 'btn btn-ghost btn-xs', 'None');
+        bar.appendChild(count); bar.appendChild(el('span', 'wz-pick-sp'));
+        bar.appendChild(allB); bar.appendChild(noneB);
+        d.body.appendChild(bar);
+        const setAll = v => {
+          p._sel = new Set(v ? m.scrapers.map(wzScrId).filter(Boolean) : []);
+          d.body.querySelectorAll('.mk-scr-pick input[type=checkbox]').forEach(cb => { cb.checked = v; });
+          say();
+        };
+        allB.onclick = () => setAll(true);
+        noneB.onclick = () => setAll(false);
+      }
+
       const srcW = el('div', 'mk-scroll');
       m.scrapers.slice(0, 200).forEach(sc => {
-        const r = el('div', 'mk-scr');
+        const id = wzScrId(sc);
+        const r = el(pickable ? 'label' : 'div', 'mk-scr' + (pickable ? ' mk-scr-pick' : ''));
+        if (pickable) {
+          const cb = el('input'); cb.type = 'checkbox';
+          cb.checked = !p._sel || p._sel.has(id);
+          cb.disabled = !id;
+          cb.onchange = () => {
+            if (!p._sel) p._sel = new Set(m.scrapers.map(wzScrId).filter(Boolean));
+            if (cb.checked) p._sel.add(id); else p._sel.delete(id);
+            say();
+          };
+          r.appendChild(cb);
+        }
         r.appendChild(mkLogo(sc.name || sc.id, sc.logo, 'mk-ic-s'));
         const t = el('div'); t.style.minWidth = '0';
         t.appendChild(el('div', 'mk-sn', sc.name || sc.id || 'scraper'));
@@ -3084,7 +3142,9 @@
         srcW.appendChild(r);
       });
       d.body.appendChild(srcW);
+      if (total > 200) d.body.appendChild(el('p', 'muted sm', 'Showing the first 200 of ' + total + ' — All and None still cover every one.'));
       body.appendChild(d.node);
+      say();
     }
 
   }
@@ -3726,7 +3786,7 @@
     wzVerified.clear();
     ['keys', 'streams', 'meta'].forEach(k => { wzPending[k].length = 0; });
     ['wz-entry', 'wz-keys', 'wz-meta', 'wz-collections', 'wz-modes', 'wz-routes', 'wz-instances',
-     'wz-native-debrid', 'wz-p2p', 'wz-plugins', 'wz-aio-install', 'wz-p2p-install',
+     'wz-native-debrid', 'wz-p2p', 'wz-plugins', 'wz-stream-addons', 'wz-aio-install', 'wz-p2p-install',
      'wz-sim-install', 'wz-sim-result', 'wz-native-res', 'wz-keys-res', 'wz-summary']
       .forEach(id => { const n = $(id); if (n) { n.dataset.built = ''; clr(n); } });
     // The TorBox box keeps its own built flag (its tick is wired to it, not to
@@ -3828,6 +3888,13 @@
     else if (wz.entry == null && wz.idx != null) wz.entry = 'have';
     const on = wz.entry === 'have' || wz.entry === 'new' ? wz.entry : null;
     box.style.display = on ? 'none' : '';
+    // The two front doors are the only screen in the wizard with no frosted
+    // block behind them: there is nothing to read from the profile yet, so the
+    // block would be an empty frame with two cards in one corner of it. Every
+    // other screen — both branches of this step included — keeps it. CSS reads
+    // this class; it cannot tell from the inline display flip above.
+    const pane = document.querySelector('.wz-pane[data-wzpane="account"]');
+    if (pane) pane.classList.toggle('front', !on);
     if ($('wz-have')) $('wz-have').style.display = on === 'have' ? '' : 'none';
     if ($('wz-new')) $('wz-new').style.display = on === 'new' ? '' : 'none';
     // The only control on step 1 that used to go backwards. It is a sideways
@@ -4144,7 +4211,32 @@
       const b = el('button', 'btn btn-ghost btn-xs', 'Exit and undo');
       b.onclick = wzExitAndUndo;
       id.appendChild(b);
+      return;
     }
+    // Nothing has been written yet, so there is nothing to undo — and until
+    // this run writes something there was no way out of it at all, on any step
+    // after the first. This is that way out, and it is deliberately a different
+    // control from the one above: it ends the run, it does not reverse one.
+    const x = el('button', 'btn btn-ghost btn-xs', 'Exit setup');
+    x.title = 'Nothing has been written to this profile yet';
+    x.onclick = wzExitClean;
+    id.appendChild(x);
+  }
+
+  // Leaving before the first write. wzExitAndUndo already handles the unlocked
+  // case by resetting, but silently throwing away a key someone has just typed
+  // is the kind of thing that only feels fine to the person who wrote it — so
+  // an unsaved step asks first.
+  async function wzExitClean() {
+    if (wz.locked) return wzExitAndUndo();
+    if (wzStepDirty(wz.step) && !(await uiModal({
+      title: 'Leave the setup?',
+      message: 'Nothing has been written to this profile, so there is nothing to undo.',
+      details: ['What is filled in on this step has not been saved and will be cleared.'],
+      okLabel: 'Leave setup',
+    }))) return;
+    wzResetRun();
+    logAct('Wizard: exited before anything was written', 'info');
   }
 
   // What Next would write if it were pressed right now, which is both its label
@@ -4175,7 +4267,7 @@
     if (!wzTarget()) return false;
     if (step === 'keys') {
       const i = $('wz-key-tmdb');
-      return wzSavedKeys.has('tmdb') || !!(i && i.value.trim());
+      return wzSavedKeys.has('tmdb') || !!(i && i.value.trim()) || wzHasCred('tmdb');
     }
     if (step === 'streams') return wz.mode === 'advanced' ? !!wz.route : !!wz.mode;
     return true;                       // account (a target exists) and metadata (all optional)
@@ -4186,6 +4278,16 @@
     keys: 'TMDB is required — paste its key to carry on.',
     streams: 'Pick how you want your streams set up.',
   };
+  // ---- what this profile ALREADY has -------------------------------------
+  // Read once by the live panel, which pulls the profile's credentials anyway,
+  // and kept here so a required key that is already on the profile does not
+  // have to be typed in again to get past the step. Keyed by target, so it can
+  // never answer for the profile before last. Empty until that read lands —
+  // which is the safe direction: the step stays blocked until something
+  // positively says the key is there.
+  let wzCreds = { key: '', set: new Set() };
+  const wzCredKey = () => { const t = wzTarget(); return t ? t.aid + ':' + t.idx : ''; };
+  const wzHasCred = p => wzCreds.key === wzCredKey() && wzCreds.set.has(p);
   function wzPaintNext() {
     const b = $('wz-next'); if (!b) return;
     const i = WZ_STEPS.indexOf(wz.step), ready = !!wzTarget(), last = i === WZ_STEPS.length - 1;
@@ -4316,6 +4418,22 @@
         creds = await A.client(store, t.aid).pullProviderCredentials(t.idx);
       } catch (e) { credErr = e.message; }
       if (gen !== wzPanelGen) return;
+
+      // The same read answers "is TMDB already on this profile?", so the keys
+      // step can stop demanding a key the profile already has. Only a value
+      // that is actually a non-empty string counts — an empty credential row
+      // is a real thing on this account (undo leaves them behind, and Nuvio
+      // has no way to delete one), and it is not a key.
+      if (!credErr) {
+        const set = new Set();
+        (creds || []).forEach(c => {
+          if (c && c.provider && c.credential_json &&
+              Object.values(c.credential_json).some(v => typeof v === 'string' && v.trim())) set.add(c.provider);
+        });
+        wzCreds = { key: t.aid + ':' + t.idx, set };
+        wzPaintNext();
+        wzMarkKeysPresent();
+      }
 
       // Classify with the table first so the panel paints immediately, then
       // upgrade each row once its manifest answers. A slow or dead add-on host
@@ -4569,6 +4687,34 @@
       box.appendChild(w);
     });
     box.dataset.built = '1';
+    wzMarkKeysPresent();
+  }
+
+  // A key the profile already carries is said so on its own row, and the
+  // required tag comes off TMDB when it is one of them: "Required" next to a
+  // box you do not have to fill in is the wizard asking for something it can
+  // already see. Numax never reads a stored key's value — only whether the
+  // provider has one — so the box stays empty and typing in it still replaces
+  // what is there.
+  function wzMarkKeysPresent() {
+    if (!WZ) return;
+    (WZ.KEYS || []).forEach(k => {
+      const w = document.querySelector('[data-wzkey="' + k.id + '"]');
+      if (!w) return;
+      const on = wzHasCred(k.provider);
+      let tag = w.querySelector('.wz-key-have');
+      if (on && !tag) {
+        tag = wzTag('Already on this profile', 'plain');
+        tag.classList.add('wz-key-have');
+        const sp = w.querySelector('.wz-key-h .wz-pick-sp');
+        if (sp) w.querySelector('.wz-key-h').insertBefore(tag, sp);
+      } else if (!on && tag) tag.remove();
+      const req = w.querySelector('.wz-tag.req');
+      if (req) req.style.display = on ? 'none' : '';
+      const inp = $('wz-key-' + k.id);
+      if (inp && on) inp.placeholder = 'Paste a new ' + k.name + ' key to replace it';
+      else if (inp) inp.placeholder = k.placeholder;
+    });
   }
 
   // ---- is this key real? --------------------------------------------------
@@ -4918,10 +5064,143 @@
     $('wz-route-aiostreams').style.display = adv && wz.route === 'aiostreams' ? '' : 'none';
     $('wz-route-native').style.display = adv && wz.route === 'native' ? '' : 'none';
     $('wz-route-plugins').style.display = adv && wz.route === 'plugins' ? '' : 'none';
+    if (adv) wzRenderStreamAddons();
     if (wz.mode === 'simple') wzRenderSimple();
     if (adv && wz.route === 'aiostreams') wzRenderAio();
     if (adv && wz.route === 'native') wzRenderNative();
     if (adv && wz.route === 'plugins') wzRenderPlugins();
+  }
+
+  // ---- step 3: every other stream add-on ----------------------------------
+  // Sits under the three route cards and alongside whichever one is chosen.
+  // Browse opens the Marketplace's curated list; the box underneath is the
+  // same wzInstallBox the metadata step uses, so a link brought back from an
+  // add-on's own configure page is written by Next through the one write path.
+  function wzRenderStreamAddons() {
+    const box = $('wz-stream-addons'); if (!box || box.dataset.built === '1') return;
+    const S = WZ.STREAM_ADDONS;
+    clr(box);
+    box.appendChild(el('p', 'muted sm wz-sec-lead', S.lead));
+    const run = el('div', 'wz-run');
+    const b = el('button', 'btn btn-primary', S.browse);
+    b.onclick = wzStreamAddonDialog;
+    run.appendChild(b);
+    box.appendChild(run);
+    const slot = el('div'); slot.style.marginTop = '18px'; box.appendChild(slot);
+    wzInstallBox(slot, { step: 'streams', label: S.boxLabel, hint: S.hint });
+    box.dataset.built = '1';
+  }
+
+  // The curated list market.js already hand-maintains, minus its Subtitles
+  // group — this is the streams step, and a subtitle add-on is not a stream
+  // source. One row is pinned above the rest: PenguPlay needs no debrid
+  // service and no configuring, so it is the only one that can be added from
+  // here directly. Every other row opens its own site, because a stream
+  // add-on's manifest URL is the thing its configure page hands you.
+  async function wzStreamAddonDialog() {
+    const t = wzTarget(); if (!t || !MK) return;
+    const S = WZ.STREAM_ADDONS;
+    const pop = openMkPop(null, S.dlgTitle, 'Adding goes straight to ' + wzProfileName() + '. ' + S.dlgSub);
+    pop.root.classList.add('mk-dlg-wide');
+    const mine = pop;
+    const stale = () => mkPop !== mine;
+
+    const st = el('div', 'inline-status'); pop.foot.appendChild(st);
+    const res = el('div', 'mk-res'); pop.foot.appendChild(res);
+
+    const groups = (MK.ADDON_GROUPS || []).filter(g => !/subtitle/i.test(g.title));
+    const top = groups.reduce((f, g) => f || (g.items || []).find(i => i.name === S.topName), null);
+
+    const bar = el('div', 'wz-plug-bar');
+    const inp = el('input', 'wz-plug-search modal-input'); inp.type = 'search'; inp.autocomplete = 'off';
+    inp.placeholder = 'Search stream add-ons…';
+    const cnt = el('span', 'pill-count');
+    bar.appendChild(inp); bar.appendChild(cnt);
+    pop.body.appendChild(bar);
+    const list = el('div', 'wz-plug-list'); pop.body.appendChild(list);
+
+    const row = (it, group, isTop) => {
+      const r = el('div', 'wz-plug' + (isTop ? ' wz-plug-top' : ''));
+      const h = el('div', 'wz-plug-h');
+      h.appendChild(mkLogo(it.name, ''));
+      const tx = el('div', 'wz-plug-tx');
+      const nm = el('div', 'wz-plug-n');
+      nm.appendChild(el('span', '', it.name));
+      if (isTop) nm.appendChild(wzTag(S.topTag));
+      tx.appendChild(nm);
+      tx.appendChild(el('div', 'wz-plug-m', isTop ? S.topWhy : (group.note || group.title)));
+      h.appendChild(tx);
+      const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
+      open.title = S.openHint;
+      open.onclick = () => wzOpen(it.url);
+      h.appendChild(open);
+      if (isTop) {
+        const add = el('button', 'btn btn-primary btn-xs', 'Add');
+        add.title = S.addHint;
+        add.onclick = () => wzAddCuratedAddon(it, { btn: add, st, res });
+        h.appendChild(add);
+      }
+      r.appendChild(h);
+      return r;
+    };
+
+    let timer = null;
+    const draw = () => {
+      const q = inp.value.trim().toLowerCase();
+      clr(list);
+      let n = 0, all = 0;
+      if (top) {
+        all++;
+        if (!q || top.name.toLowerCase().includes(q)) { list.appendChild(row(top, {}, true)); n++; }
+      }
+      groups.forEach(g => {
+        const items = (g.items || []).filter(i => i !== top && (!q ||
+          (i.name + ' ' + g.title + ' ' + (g.note || '')).toLowerCase().includes(q)));
+        all += (g.items || []).filter(i => i !== top).length;
+        if (!items.length) return;
+        const head = el('div', 'wz-grp-h');
+        head.appendChild(el('span', '', g.title));
+        if (g.note) head.appendChild(el('span', 'wz-grp-n', g.note));
+        list.appendChild(head);
+        items.forEach(i => { list.appendChild(row(i, g, false)); n++; });
+      });
+      cnt.textContent = q ? n + ' of ' + all : all + ' add-ons';
+      if (!n) list.appendChild(el('p', 'mk-find-none', 'No add-on matches “' + q + '”.'));
+    };
+    inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { draw(); pop.body.scrollTop = 0; }, 110); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Escape') { inp.value = ''; draw(); pop.body.scrollTop = 0; } });
+    if (stale()) return;
+    draw();
+    pop.body.scrollTop = 0;
+    setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 60);
+  }
+
+  // The pinned row's own Add. The curated list stores configure pages, not
+  // manifests, so the address is resolved the same way the Marketplace's Add
+  // box resolves a pasted one (market.js probeManifest) rather than assumed —
+  // writing a /configure URL is exactly the "it said it added but nothing
+  // happened" bug that resolution exists to stop.
+  async function wzAddCuratedAddon(it, o) {
+    const t = wzTarget(); if (!t) return;
+    o.btn.disabled = true;
+    status(o.st, 'Finding ' + it.name + '’s manifest…');
+    let url = '';
+    try {
+      const r = await MK.probeManifest(it.url);
+      if (r.ok) url = r.url;
+      else if (r.reason === 'blocked') url = (MK.resolveManifestUrl(it.url) || [])[0] || '';
+    } catch (e) { /* handled by the empty url below */ }
+    o.btn.disabled = false;
+    if (!url) {
+      status(o.st, "Couldn't find a manifest at " + it.name + "’s address. Open its site, set it up there, and paste the link it gives you into the box on the step behind this.", 'err');
+      return;
+    }
+    status(o.st, '');
+    const urlIn = { value: url }, nmIn = { value: it.name };
+    await wzAddAddon({
+      url: urlIn, nm: nmIn, btn: o.btn, st: o.st, res: o.res, label: it.name,
+      top: () => false, rearm: () => {}, auto: true, onSaved: () => {},
+    });
   }
 
   // ======================================================================
@@ -5447,12 +5726,10 @@
     const box = $('wz-plugins'); if (!box || box.dataset.built === '1') return;
     const P = WZ.PLUGINS;
     clr(box);
-    box.appendChild(el('p', 'muted sm wz-sec-lead', P.lead));
+    // One caveat and one button. The three paragraphs that used to stand
+    // between them said nothing somebody pressing "Browse" could act on, and
+    // the dialog they open says the part that matters at the point it matters.
     const warn = el('div', 'wz-catch'); warn.innerHTML = P.caveat; box.appendChild(warn);
-    const note = el('div', 'mk-note wz-plug-note');
-    note.innerHTML = MK_INFO_SVG + '<div>' + P.ondevice + '</div>';
-    box.appendChild(note);
-    box.appendChild(el('p', 'muted sm', P.trust));
     const run = el('div', 'wz-run');
     const b = el('button', 'btn btn-primary', P.browse);
     b.onclick = wzPluginDialog;
@@ -5533,12 +5810,49 @@
     setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 60);
   }
 
-  // One repository. The provider list underneath is CONTEXT, never a picker:
-  // Nuvio's sync stores one row per repository and the per-provider switches
-  // are device-local, so a tick here would be a control Numax could not honour.
-  // Open state is kept on the row object so a redraw does not close it.
+  // ---- which providers, and how that is possible at all -------------------
+  // Nuvio's sync stores ONE row per repository with no per-provider field, and
+  // the per-provider switches never leave the device. So a tick here cannot be
+  // written to Nuvio — what it does instead is change WHICH REPOSITORY gets
+  // written: relay/plugins.js serves the same manifest with the unticked
+  // providers removed, and Nuvio sees a repository that contains only those.
+  //
+  // Picking everything writes the repository's own address, untouched, so the
+  // Worker is only ever in the path for somebody who asked for a subset. With
+  // no Worker deployed (market.js PLUGIN_FILTER_RELAY empty) there is no
+  // picker at all — the list goes back to being read-only context, because a
+  // tick that cannot be honoured is worse than no tick.
+  const wzPickReady = () => !!(MK && MK.pluginFilterReady && MK.pluginFilterReady());
+  const wzScrId = sc => String((sc && (sc.id || sc.filename || sc.name)) || '');
+  // A filtered repository is stored under the Worker's address, not the
+  // forge's, so "is this one already on the profile?" has to look through it —
+  // otherwise a repository somebody added six providers of reads as missing.
+  function wzHasRepo(have, manifestUrl) {
+    const want = String(manifestUrl);
+    for (const u of have) {
+      if (String(u) === want) return true;
+      const f = MK && MK.readFilteredUrl && MK.readFilteredUrl(u);
+      if (f && f.url === want) return true;
+    }
+    return false;
+  }
+  // What this row would write right now: the plain URL, or a filtered one.
+  function wzPlugChoice(p) {
+    const m = p._m;
+    const all = m ? m.scrapers.map(wzScrId).filter(Boolean) : [];
+    const sel = p._sel;
+    const subset = wzPickReady() && !!m && !!sel && sel.size > 0 && sel.size < all.length;
+    const url = subset ? MK.filteredManifestUrl(p.manifestUrl, [...sel]) : null;
+    if (subset && url) {
+      return { url, name: p.name + ' (' + sel.size + ' of ' + all.length + ')', picked: sel.size, total: all.length };
+    }
+    return { url: p.manifestUrl, name: p.name, picked: all.length, total: all.length };
+  }
+
+  // One repository. Open state and the selection are kept on the row object so
+  // a redraw closes neither.
   function wzPlugRow(p, have, st, res, redraw) {
-    const on = have.has(String(p.manifestUrl));
+    const on = wzHasRepo(have, p.manifestUrl);
     const row = el('div', 'wz-plug' + (on ? ' on' : ''));
     const head = el('div', 'wz-plug-h');
     const ic = mkLogo(p.name, p.logo);
@@ -5555,13 +5869,21 @@
     head.appendChild(tx);
     const lang = String(p.lang || '').replace(/ language$/i, '');
     if (lang && lang !== 'Unknown') head.appendChild(el('span', 'mk-lang', lang));
-    const see = el('button', 'btn btn-ghost btn-xs', p._open ? 'Hide providers' : 'Providers');
+    const pickable = wzPickReady();
+    const see = el('button', 'btn btn-ghost btn-xs', p._open ? 'Hide providers' : (pickable ? 'Choose providers' : 'Providers'));
     const add = el('button', 'btn btn-primary btn-xs', on ? 'Add again' : 'Add');
     head.appendChild(see); head.appendChild(add);
     row.appendChild(head);
 
     const body = el('div', 'wz-plug-b'); body.style.display = p._open ? '' : 'none';
     row.appendChild(body);
+
+    // The Add button says what it is about to write, so a subset can never be
+    // added by somebody who thought they were adding the whole repository.
+    const paintAdd = () => {
+      const c = wzPlugChoice(p);
+      add.textContent = c.picked < c.total ? 'Add ' + c.picked + ' of ' + c.total : (on ? 'Add again' : 'Add');
+    };
 
     const fill = () => {
       clr(body);
@@ -5573,9 +5895,50 @@
       const m = p._m;
       if (!m) { body.appendChild(el('p', 'muted sm shimmer', 'Reading the manifest…')); return; }
       if (!m.scrapers.length) { body.appendChild(el('p', 'empty sm', 'This repository lists no providers.')); return; }
+
+      let count = null;
+      if (pickable) {
+        const note = el('div', 'mk-note'); note.innerHTML = MK_INFO_SVG + '<div>' + WZ.PLUGINS.pick + '</div>';
+        body.appendChild(note);
+        const bar = el('div', 'wz-scr-bar');
+        count = el('span', 'pill-count');
+        const allB = el('button', 'btn btn-ghost btn-xs', 'All');
+        const noneB = el('button', 'btn btn-ghost btn-xs', 'None');
+        bar.appendChild(count); bar.appendChild(el('span', 'wz-pick-sp'));
+        bar.appendChild(allB); bar.appendChild(noneB);
+        body.appendChild(bar);
+        const setAll = v => {
+          p._sel = new Set(v ? m.scrapers.map(wzScrId).filter(Boolean) : []);
+          fill(); paintAdd();
+        };
+        allB.onclick = () => setAll(true);
+        noneB.onclick = () => setAll(false);
+      }
+      const total = m.scrapers.length;
+      const say = () => {
+        if (!count) return;
+        const n = p._sel ? p._sel.size : total;
+        count.textContent = n + ' of ' + total + ' picked';
+        // Zero picked is not a repository. The Add button refuses rather than
+        // writing something that would install nothing.
+        add.disabled = n === 0;
+      };
+
       const w = el('div', 'wz-plug-scr');
       m.scrapers.slice(0, 200).forEach(sc => {
-        const r = el('div', 'mk-scr');
+        const id = wzScrId(sc);
+        const r = el(pickable ? 'label' : 'div', 'mk-scr' + (pickable ? ' mk-scr-pick' : ''));
+        if (pickable) {
+          const cb = el('input'); cb.type = 'checkbox';
+          cb.checked = !p._sel || p._sel.has(id);
+          cb.disabled = !id;
+          cb.onchange = () => {
+            if (!p._sel) p._sel = new Set(m.scrapers.map(wzScrId).filter(Boolean));
+            if (cb.checked) p._sel.add(id); else p._sel.delete(id);
+            say(); paintAdd();
+          };
+          r.appendChild(cb);
+        }
         r.appendChild(mkLogo(sc.name || sc.id, sc.logo, 'mk-ic-s'));
         const c = el('div'); c.style.minWidth = '0';
         c.appendChild(el('div', 'mk-sn', sc.name || sc.id || 'provider'));
@@ -5586,16 +5949,22 @@
         w.appendChild(r);
       });
       body.appendChild(w);
-      if (m.scrapers.length > 200) body.appendChild(el('p', 'muted sm', 'Showing the first 200 of ' + m.scrapers.length + '.'));
+      // Only the first 200 are drawn, so "All" and "None" have to act on the
+      // whole list rather than on what happens to be on screen — they do
+      // (they rebuild from m.scrapers), and a repository long enough to hit
+      // this is told that the rest are included as they are.
+      if (total > 200) body.appendChild(el('p', 'muted sm', 'Showing the first 200 of ' + total + ' — All and None still cover every one.'));
+      say();
     };
 
     see.onclick = () => {
       p._open = !p._open;
-      see.textContent = p._open ? 'Hide providers' : 'Providers';
+      see.textContent = p._open ? 'Hide providers' : (pickable ? 'Choose providers' : 'Providers');
       body.style.display = p._open ? '' : 'none';
       if (p._open) fill();
     };
     if (p._open) fill();
+    paintAdd();
 
     // Reachability and the provider names the search box needs, in one read.
     // market.js caches it, so a redraw is free.
@@ -5606,6 +5975,7 @@
         p._meta = m.scrapers.length + ' provider' + (m.scrapers.length === 1 ? '' : 's') + (m.version ? ' · v' + m.version : '');
         meta.textContent = p._meta;
         if (p._open) fill();
+        paintAdd();
       }).catch(e => {
         p._err = e.message;
         p._meta = 'could not preview from here';
@@ -5617,7 +5987,7 @@
 
     add.onclick = async () => {
       const r = await wzAddPlugin(p, { btn: add, st, res });
-      if (r && r.ok && r.written) have.add(String(p.manifestUrl));
+      if (r && r.ok && r.written) have.add(String(wzPlugChoice(p).url));
       // mkWrite leaves the button it drove in its finished state, so the row is
       // rebuilt rather than un-picked by hand. The status and the report are in
       // the dialog footer, so they survive it.
@@ -5633,7 +6003,12 @@
   // MERGE, so mkWrite's removal gate is never reached.
   async function wzAddPlugin(p, o) {
     const t = wzTarget(); if (!t) return { written: false, ok: false };
-    const name = String(p.name || 'Plugin repository').trim();
+    // What actually gets stored: the repository's own address, or a filtered
+    // copy of it when a subset was picked. Decided here, once, so the button
+    // label and the write can never disagree.
+    const c = wzPlugChoice(p);
+    const name = String(c.name || 'Plugin repository').trim();
+    const some = c.picked < c.total;
     try { await wzSnapPlugins(t); }
     catch (e) {
       status(o.st, "Couldn't read this profile's plugins first, and without that this could not be undone — nothing was written: " + e.message, 'err');
@@ -5641,13 +6016,15 @@
     }
     return (await mkWrite({
       kind: 'plugins',
-      master: [{ url: p.manifestUrl, name, enabled: true }],
+      master: [{ url: c.url, name, enabled: true }],
       targets: [{ aid: t.aid, idx: t.idx, name: t.name }],
       mode: 'merge', st: o.st, res: o.res, btn: o.btn, label: name, aid: t.aid, auto: true,
       onDone: ok => {
         if (!ok) return;
         wzLock();
-        wzLog('Added the ' + name + ' plugin repository — its providers still have to be switched on in the Nuvio app.');
+        wzLog('Added the ' + name + ' plugin repository'
+          + (some ? ' — ' + c.picked + ' of its ' + c.total + ' providers' : '')
+          + '. They still have to be switched on in the Nuvio app.');
       },
     })) || { written: false, ok: true };
   }
@@ -6099,7 +6476,7 @@
     if (step === 'keys') {
       const inp = $('wz-key-tmdb');
       const tmdb = (inp && inp.value || '').trim();
-      if (!tmdb && !wzSavedKeys.has('tmdb')) {
+      if (!tmdb && !wzSavedKeys.has('tmdb') && !wzHasCred('tmdb')) {
         status($('wz-keys-status'), 'TMDB is required \u2014 paste its key before moving on.', 'err');
         if (inp) { inp.classList.add('wz-need'); inp.focus(); }
         return false;
