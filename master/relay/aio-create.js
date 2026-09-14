@@ -36,6 +36,21 @@
  * silently finds nothing - exactly the kind of silent failure Numax does not
  * ship. So the key is checked against TorBox before anything is created.
  *
+ * IT ALSO ANSWERS A BARE "IS THIS TORBOX KEY REAL?" (added 2026-09-13)
+ * -------------------------------------------------------------------
+ * POST {op:'verify', provider:'torbox', key:'...'} -> {ok:true|false}
+ *
+ * The wizard's Nuvio+TorBox path writes a TorBox key straight into Nuvio, with
+ * no AIOStreams anywhere, and wants the same live tick the TMDB/MDBList boxes
+ * have. It cannot do that itself: api.torbox.app runs an origin ALLOWLIST that
+ * contains only https://torbox.app, so every other origin gets 400 "Disallowed
+ * CORS origin" on the preflight (measured 2026-09-13). Premiumize, by contrast,
+ * answers any origin, so the page checks that one directly and never comes here.
+ *
+ * This op reuses torboxKeyOk() unchanged and writes nothing anywhere. A relay
+ * deployed before this op existed answers 400 "No instance was given.", which
+ * the page reads as "couldn't check" - it never turns into a cross.
+ *
  * DEPLOYING IT: see relay/README.md
  */
 
@@ -148,6 +163,19 @@ export default {
       if (raw.length > MAX_BODY) throw new Fail(413, 'That configuration is too large.');
       let payload;
       try { payload = JSON.parse(raw); } catch { throw new Fail(400, 'The request body was not valid JSON.'); }
+
+      // The bare key check. Deliberately first and deliberately tiny: it reaches
+      // no AIOStreams instance, needs no host allowlist, and creates nothing.
+      if (payload && payload.op === 'verify') {
+        if (payload.provider !== 'torbox') throw new Fail(400, 'Only TorBox keys are checked here.');
+        const k = typeof payload.key === 'string' ? payload.key.trim() : '';
+        if (!k) throw new Fail(400, 'No key was given.');
+        const ok = await torboxKeyOk(k);
+        // null is "TorBox did not answer", which is not the same as a bad key
+        // and must never be reported as one.
+        if (ok === null) throw new Fail(502, 'TorBox did not answer, so the key could not be checked.');
+        return reply(200, { ok }, cors);
+      }
 
       const { instance, config, password } = payload || {};
       if (typeof instance !== 'string' || !instance) throw new Fail(400, 'No instance was given.');

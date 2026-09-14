@@ -3419,7 +3419,15 @@
     const c = rec && rec.profiles.find(x => x.index === wz.idx);
     return c ? c.name : 'Profile ' + wz.idx;
   }
-  function wzLog(what) { wz.done.push(what); }
+  // Every successful write ends here. The "This run" box is repainted straight
+  // away because it costs nothing, and the rest of the panel re-reads — the
+  // write paths have just called inval() on the account, so that read is fresh.
+  function wzLog(what) {
+    wz.done.push(what);
+    const run = document.querySelector('#wz-panel .wz-pnl-run');
+    if (run) wzPaintRun(run);
+    wzRenderPanel();
+  }
 
   // ---- lock ---------------------------------------------------------------
   // Called by every path that has just written something. Repaints only the
@@ -3638,14 +3646,20 @@
     wzSavedKeys.clear();
     wzVerified.clear();
     ['keys', 'streams', 'meta'].forEach(k => { wzPending[k].length = 0; });
-    ['wz-entry', 'wz-keys', 'wz-meta', 'wz-modes', 'wz-routes', 'wz-debrid', 'wz-instances',
-     'wz-native-debrid', 'wz-p2p', 'wz-aio-install', 'wz-p2p-install', 'wz-sim-preset', 'wz-sim-hosts',
+    ['wz-entry', 'wz-keys', 'wz-meta', 'wz-modes', 'wz-routes', 'wz-instances',
+     'wz-native-debrid', 'wz-p2p', 'wz-aio-install', 'wz-p2p-install',
      'wz-sim-install', 'wz-sim-result', 'wz-native-res', 'wz-keys-res', 'wz-summary']
       .forEach(id => { const n = $(id); if (n) { n.dataset.built = ''; clr(n); } });
+    // The TorBox box keeps its own built flag (its tick is wired to it, not to
+    // a container), so it is cleared by value and by flag, not by clr().
+    const simKey = $('wz-sim-key'); if (simKey) simKey.dataset.built = '';
+    wzNativeRecheck = null;
     ['wz-native-key', 'wz-sim-key', 'wz-prof-name', 'wz-new-email', 'wz-new-pass', 'wz-new-pass2', 'wz-new-label']
       .forEach(id => { const n = $(id); if (n) n.value = ''; });
+    ['wz-keyv-sim', 'wz-keyv-native'].forEach(id => { const n = $(id); if (n) { n.textContent = ''; n.className = 'wz-key-v'; } });
+    ['wz-chk-sim', 'wz-chk-native'].forEach(id => { const n = $(id); if (n) { n.className = 'wz-chk idle'; n.innerHTML = ''; n.title = ''; } });
     ['wz-keys-status', 'wz-native-status', 'wz-sim-status', 'wz-profile-status', 'wz-new-status',
-     'wz-inst-status', 'wz-sim-hosts-status'].forEach(id => { const n = $(id); if (n) status(n, ''); });
+     'wz-inst-status'].forEach(id => { const n = $(id); if (n) status(n, ''); });
     ['wz-sim-result', 'wz-sim-install', 'wz-mode-simple', 'wz-mode-advanced', 'wz-route-aiostreams',
      'wz-route-native', 'wz-newprof'].forEach(id => { const n = $(id); if (n) n.style.display = 'none'; });
     if ($('wz-account')) $('wz-account').disabled = false;
@@ -3710,7 +3724,7 @@
     if (box.dataset.built !== '1') {
       clr(box);
       WZ_ENTRY.forEach(e => {
-        const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); });
+        const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); wzPaintHead(); });
         card.dataset.wzentry = e.id;
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', e.name));
         card.appendChild(h);
@@ -3723,16 +3737,23 @@
   }
   function wzPaintEntry() {
     const box = $('wz-entry'); if (!box) return;
-    // A picked profile means the question is already answered; a locked run
-    // means it can no longer be asked at all.
-    if (wz.locked || wz.idx != null) wz.entry = 'have';
-    const on = wz.entry;
+    // A locked run can no longer be asked the question at all. A picked profile
+    // ANSWERS it — which is why coming back to step 1 from step 3 lands on the
+    // account branch rather than on the two front doors — but answering it must
+    // not silence it: Back has to be able to put the doors back. The old
+    // version forced 'have' on every repaint the moment a profile existed, so
+    // Back set the state and this line immediately undid it, one frame later.
+    // That, and nothing else, is why Back did nothing. 'choose' is the explicit
+    // "I pressed Back" state that survives the repaint.
+    if (wz.locked) wz.entry = 'have';
+    else if (wz.entry == null && wz.idx != null) wz.entry = 'have';
+    const on = wz.entry === 'have' || wz.entry === 'new' ? wz.entry : null;
     box.style.display = on ? 'none' : '';
     if ($('wz-have')) $('wz-have').style.display = on === 'have' ? '' : 'none';
     if ($('wz-new')) $('wz-new').style.display = on === 'new' ? '' : 'none';
     document.querySelectorAll('.wz-entry-back').forEach(b => {
       b.style.display = wz.locked ? 'none' : '';
-      b.onclick = () => { wz.entry = null; wzPaintEntry(); };
+      b.onclick = () => { wz.entry = 'choose'; wzPaintEntry(); wzPaintHead(); wzPaintNext(); };
     });
     if ($('wz-account')) $('wz-account').disabled = !!wz.locked;
     // The chips are normally already on screen when the first write happens, so
@@ -3802,7 +3823,9 @@
       // Locked: the picked one still reads as picked, the rest are visibly out
       // of reach rather than quietly doing nothing when clicked.
       c.dataset.wzidx = String(p.index);
-      c.appendChild(avatar(p, 42)); c.appendChild(el('span', 'pcn', p.name));
+      // 54, not 42: this step is one question and the chips are the answer, so
+      // they are sized to be the thing on screen rather than a row of buttons.
+      c.appendChild(avatar(p, 54)); c.appendChild(el('span', 'pcn', p.name));
       c.onclick = () => { if (wz.locked) return; wz.aid = aid; wz.idx = p.index; wz.done = []; wzRenderProfiles(aid); };
       box.appendChild(c);
     });
@@ -3974,6 +3997,7 @@
       b.disabled = (k !== 'account') && !ready;
     });
     wzPaintTarget();
+    wzPaintHead();
     if (wz.step === 'account') wzPaintEntry();
     $('wz-back').disabled = WZ_STEPS.indexOf(wz.step) === 0;
     wzPaintNext();
@@ -3981,6 +4005,20 @@
     if (wz.step === 'streams') wzRenderStreams();
     if (wz.step === 'meta') wzRenderMeta();
     if (wz.step === 'done') wzRenderDone();
+    wzRenderPanel();
+  }
+
+  // The step's question, at size. Hidden on step 1 until a profile exists,
+  // because until then the two front doors ARE the question.
+  function wzPaintHead() {
+    const h = $('wz-head'); if (!h) return;
+    const copy = (WZ.STEP_HEADS || {})[wz.step];
+    const hideOnEntry = wz.step === 'account' && !wzTarget() && wz.entry !== 'have' && wz.entry !== 'new';
+    if (!copy || hideOnEntry) { h.style.display = 'none'; return; }
+    h.style.display = '';
+    clr(h);
+    h.appendChild(el('h2', null, copy.q));
+    if (copy.sub) h.appendChild(el('p', null, copy.sub));
   }
 
   // "Writing to X" strip — present from step 2 on, so there is never any doubt
@@ -4020,17 +4058,41 @@
     }
     return (wzPending[step] || []).some(x => x.dirty());
   }
+  // Whether this step has been answered, which is a different question from
+  // whether it has anything to write. Next lights up on THIS, not on dirty:
+  // "you have chosen something, you may go on" is the thing a wizard has to
+  // say, and a step that is answered but needs no write (a metadata add-on you
+  // already have, a route you only wanted to read about) was showing a dead
+  // grey button that looked like it had stopped working.
+  function wzCanAdvance(step) {
+    if (!wzTarget()) return false;
+    if (step === 'keys') {
+      const i = $('wz-key-tmdb');
+      return wzSavedKeys.has('tmdb') || !!(i && i.value.trim());
+    }
+    if (step === 'streams') return wz.mode === 'advanced' ? !!wz.route : !!wz.mode;
+    return true;                       // account (a target exists) and metadata (all optional)
+  }
+  // What is missing, in the words of the thing that is missing. Only shown when
+  // Next is not lit, so it never sits next to a button that already works.
+  const WZ_BLOCKED = {
+    keys: 'TMDB is required — paste its key to carry on.',
+    streams: 'Pick how you want your streams set up.',
+  };
   function wzPaintNext() {
     const b = $('wz-next'); if (!b) return;
     const i = WZ_STEPS.indexOf(wz.step), ready = !!wzTarget(), last = i === WZ_STEPS.length - 1;
     b.disabled = last || !ready;
     const dirty = ready && !last && wzStepDirty(wz.step);
+    const can = ready && !last && wzCanAdvance(wz.step);
     b.textContent = dirty ? 'Save and move to next step' : (i === WZ_STEPS.length - 2 ? 'Finish' : 'Next');
-    b.className = 'btn ' + (dirty ? 'btn-primary' : 'btn-ghost');
+    b.className = 'btn ' + (can ? 'btn-primary' : 'btn-ghost');
     const note = $('wz-foot-note');
     if (note) {
       note.textContent = !ready ? 'Pick or create a profile to carry on.'
-        : (last ? '' : (dirty ? '' : 'Nothing to save on this step.'));
+        : last ? ''
+        : !can ? (WZ_BLOCKED[wz.step] || '')
+        : dirty ? '' : 'Nothing to save on this step.';
     }
   }
   const wzGo = d => { const i = WZ_STEPS.indexOf(wz.step) + d; if (i >= 0 && i < WZ_STEPS.length) wzShow(WZ_STEPS[i]); };
@@ -4048,13 +4110,268 @@
     c.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick(); } };
     return c;
   }
+  // Somebody else's mark — TMDB, TorBox, AIOStreams, Torrentio and the rest.
+  // One helper for all of them, and one rule: the monogram is drawn first and
+  // the image on top of it, so a host that stops serving its logo degrades to a
+  // letter rather than to a broken-image icon. `size` is '', 'sm' or 'lg'.
+  function wzLogo(m, size) {
+    // `logos` (plural) is a route that names two services — Nuvio's own debrid
+    // works with TorBox and Premiumize — and draws a mark for each rather than
+    // picking one and implying the other is not on offer.
+    if (Array.isArray(m.logos) && m.logos.length) {
+      const g = el('span', 'wz-logo-pair');
+      m.logos.forEach(src => g.appendChild(wzLogo({ logo: src, mono: m.mono, name: m.name }, size)));
+      return g;
+    }
+    const t = el('span', 'wz-logo' + (size ? ' ' + size : ''));
+    t.appendChild(el('span', 'mono', m.mono || ((m.name || '?').trim()[0] || '?').toUpperCase()));
+    if (m.logo) {
+      const i = document.createElement('img');
+      // Deliberately NOT loading="lazy". These are 21-34px marks that are on
+      // screen the moment their row is, so lazy buys nothing — and it costs
+      // something real: a lazy image never starts loading at all while the
+      // document is hidden, because the observer that would trigger it never
+      // fires. Every logo in the panel stayed blank for exactly that reason.
+      i.alt = ''; i.referrerPolicy = 'no-referrer';
+      i.onerror = () => i.remove();
+      i.src = m.logo;
+      t.appendChild(i);
+    }
+    return t;
+  }
+
+  // ======================================================================
+  // the live "On this profile" panel
+  // ======================================================================
+  // The wizard used to pick a target and then work blind on it for four steps.
+  // This is the thing that was missing, and it happens to be what fills the
+  // empty half of every sparse step.
+  //
+  // It is READ-ONLY and it writes nothing. Both reads are ones the wizard
+  // already makes: loadAccount() is cached per account (wzMarkMetaInstalled
+  // uses the same one), and pullProviderCredentials is the same small RPC
+  // Sync Desk uses. A generation guard stops a slow read painting over a newer
+  // one, exactly like wzRenderProfiles.
+  //
+  // API KEY VALUES ARE NEVER SHOWN, and that is not an oversight. This app
+  // strips credential values on receipt by design; the panel answers "does
+  // this profile have a TMDB key" — which is the question — and never "what
+  // is it".
+  let wzPanelGen = 0;
+  function wzRenderPanel() {
+    const host = $('wz-panel'); if (!host) return;
+    const t = wzTarget();
+    if (!t) { host.style.display = 'none'; return; }
+    host.style.display = '';
+    const gen = ++wzPanelGen;
+
+    clr(host);
+    const who = el('div', 'wz-pnl-who');
+    who.appendChild(avatar({ name: t.name }, 34));
+    const wh = el('div', null);
+    wh.appendChild(el('div', 'nm', t.name));
+    wh.appendChild(el('div', 'sub', accountName(t.aid) + ' · profile ' + t.idx));
+    who.appendChild(wh);
+    host.appendChild(who);
+
+    const body = el('div', 'wz-pnl-body'); host.appendChild(body);
+    body.appendChild(el('div', 'wz-pnl-load shimmer', 'Reading this profile…'));
+
+    const run = el('div', 'wz-pnl-run'); host.appendChild(run);
+    wzPaintRun(run);
+
+    (async () => {
+      let addons = [], creds = [];
+      let addonErr = '', credErr = '';
+      try {
+        const { backup } = await loadAccount(t.aid);
+        addons = (sliceProfile(backup, t.idx).addons || []).filter(a => a && a.url);
+      } catch (e) { addonErr = e.message; }
+      try {
+        creds = await A.client(store, t.aid).pullProviderCredentials(t.idx);
+      } catch (e) { credErr = e.message; }
+      if (gen !== wzPanelGen) return;
+
+      // Classify with the table first so the panel paints immediately, then
+      // upgrade each row once its manifest answers. A slow or dead add-on host
+      // therefore costs nothing on screen beyond its own row staying generic.
+      const rows = addons.map(a => Object.assign(
+        { url: a.url, stored: a.name, order: a.sort_order },
+        wzAddonFallback(a.url, a.name)
+      ));
+      clr(body);
+      wzPaintAddons(body, rows, addonErr);
+      wzPaintKeys(body, creds, credErr);
+
+      Promise.all(rows.map(async r => {
+        const info = await wzAddonInfo(r.url, r.stored);
+        Object.assign(r, info);
+      })).then(() => {
+        if (gen !== wzPanelGen) return;
+        clr(body);
+        wzPaintAddons(body, rows, addonErr);
+        wzPaintKeys(body, creds, credErr);
+      });
+    })();
+  }
+
+  function wzPnlHead(text) {
+    return el('div', 'wz-pnl-h', text);
+  }
+  function wzPaintAddons(body, rows, err) {
+    if (err) {
+      body.appendChild(wzPnlHead('Add-ons'));
+      body.appendChild(el('div', 'wz-pnl-err', "Couldn't read them: " + err));
+      return;
+    }
+    (WZ.PANEL_SECTIONS || []).forEach(sec => {
+      const mine = rows.filter(r => r.kind === sec.kind);
+      // 'Other' only appears when there is something in it — an empty
+      // "Other add-ons: none" is a line that never says anything.
+      if (!mine.length && !sec.empty) return;
+      body.appendChild(wzPnlHead(sec.label));
+      if (!mine.length) { body.appendChild(el('div', 'wz-pnl-none', sec.empty)); return; }
+      mine.sort((a, b) => (a.order || 0) - (b.order || 0));
+      mine.forEach(r => {
+        const row = el('div', 'wz-pnl-row');
+        row.appendChild(wzLogo(r, 'xs'));
+        const nm = el('span', 'nm', r.name);
+        // The user's own label is worth keeping when it differs — "Main" is how
+        // Furqan finds that row in Nuvio, "AIOStreams" is what it actually is.
+        row.appendChild(nm);
+        const stored = wzShortName(r.stored);
+        if (stored && stored.toLowerCase() !== r.name.toLowerCase()) {
+          row.appendChild(el('span', 'as', '“' + stored + '”'));
+        }
+        body.appendChild(row);
+      });
+    });
+  }
+  function wzPaintKeys(body, creds, err) {
+    body.appendChild(wzPnlHead('API keys'));
+    if (err) { body.appendChild(el('div', 'wz-pnl-err', "Couldn't read them: " + err)); return; }
+    const has = p => (creds || []).some(c => c && c.provider === p &&
+      c.credential_json && Object.values(c.credential_json).some(v => typeof v === 'string' && v.trim()));
+    (WZ.KEYS || []).forEach(k => {
+      const row = el('div', 'wz-pnl-row');
+      row.appendChild(wzLogo(k, 'xs'));
+      row.appendChild(el('span', 'nm', k.name));
+      row.appendChild(el('span', 'sp'));
+      const on = has(k.provider);
+      row.appendChild(el('span', 'st' + (on ? ' on' : ''), on ? 'set' : 'not set'));
+      body.appendChild(row);
+    });
+    // Debrid lives under its own provider ids, and only ever one at a time.
+    const d = (WZ.DEBRID || []).filter(x => x.native).find(x => has('debrid:' + x.id));
+    const row = el('div', 'wz-pnl-row');
+    row.appendChild(wzLogo(d || { mono: 'D', name: 'Debrid' }, 'xs'));
+    row.appendChild(el('span', 'nm', d ? d.name : 'Debrid'));
+    row.appendChild(el('span', 'sp'));
+    row.appendChild(el('span', 'st' + (d ? ' on' : ''), d ? 'linked' : 'not linked'));
+    body.appendChild(row);
+  }
+  function wzPaintRun(run) {
+    clr(run);
+    run.appendChild(wzPnlHead('This run'));
+    if (!wz.done.length) { run.appendChild(el('div', 'wz-pnl-none', 'nothing written yet')); return; }
+    wz.done.forEach(d => {
+      const r = el('div', 'wz-pnl-did');
+      r.appendChild(el('span', 'tk', '✓'));
+      r.appendChild(el('span', '', d));
+      run.appendChild(r);
+    });
+  }
+
+  // ======================================================================
+  // what IS this add-on?
+  // ======================================================================
+  // Nuvio stores only {url, name, enabled, sort_order} — no type, and a name
+  // the user chose (the test account's AIOStreams instances are called "Main"
+  // and "Niche"), so the URL is the only thing that can answer this.
+  //
+  // Order of authority, best first:
+  //   1. the add-on's OWN manifest, fetched from the stored URL exactly as
+  //      stored. Stremio's `resources` is the answer: 'stream' wins outright,
+  //      then 'subtitles', then 'catalog'/'meta'. It also hands back the real
+  //      product name and logo, which is why "Main" can be shown as AIOStreams.
+  //   2. wizard.js's ADDON_KINDS table, for the manifests a browser cannot
+  //      read cross-origin — and for the two that answer but do not settle it:
+  //      Cinemeta publishes no logo, AIOMetadata publishes empty `resources`.
+  //   3. 'other'. An add-on nobody can identify is shown as one. It is never
+  //      filed under a guess, because a stream source counted as metadata is
+  //      worse than an honest "Other add-on".
+  const _wzAddonCache = new Map();          // stored url -> {name, kind, logo}
+  // `resources` entries are strings OR {name, types, idPrefixes} objects.
+  const wzResList = m => (Array.isArray(m && m.resources) ? m.resources : [])
+    .map(r => (typeof r === 'string' ? r : (r && r.name) || '')).filter(Boolean);
+  // Vendor suffixes: Comet's manifest calls itself "Comet | ElfHosted". Furqan
+  // wants the product name, so the first segment wins — but only on a real
+  // separator, so "OpenSubtitles v3" survives intact.
+  const wzShortName = n => String(n || '').split(/\s+[|·—–]\s+/)[0].trim() || '';
+  // Several manifests (OpenSubtitles v3 among them) publish an http: logo,
+  // which a browser on the https site blocks outright as mixed content.
+  const wzHttps = u => String(u || '').replace(/^http:\/\//i, 'https://');
+
+  function wzKnownAddon(url) {
+    const u = String(url || '');
+    return (WZ.ADDON_KINDS || []).find(k => k.re.test(u)) || null;
+  }
+  function wzAddonFallback(url, storedName) {
+    const k = wzKnownAddon(url);
+    return {
+      name: k ? k.name : (wzShortName(storedName) || 'Add-on'),
+      kind: k ? k.kind : 'other',
+      logo: k && k.logo ? k.logo : '',
+      sure: !!k,
+    };
+  }
+  async function wzAddonInfo(url, storedName) {
+    const key = String(url || '');
+    if (_wzAddonCache.has(key)) return _wzAddonCache.get(key);
+    const fb = wzAddonFallback(key, storedName);
+    let out = fb;
+    try {
+      // Nuvio does NOT always store a full manifest URL — the test account has
+      // OpenSubtitles stored as bare "https://opensubtitles-v3.strem.io", which
+      // answers with a page rather than JSON. market.js already owns the repair
+      // (it appends manifest.json to a directory form, and rewrites Codeberg's
+      // no-CORS raw path), so reuse it rather than writing a second one. The
+      // cache key stays the STORED url, because that is what identifies the row.
+      const fetchUrl = (MK && MK.normalizeManifestUrl) ? MK.normalizeManifestUrl(key) : key;
+      const ctl = new AbortController();
+      const t = setTimeout(() => ctl.abort(), 8000);
+      const m = await fetch(fetchUrl, { signal: ctl.signal }).then(r => r.json());
+      clearTimeout(t);
+      const res = wzResList(m);
+      const kind = res.includes('stream') ? 'stream'
+        : res.includes('subtitles') ? 'subs'
+        : (res.includes('catalog') || res.includes('meta')) ? 'meta'
+        : fb.kind;                                   // empty resources -> the table
+      // The NAME is the one thing the table beats the manifest at. A manifest's
+      // name is whatever that INSTANCE calls itself, not what the product is:
+      // the test account's second AIOStreams config is named "Mainstream" by
+      // the community template it was built from, so trusting the manifest put
+      // "AIOStreams" and "Mainstream" side by side as if they were different
+      // products. A recognised host gets its product name; only an
+      // unrecognised one falls back to whatever its manifest says it is.
+      out = {
+        name: fb.sure ? fb.name : (wzShortName(m && m.name) || fb.name),
+        kind,
+        logo: wzHttps((m && m.logo) || '') || fb.logo,
+        sure: true,
+      };
+    } catch (e) { /* unreadable cross-origin — the table already answered */ }
+    _wzAddonCache.set(key, out);
+    return out;
+  }
+
   // The round "?" in a card's header, and the only thing that opens its
   // reasoning. Volunteering pros and cons on every card made the streams step a
   // wall of text; opening them on hover made the page rearrange itself as the
   // pointer crossed it. Asked for, then shown.
   function wzWhyBtn(card, label) {
     const q = el('button', 'wz-pick-q', '?'); q.type = 'button';
-    q.setAttribute('aria-label', 'Pros and cons for ' + label);
+    q.setAttribute('aria-label', 'More about ' + label);
     q.setAttribute('aria-expanded', 'false');
     q.onclick = e => {
       e.stopPropagation();
@@ -4069,6 +4386,18 @@
     (cons || []).forEach(c => { const r = el('div', 'con'); r.innerHTML = '<span class="s">−</span><span>' + c + '</span>'; w.appendChild(r); });
     return w;
   }
+  // What "Do it all for me" behind its "?" — the preset, not a pros-and-cons
+  // list. "What am I actually getting" was the only question anyone had about
+  // that card, and it used to be answered by a whole section sitting under it
+  // taking a screenful to say six things. Same disclosure mechanism, so the
+  // card behaves exactly like its neighbour.
+  function wzPresetBlock() {
+    const P = WZ.PRESET, w = el('div', 'wz-pc');
+    if (P.blurb) w.appendChild(el('div', 'wz-pc-b', P.blurb));
+    (P.points || []).forEach(p => { const r = el('div', 'pro'); r.innerHTML = '<span class="s">+</span><span>' + p + '</span>'; w.appendChild(r); });
+    if (P.note) w.appendChild(el('div', 'wz-pc-b', P.note));
+    return w;
+  }
   function wzTag(text, cls) { const s = el('span', 'wz-tag' + (cls ? ' ' + cls : ''), text); return s; }
   const wzOpen = url => window.open(url, '_blank', 'noopener');
 
@@ -4078,10 +4407,13 @@
   function wzRenderKeys() {
     const box = $('wz-keys'); if (!box || box.dataset.built === '1') return;
     clr(box);
-    WZ.KEYS.forEach((k, n) => {
+    WZ.KEYS.forEach(k => {
       const w = el('div', 'wz-key'); w.dataset.wzkey = k.id;
       const h = el('div', 'wz-key-h');
-      h.appendChild(el('span', 'wz-n', String(n + 1)));
+      // The provider's own mark rather than a counter. Three rows in a fixed
+      // order do not need numbering, and the logo is the thing that tells you
+      // at a glance which site this row is asking you to go to.
+      h.appendChild(wzLogo(k, 'sm'));
       h.appendChild(el('span', 'wz-key-n', k.name));
       if (k.tag) h.appendChild(wzTag(k.tag, k.required ? 'req' : (/optional/i.test(k.tag) ? 'plain' : '')));
       h.appendChild(el('span', 'wz-pick-sp'));
@@ -4108,24 +4440,7 @@
       row.appendChild(inp); row.appendChild(chk);
       w.appendChild(row);
       const v = el('div', 'wz-key-v'); v.id = 'wz-keyv-' + k.id; w.appendChild(v);
-
-      // A key is checked once it LOOKS finished (k.shape), not while it is half
-      // typed — a red cross after three characters is noise, not feedback. A box
-      // you leave with something unrecognisable in it still gets checked on blur,
-      // so a wrong-format paste is told rather than silently accepted.
-      let timer = null;
-      inp.addEventListener('input', () => {
-        inp.classList.remove('wz-need');
-        clearTimeout(timer);
-        const val = inp.value.trim();
-        if (!val) { wzChk(k, 'idle', ''); return; }
-        const seen = wzVerified.get(k.id);
-        if (seen && seen.value === val) { wzChk(k, seen.state, seen.msg); return; }
-        wzChk(k, 'idle', '');
-        if (k.shape && k.shape.test(val)) timer = setTimeout(() => wzVerifyKey(k), 350);
-      });
-      inp.addEventListener('blur', () => { clearTimeout(timer); if (inp.value.trim()) wzVerifyKey(k); });
-      wzChk(k, 'idle', '');
+      wzWireCheck({ inp, chk, val: v, card: w }, () => k);
       box.appendChild(w);
     });
     box.dataset.built = '1';
@@ -4137,7 +4452,11 @@
   // belongs to and nowhere else — the same request Nuvio will make with it a
   // minute later — and a network failure resolves to "couldn't check", never to
   // a cross, so a blocked corporate proxy can't make a good key look bad.
-  const wzVerified = new Map();          // key id -> { value, state, msg }
+  // Keyed by what was asked and what was asked about, NOT by which box it was
+  // typed into: the same TorBox key can be typed on the simple path and on the
+  // Nuvio+TorBox path, and asking TorBox twice about the same string is pure
+  // waste. Cleared with the rest of the run by wzResetRun.
+  const wzVerified = new Map();          // verify-kind + '\0' + value -> { state, msg }
   const wzVerifyGen = {};
   const WZ_CHK = {
     idle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m5 12 4.5 4.5L19 7"/></svg>',
@@ -4146,30 +4465,66 @@
     unknown: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 7.5v6"/><path d="M12 17h.01"/></svg>',
     busy: '',
   };
-  function wzChk(k, state, msg) {
-    const chk = $('wz-chk-' + k.id); if (!chk) return;
-    chk.className = 'wz-chk ' + state;
-    chk.innerHTML = WZ_CHK[state] || '';
-    chk.title = msg || '';
-    const v = $('wz-keyv-' + k.id);
-    if (v) { v.textContent = msg || ''; v.className = 'wz-key-v' + (state === 'busy' || state === 'idle' ? '' : ' ' + state); }
-    const card = document.querySelector('#wz-keys [data-wzkey="' + k.id + '"]');
-    if (card) card.classList.toggle('ok', state === 'good');
+  // `els` is the trio a tick needs: the box, the tick, and the line under it
+  // (plus optionally the card to mark green). `getSpec` is called fresh every
+  // time rather than captured, because on the streams step WHICH service is
+  // being checked changes under the same box when you pick a different one.
+  function wzChkPaint(els, state, msg) {
+    if (els.chk) {
+      els.chk.className = 'wz-chk ' + state;
+      els.chk.innerHTML = WZ_CHK[state] || '';
+      els.chk.title = msg || '';
+    }
+    if (els.val) { els.val.textContent = msg || ''; els.val.className = 'wz-key-v' + (state === 'busy' || state === 'idle' ? '' : ' ' + state); }
+    if (els.card) els.card.classList.toggle('ok', state === 'good');
   }
-  async function wzVerifyKey(k) {
-    const inp = $('wz-key-' + k.id); if (!inp) return;
-    const val = inp.value.trim();
-    if (!val) { wzChk(k, 'idle', ''); return; }
-    const seen = wzVerified.get(k.id);
-    if (seen && seen.value === val) { wzChk(k, seen.state, seen.msg); return; }
-    const gen = wzVerifyGen[k.id] = (wzVerifyGen[k.id] || 0) + 1;
-    wzChk(k, 'busy', 'Checking it with ' + k.getLabel + '…');
+  const wzChkLabel = spec => spec.getLabel || spec.name || 'the provider';
+  async function wzRunCheck(els, spec) {
+    if (!els.inp) return;
+    const val = (els.inp.value || '').trim();
+    if (!val || !spec || !spec.verify) { wzChkPaint(els, 'idle', ''); return; }
+    const ck = spec.verify + '\u0000' + val;
+    const seen = wzVerified.get(ck);
+    if (seen) { wzChkPaint(els, seen.state, seen.msg); return; }
+    const gen = wzVerifyGen[spec.verify] = (wzVerifyGen[spec.verify] || 0) + 1;
+    wzChkPaint(els, 'busy', 'Checking it with ' + wzChkLabel(spec) + '…');
     let out;
-    try { out = await wzAskProvider(k.verify, val); }
-    catch (e) { out = { state: 'unknown', msg: "Couldn't reach " + k.getLabel + ' to check this one — save it anyway, Nuvio will tell you if it is wrong.' }; }
-    if (gen !== wzVerifyGen[k.id] || inp.value.trim() !== val) return;   // a newer keystroke won
-    wzVerified.set(k.id, { value: val, state: out.state, msg: out.msg });
-    wzChk(k, out.state, out.msg);
+    try { out = await wzAskProvider(spec.verify, val); }
+    catch (e) { out = { state: 'unknown', msg: "Couldn't check this one with " + wzChkLabel(spec) + ' — save it anyway, Nuvio will tell you if it is wrong.' }; }
+    if (gen !== wzVerifyGen[spec.verify] || (els.inp.value || '').trim() !== val) return;   // a newer keystroke won
+    wzVerified.set(ck, out);
+    wzChkPaint(els, out.state, out.msg);
+  }
+  // A key is checked once it LOOKS finished (spec.shape), not while it is half
+  // typed — a red cross after three characters is noise, not feedback. A box you
+  // leave with something unrecognisable in it still gets checked on blur, so a
+  // wrong-format paste is told rather than silently accepted.
+  const wzChkWired = new WeakMap();
+  function wzWireCheck(els, getSpec) {
+    // The two streams-step boxes are in the markup and are never replaced, but
+    // the blocks around them get rebuilt (a fresh run, a different service), so
+    // this has to be idempotent or every rebuild stacks another listener on the
+    // same input. The keys step builds new inputs each time and never hits this.
+    const had = wzChkWired.get(els.inp);
+    if (had) { wzChkPaint(els, 'idle', ''); return had; }
+    let timer = null;
+    els.inp.addEventListener('input', () => {
+      els.inp.classList.remove('wz-need');
+      clearTimeout(timer);
+      const spec = getSpec(), val = (els.inp.value || '').trim();
+      if (!val || !spec || !spec.verify) { wzChkPaint(els, 'idle', ''); return; }
+      const seen = wzVerified.get(spec.verify + '\u0000' + val);
+      if (seen) { wzChkPaint(els, seen.state, seen.msg); return; }
+      wzChkPaint(els, 'idle', '');
+      if (spec.shape && spec.shape.test(val)) timer = setTimeout(() => wzRunCheck(els, getSpec()), 350);
+    });
+    els.inp.addEventListener('blur', () => { clearTimeout(timer); if ((els.inp.value || '').trim()) wzRunCheck(els, getSpec()); });
+    wzChkPaint(els, 'idle', '');
+    // Re-ask when the thing being asked changes rather than the text — picking
+    // Premiumize after typing a TorBox key has to drop the old verdict.
+    const recheck = () => { clearTimeout(timer); wzRunCheck(els, getSpec()); };
+    wzChkWired.set(els.inp, recheck);
+    return recheck;
   }
   // Endpoints and status codes confirmed live 2026-09-11 with a deliberately
   // wrong key: TMDB 401 + status_code 7, MDBList 403 {"error":"Invalid API key"},
@@ -4199,6 +4554,37 @@
       const err = j && j.errors && j.errors[0] && String(j.errors[0].message || '');
       if (err && /client.?id/i.test(err)) return { state: 'bad', msg: 'Anime Skip does not recognise this Client ID.' };
       throw new Error('Anime Skip answered ' + r.status + (err ? ': ' + err : ''));
+    }
+    // Premiumize answers any origin (Access-Control-Allow-Origin: *, measured
+    // 2026-09-13 from a neutral page) and always answers 200 — the verdict is
+    // in the body, not the status, so a status check here would pass every key.
+    if (kind === 'premiumize') {
+      const r = await fetch('https://www.premiumize.me/api/account/info?apikey=' + encodeURIComponent(key));
+      const j = await r.json().catch(() => null);
+      if (j && j.status === 'success') return { state: 'good', msg: 'Premiumize recognises this key.' };
+      if (j && j.status === 'error') return { state: 'bad', msg: 'Premiumize does not recognise this key — copy it again from your account page.' };
+      throw new Error('Premiumize answered ' + r.status);
+    }
+    // TorBox cannot be asked from here at all: api.torbox.app runs an origin
+    // allowlist holding only https://torbox.app, and every other origin gets
+    // 400 "Disallowed CORS origin" on the preflight (measured 2026-09-13). The
+    // relay Worker already had to check TorBox keys for the "Do it all for me"
+    // path, so it answers this too. A relay that predates that op replies 400
+    // to this shape, which lands in the catch and shows "couldn't check" —
+    // which is also what a TorBox outage shows. Never a cross it cannot prove.
+    if (kind === 'torbox') {
+      if (!WZ.RELAY) throw new Error('no relay to ask through');
+      const r = await fetch(WZ.RELAY, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'verify', provider: 'torbox', key }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j && typeof j.ok === 'boolean') {
+        return j.ok
+          ? { state: 'good', msg: 'TorBox recognises this key.' }
+          : { state: 'bad', msg: 'TorBox does not recognise this key — copy it again from torbox.app/settings.' };
+      }
+      throw new Error((j && j.error) || ('the relay answered ' + r.status));
     }
     throw new Error('no check available');
   }
@@ -4362,7 +4748,7 @@
     if (modes && modes.dataset.built !== '1') {
       clr(modes);
       WZ.MODES.forEach(m => {
-        const c = wzCard('', () => { wz.mode = m.id; wzRenderStreams(); });
+        const c = wzCard('', () => { wz.mode = m.id; wzRenderStreams(); wzPaintNext(); });
         c.dataset.wzmode = m.id;
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', m.name));
         if (m.tag) h.appendChild(wzTag(m.tag));
@@ -4370,7 +4756,9 @@
         h.appendChild(wzWhyBtn(c, m.name));
         c.appendChild(h);
         c.appendChild(el('div', 'wz-pick-one', m.oneLiner));
-        const wrap = el('div', 'wz-pc-wrap'); wrap.appendChild(wzProsCons(m.pros, m.cons));
+        // The simple card's "?" opens the preset instead of pros and cons.
+        const wrap = el('div', 'wz-pc-wrap');
+        wrap.appendChild(m.id === 'simple' ? wzPresetBlock() : wzProsCons(m.pros, m.cons));
         c.appendChild(wrap);
         modes.appendChild(c);
       });
@@ -4384,9 +4772,11 @@
     if (box && box.dataset.built !== '1') {
       clr(box);
       WZ.ROUTES.forEach(r => {
-        const c = wzCard('', () => { wz.route = r.id; wzRenderStreams(); });
+        const c = wzCard('', () => { wz.route = r.id; wzRenderStreams(); wzPaintNext(); });
         c.dataset.wzroute = r.id;
-        const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', r.name));
+        const h = el('div', 'wz-pick-h');
+        h.appendChild(wzLogo(r, 'sm'));
+        h.appendChild(el('span', 'wz-pick-n', r.name));
         if (r.tag) h.appendChild(wzTag(r.tag));
         h.appendChild(el('span', 'wz-pick-sp'));
         h.appendChild(wzWhyBtn(c, r.name));
@@ -4416,21 +4806,22 @@
   // profile through wzInstallBox, i.e. the same engine.planTarget + api.applyPlan
   // path as every other write in this app. There is no second write mechanism.
   function wzRenderSimple() {
-    const S = WZ.SIMPLE, P = WZ.PRESET;
-    const pre = $('wz-sim-preset');
-    if (pre.dataset.built !== '1') {
-      $('wz-sim-preset-t').textContent = P.title;
-      $('wz-sim-preset-b').textContent = P.blurb;
-      clr(pre);
-      P.points.forEach(p => pre.appendChild(el('li', null, p)));
-      $('wz-sim-preset-n').textContent = P.note;
+    const S = WZ.SIMPLE;
+    const key = $('wz-sim-key');
+    if (key.dataset.built !== '1') {
       $('wz-sim-key-b').textContent = S.keyBlurb;
-      $('wz-sim-key').placeholder = S.keyPlaceholder;
+      key.placeholder = S.keyPlaceholder;
       $('wz-sim-key-h').textContent = S.keyHint;
       $('wz-sim-key-no').textContent = S.noTorbox;
-      $('wz-sim-hosts-b').textContent = S.instBlurb;
       $('wz-sim-run').textContent = S.runLabel;
-      pre.dataset.built = '1';
+      // Same live tick as the API-keys step, on the same TorBox descriptor —
+      // which means it goes through the relay, because TorBox refuses to answer
+      // a browser directly. See wzAskProvider('torbox').
+      wzWireCheck(
+        { inp: key, chk: $('wz-chk-sim'), val: $('wz-keyv-sim') },
+        () => WZ.DEBRID.find(d => d.id === 'torbox')
+      );
+      key.dataset.built = '1';
     }
     // The relay is the one step a web page cannot take (see wizard.js RELAY).
     // Without it this path says so plainly instead of offering a dead button.
@@ -4439,48 +4830,38 @@
       off.textContent = S.notDeployed; off.style.display = '';
       $('wz-sim-run').disabled = true;
     } else { off.style.display = 'none'; }
-    if ($('wz-sim-hosts').dataset.built !== '1') wzLoadHosts();
+    // Warm the host list now so pressing the button does not wait on it. A
+    // failure here is silent on purpose — nothing on screen depends on it, and
+    // wzSimRun asks again and reports properly if it still cannot be read.
+    wzHosts().catch(() => {});
   }
 
-  async function wzLoadHosts() {
-    const box = $('wz-sim-hosts'), st = $('wz-sim-hosts-status');
-    clr(box); status(st, 'Reading the uptime tracker…');
-    try {
-      if (!MK) throw new Error('the marketplace data layer did not load');
-      const list = await MK.loadInstances('AIOStreams', true);
-      clr(box); status(st, '');
-      $('wz-sim-host-count').textContent = list.length + ' public';
-      if (!list.length) { box.appendChild(el('p', 'empty', 'No hosts listed right now — try Refresh in a minute.')); return; }
-      // Best uptime first, so the top one is the recommendation and is preselected.
-      if (!list.some(i => i.url === wz.host)) wz.host = list[0].url;
-      list.forEach(i => {
-        const r = el('div', 'wz-host');
-        r.setAttribute('role', 'button'); r.tabIndex = 0;
-        r.dataset.wzhost = i.url;
-        const pick = e => { if (e && e.target.closest('button')) return; wz.host = i.url; wzMarkHost(); };
-        r.onclick = pick;
-        r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
-        r.appendChild(el('span', 'tick'));
-        r.appendChild(el('span', 'nm', i.name));
-        r.appendChild(el('span', 'up' + (i.uptime != null && i.uptime < 99 ? ' low' : ''),
-          i.uptime != null ? i.uptime.toFixed(2) + '% up' : 'uptime unknown'));
-        r.appendChild(el('span', 'spacer'));
-        const open = el('button', 'btn btn-ghost btn-xs', 'Open');
-        open.onclick = e => { e.stopPropagation(); wzOpen(i.url); };
-        r.appendChild(open);
-        box.appendChild(r);
-      });
-      wzMarkHost();
-      box.dataset.built = '1';
-    } catch (e) {
-      clr(box); status(st, "Couldn't read the host list: " + e.message, 'err');
-      const again = el('button', 'btn btn-ghost btn-xs', 'Try again');
-      again.onclick = () => wzLoadHosts();
-      box.appendChild(again);
+  // ---- which AIOStreams host builds it ------------------------------------
+  // This used to be a question, with twelve rows of answers. It was a question
+  // nobody had the information to answer: the list is the uptime tracker's own,
+  // already sorted best-first, and any of the leaders is equally fine. So the
+  // wizard takes one of the four best itself — at random, which also stops
+  // every Numax user piling onto whichever host happens to lead today.
+  // Deliberately not narrated on screen: it is not a choice the user made.
+  const WZ_HOST_POOL = 4;
+  let _wzHosts = null;
+  function wzHosts() {
+    if (!_wzHosts) {
+      _wzHosts = (async () => {
+        if (!MK) throw new Error('the marketplace data layer did not load');
+        const list = await MK.loadInstances('AIOStreams', true);
+        if (!list.length) throw new Error('the uptime tracker listed no AIOStreams hosts');
+        return list;
+      })();
+      // A failed read must not become the cached answer for the rest of the
+      // session — the next press has to be allowed to try again.
+      _wzHosts.catch(() => { _wzHosts = null; });
     }
+    return _wzHosts;
   }
-  function wzMarkHost() {
-    document.querySelectorAll('#wz-sim-hosts [data-wzhost]').forEach(r => r.classList.toggle('on', r.dataset.wzhost === wz.host));
+  function wzPickHost(list) {
+    const pool = list.slice(0, WZ_HOST_POOL);
+    return pool[Math.floor(Math.random() * pool.length)].url;
   }
 
   // The template is fetched rather than inlined so a newer export from Furqan's
@@ -4517,13 +4898,21 @@
     if (!WZ.RELAY) { status(st, WZ.SIMPLE.notDeployed, 'err'); return; }
     if (!key) { status(st, 'Paste your TorBox API key first.', 'err'); $('wz-sim-key').classList.add('wz-need'); return; }
     $('wz-sim-key').classList.remove('wz-need');
-    if (!wz.host) { status(st, 'Pick a host first.', 'err'); return; }
-
-    let base;
-    try { base = new URL(wz.host).origin; } catch { status(st, 'That host address could not be read.', 'err'); return; }
 
     btn.disabled = true; out.style.display = 'none'; clr(out);
     status(st, WZ.SIMPLE.running);
+
+    // Chosen here rather than earlier, so a host that has gone down since the
+    // step opened is not the one this run is committed to.
+    let list;
+    try { list = await wzHosts(); }
+    catch (e) { status(st, WZ.SIMPLE.noHosts, 'err'); btn.disabled = false; return; }
+    wz.host = wzPickHost(list);
+
+    let base;
+    try { base = new URL(wz.host).origin; }
+    catch { status(st, 'That host address could not be read.', 'err'); btn.disabled = false; return; }
+
     const password = wzPassword();
     try {
       const tpl = await wzTemplate();
@@ -4638,6 +5027,7 @@
       hint: WZ.SIMPLE.installHint,
       defaultName: 'AIOStreams',
       defaultUrl: r.url,
+      sayWhere: true,
     });
   }
 
@@ -4662,15 +5052,13 @@
     try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
   }
 
+  // No debrid picker here any more. AIOStreams asks for your service on its own
+  // site, in its own Services menu, and applies the key there — so picking one
+  // in Numax first changed nothing, wrote nothing and could not be acted on. It
+  // was seven cards of reading in front of the two steps that actually do
+  // something. (wizard.js still carries the DEBRID list; the Nuvio+TorBox route
+  // uses the two entries Nuvio itself can drive.)
   function wzRenderAio() {
-    // debrid picker
-    const box = $('wz-debrid');
-    if (box.dataset.built !== '1') {
-      clr(box);
-      WZ.DEBRID.forEach(d => box.appendChild(wzDebridCard(d, false)));
-      box.dataset.built = '1';
-    }
-    wzMarkDebrid();
     // instances
     if ($('wz-instances').dataset.built !== '1') wzLoadInstances();
     // paste-back
@@ -4679,6 +5067,7 @@
         step: 'streams', label: 'AIOStreams',
         hint: 'The manifest link AIOStreams gave you — it ends in /manifest.json.',
         defaultName: 'AIOStreams',
+        sayWhere: true,
       });
       $('wz-aio-install').dataset.built = '1';
     }
@@ -4698,13 +5087,15 @@
     });
   }
 
-  function wzDebridCard(d, nativeOnly) {
-    const c = wzCard('', () => { wz.debrid = d.id; nativeOnly ? wzMarkNativeDebrid() : wzMarkDebrid(); });
+  // Only the Nuvio+TorBox route builds these now, and only for the two services
+  // Nuvio can drive itself, so `nativeOnly` is gone with the other caller.
+  function wzDebridCard(d) {
+    const c = wzCard('', () => { wz.debrid = d.id; wzMarkNativeDebrid(); });
     c.dataset.wzdebrid = d.id;
     const h = el('div', 'wz-pick-h');
+    h.appendChild(wzLogo(d, 'sm'));
     h.appendChild(el('span', 'wz-pick-n', d.name));
     if (d.tag) h.appendChild(wzTag(d.tag));
-    if (!nativeOnly && d.native) h.appendChild(wzTag('Nuvio drives this too', 'plain'));
     h.appendChild(el('span', 'wz-pick-sp'));
     h.appendChild(wzWhyBtn(c, d.name));
     const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
@@ -4712,30 +5103,11 @@
     h.appendChild(open);
     c.appendChild(h);
     if (d.price) c.appendChild(el('div', 'wz-pick-price', d.price));
-    // Seven of these side by side, each with its own reasoning, was a wall of
-    // text — so the detail folds away and only the "?" in the header opens it.
+    // The reasoning folds away and only the "?" in the header opens it.
     const wrap = el('div', 'wz-pc-wrap');
     wrap.appendChild(wzProsCons(d.pros, d.cons));
     c.appendChild(wrap);
     return c;
-  }
-  function wzMarkDebrid() {
-    document.querySelectorAll('#wz-debrid [data-wzdebrid]').forEach(b => b.classList.toggle('on', b.dataset.wzdebrid === wz.debrid));
-    const d = WZ.DEBRID.find(x => x.id === wz.debrid);
-    $('wz-debrid-picked').textContent = wz.debrid === 'none'
-      ? WZ.NO_DEBRID.after
-      : (d ? 'Picked ' + d.name + ' — get its API key from its site, you paste it into AIOStreams, not here.' : '');
-  }
-  async function wzNoDebrid() {
-    const ok = await uiModal({
-      title: WZ.NO_DEBRID.title,
-      message: 'It works without one. Here is what you give up:',
-      details: WZ.NO_DEBRID.why,
-      okLabel: WZ.NO_DEBRID.ok,
-    });
-    if (!ok) return;
-    wz.debrid = 'none'; wzMarkDebrid();
-    logAct('Wizard: continuing without a debrid service', 'info');
   }
 
   async function wzLoadInstances() {
@@ -4802,28 +5174,44 @@
     }
   }
 
+  // Re-asks the tick when the SERVICE changes rather than the text. Set by
+  // wzRenderNative on first build; see wzWireCheck's return value.
+  let wzNativeRecheck = null;
   function wzRenderNative() {
     const c = $('wz-native-catch');
     if (c.dataset.built !== '1') { c.innerHTML = WZ.ROUTES.find(r => r.id === 'native').catch; c.dataset.built = '1'; }
     const box = $('wz-native-debrid');
     if (box.dataset.built !== '1') {
       clr(box);
-      WZ.DEBRID.filter(d => d.native).forEach(d => box.appendChild(wzDebridCard(d, true)));
+      WZ.DEBRID.filter(d => d.native).forEach(d => box.appendChild(wzDebridCard(d)));
+      // The live tick, same machinery as the API-keys step. Which service is
+      // being asked depends on which card is on, so the spec is read fresh.
+      wzNativeRecheck = wzWireCheck(
+        { inp: $('wz-native-key'), chk: $('wz-chk-native'), val: $('wz-keyv-native') },
+        () => WZ.DEBRID.find(d => d.id === wz.debrid && d.native)
+      );
       box.dataset.built = '1';
     }
     wzMarkNativeDebrid();
+    // Two options: the one that needs no configuring, and a way out to the
+    // marketplace for anyone who already knows they want something else.
     const p = $('wz-p2p');
     if (p.dataset.built !== '1') {
       clr(p);
       WZ.P2P_ADDONS.forEach(a => {
-        const r = el('div', 'wz-inst');
-        const tx = el('div');
-        tx.appendChild(el('div', 'nm', a.name));
-        tx.appendChild(el('div', 'muted sm', a.blurb));
-        r.appendChild(tx); r.appendChild(el('span', 'spacer'));
-        const b = el('button', 'btn btn-ghost btn-xs', a.instances ? 'Pick an instance' : 'Open site');
-        b.onclick = () => a.instances ? wzShowInstancePicker() : wzOpen(a.url);
-        r.appendChild(b); p.appendChild(r);
+        const card = el('div', 'wz-pick wz-pick-static');
+        const h = el('div', 'wz-pick-h');
+        h.appendChild(wzLogo(a, 'sm'));
+        h.appendChild(el('span', 'wz-pick-n', a.name));
+        if (a.tag) h.appendChild(wzTag(a.tag));
+        h.appendChild(el('span', 'wz-pick-sp'));
+        card.appendChild(h);
+        card.appendChild(el('div', 'wz-pick-one', a.blurb));
+        const act = el('div', 'wz-pick-act');
+        const b = el('button', 'btn btn-ghost btn-xs', a.browse ? 'Browse add-ons' : 'Open site');
+        b.onclick = () => a.browse ? wzShowInstancePicker() : wzOpen(a.url);
+        act.appendChild(b); card.appendChild(act);
+        p.appendChild(card);
       });
       p.dataset.built = '1';
     }
@@ -4832,6 +5220,7 @@
         step: 'streams', label: 'torrent add-on',
         hint: 'The manifest link from whichever add-on you configured — with no debrid key in it.',
         defaultName: 'Streams',
+        sayWhere: true,
       });
       $('wz-p2p-install').dataset.built = '1';
     }
@@ -4841,22 +5230,32 @@
     const d = WZ.DEBRID.find(x => x.id === wz.debrid && x.native);
     const key = $('wz-native-key');
     key.placeholder = d ? d.name + ' API key' : 'API key';
-    status($('wz-native-status'), d ? 'Get the key from ' + host(d.keyUrl) + ', then paste it above.' : 'Pick TorBox or Premiumize first.');
+    status($('wz-native-status'), d
+      ? 'Get the key from ' + host(d.keyUrl) + ', paste it above, and “Save and move to next step” connects it and switches resolving on.'
+      : 'Pick TorBox or Premiumize first.');
+    if (wzNativeRecheck) wzNativeRecheck();
+    wzPaintNext();
   }
   // Reuses the marketplace's own instance bubble rather than a second one.
   function wzShowInstancePicker() { nav('market'); switchMkTab('addons'); }
 
   // Writes a debrid key the way Nuvio's own Connected Services screen ends up
   // storing it, and turns on the two switches that make it do anything.
+  //
+  // It has no button of its own any more. "Connect and turn on resolving" was a
+  // second thing to press on a step that already ends in Next, and pressing
+  // only Next quietly skipped it. Next is the one control that writes on every
+  // step, and wzCommitStep calls this first — so filling in the key and the
+  // add-on link and pressing Next once does both, in that order.
   async function wzSaveNativeKey() {
     const t = wzTarget(); if (!t) return false;
-    const st = $('wz-native-status'), res = $('wz-native-res'), btn = $('wz-native-save');
+    const st = $('wz-native-status'), res = $('wz-native-res');
     clr(res);
     const d = WZ.DEBRID.find(x => x.id === wz.debrid && x.native);
     if (!d) { status(st, 'Pick TorBox or Premiumize first.', 'err'); return false; }
     const key = ($('wz-native-key').value || '').trim();
     if (!key) { status(st, 'Paste the API key first.', 'err'); return false; }
-    btn.disabled = true; status(st, 'Connecting…');
+    status(st, 'Connecting…');
     const problems = [];
     try {
       const c = A.client(store, t.aid);
@@ -4902,7 +5301,7 @@
       status(st, "Couldn't save: " + e.message, 'err');
       logAct('Wizard: debrid connect failed — ' + e.message, 'err');
       return false;
-    } finally { btn.disabled = false; }
+    }
   }
 
   // ======================================================================
@@ -4916,7 +5315,7 @@
       WZ.METADATA.forEach(m => {
         const w = el('div', 'wz-meta-card'); w.dataset.wzmeta = m.id;
         const top = el('div', 'wz-meta-top');
-        top.appendChild(wzLogo(m));
+        top.appendChild(wzLogo(m, 'lg'));
         const hd = el('div', 'wz-meta-hd');
         const nm = el('div', 'nm');
         nm.appendChild(el('span', '', m.name));
@@ -4944,22 +5343,6 @@
       box.dataset.built = '1';
     }
     wzMarkMetaInstalled();
-  }
-
-  // The tile's artwork. It is decoration with a job — it is how you recognise
-  // the add-on you already know — so a host that has gone away degrades to the
-  // monogram sitting underneath it, never to a broken-image icon.
-  function wzLogo(m) {
-    const t = el('span', 'wz-meta-logo');
-    t.appendChild(el('span', 'mono', m.mono || ((m.name || '?').trim()[0] || '?').toUpperCase()));
-    if (m.logo) {
-      const i = document.createElement('img');
-      i.alt = ''; i.loading = 'lazy'; i.referrerPolicy = 'no-referrer';
-      i.onerror = () => i.remove();
-      i.src = m.logo;
-      t.appendChild(i);
-    }
-    return t;
   }
 
   // Whether each metadata add-on is ACTUALLY on the profile, read live rather
@@ -5055,10 +5438,14 @@
       const tx = el('div', 'tx'); tx.appendChild(el('b', '', 'Put it at the top of the add-on list'));
       lab.appendChild(cb); lab.appendChild(tx); w.appendChild(lab);
     }
-    // With no button of its own, the box has to say where its save button went.
-    const go = el('div', 'muted sm mk-hint');
-    go.textContent = 'Filled in? “Save and move to next step” at the bottom writes it in.';
-    w.appendChild(go);
+    // Where the save button went is said once per STEP, in that step's header,
+    // not once per box. On the metadata step there are four of these side by
+    // side and the same sentence appeared under every one of them.
+    if (opts.sayWhere) {
+      const go = el('div', 'muted sm mk-hint');
+      go.textContent = 'Filled in? “Save and move to next step” at the bottom writes it in.';
+      w.appendChild(go);
+    }
     const st = el('div', 'inline-status');
     const res = el('div', 'mk-res');
     // The box has no button of its own any more: Next is the one thing that
@@ -5221,13 +5608,10 @@
       $('wz-prof-create').onclick = wzCreateProfile;
       $('wz-prof-name').addEventListener('keydown', e => { if (e.key === 'Enter') wzCreateProfile(); });
       $('wz-prof-cancel').onclick = () => { $('wz-newprof').style.display = 'none'; status($('wz-profile-status'), ''); };
-      $('wz-nodebrid-btn').onclick = wzNoDebrid;
       $('wz-guide-btn').onclick = wzShowGuide;
       $('wz-inst-refresh').onclick = wzLoadInstances;
-      $('wz-native-save').onclick = wzSaveNativeKey;
       $('wz-sim-run').onclick = wzSimRun;
       $('wz-sim-key-open').onclick = () => wzOpen('https://torbox.app/settings');
-      $('wz-sim-hosts-refresh').onclick = wzLoadHosts;
       // Editing the key means starting over, so the finished link and its install
       // box are put away: a stale link left on screen next to a new key is a lie,
       // and a hidden install box reports itself clean so Next won't write it.

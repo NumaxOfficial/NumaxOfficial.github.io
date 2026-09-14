@@ -747,7 +747,96 @@
      gives the text `min-width:0` and the button `flex:none`. Without that a long
      add-on name or instance host pushes the button out of its card, which is
      exactly what "text going out of boxes" was. */
-  .panel[data-panel="wizard"]{ max-width:1400px; }
+  /* The panel is a column and .wz-body is the part that grows, so the Back/Next
+     bar sits on the bottom edge of the window on a short step instead of
+     floating halfway up it with a screenful of nothing underneath. A long step
+     simply pushes it down and the panel scrolls as before. */
+  .panel[data-panel="wizard"]{ max-width:1400px; display:flex; flex-direction:column; }
+  /* Grows so the Back/Next bar sits on the bottom edge of the window like a
+     dialog's action bar. It is deliberately NOT centred: centring made every
+     step begin at a different height (85px below the rail on one, 217px on
+     another), so moving between steps jumped the whole page around. Content
+     starts in the same place on all five. */
+  /* Two columns: the step on the left, a live read of the target profile on
+     the right. The panel is what claims the space a short step leaves over,
+     and it is useful rather than decorative - the wizard could not previously
+     tell you what was on the profile you had just chosen. */
+  .wz-body{ flex:1 0 auto; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) 322px; gap:38px; }
+  /* Named container so grids inside can size against this column rather than
+     the window — the panel beside it takes a fixed 322px out of the reckoning. */
+  .wz-main{ min-width:0; display:flex; flex-direction:column; gap:34px;
+    container-type:inline-size; container-name:wzmain; }
+  @media (max-width:1180px){
+    .wz-body{ grid-template-columns:minmax(0,1fr); gap:30px; }
+    .wz-panel{ border-left:0 !important; padding-left:0 !important; border-top:1px solid var(--line-2); padding-top:26px !important; }
+  }
+
+  /* ---- the step's question, at size (one question per screen) ---- */
+  .wz-head{ min-width:0; }
+  .wz-head h2{
+    font-size:clamp(23px,2.6vw,31px); font-weight:800; letter-spacing:-.025em;
+    line-height:1.12; margin:0; text-wrap:balance; }
+  .wz-head p{ font-size:14px; color:var(--t55); line-height:1.55; margin:10px 0 0; max-width:58ch; }
+
+  /* ---- the live profile panel ---- */
+  .wz-panel{
+    min-width:0; border-left:1px solid var(--line-2); padding-left:32px;
+    display:flex; flex-direction:column; font-size:12px; }
+  .wz-pnl-who{ display:flex; align-items:center; gap:11px; margin-bottom:20px; min-width:0; }
+  .wz-pnl-who > div{ min-width:0; }
+  .wz-pnl-who .nm{ font-size:14.5px; font-weight:700; letter-spacing:-.01em;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-pnl-who .sub{ font-size:11px; color:var(--t45); margin-top:1px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-pnl-body{ min-width:0; }
+  .wz-pnl-h{
+    font-family:ui-monospace,monospace; font-size:9.5px; letter-spacing:.15em;
+    text-transform:uppercase; color:var(--t35); margin:18px 0 8px;
+    padding-bottom:7px; border-bottom:1px solid var(--line-2); }
+  .wz-pnl-body > .wz-pnl-h:first-child{ margin-top:0; }
+  .wz-pnl-row{ display:flex; align-items:center; gap:9px; padding:5px 0; min-width:0; }
+  .wz-pnl-row .nm{ font-size:12.5px; font-weight:600; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* The user's own label for a row, kept when it differs from what the add-on
+     actually is - "Main" is how you find it in Nuvio, AIOStreams is what it is. */
+  .wz-pnl-row .as{ font-size:11px; color:var(--t35); min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-pnl-row .sp{ flex:1 1 auto; min-width:6px; }
+  .wz-pnl-row .st{ flex:none; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--t35); }
+  .wz-pnl-row .st.on{ color:#7bd88f; }
+  .wz-pnl-none{ font-size:11.5px; color:var(--t35); font-style:italic; padding:3px 0 4px; }
+  .wz-pnl-err{ font-size:11.5px; color:#ff9a94; line-height:1.5; padding:3px 0; }
+  .wz-pnl-load{ font-size:11.5px; color:var(--t45); padding:6px 0; }
+  .wz-pnl-run{ margin-top:auto; padding-top:18px; }
+  .wz-pnl-run .wz-pnl-h{ margin-top:0; }
+  .wz-pnl-did{ display:flex; gap:8px; align-items:flex-start; font-size:11.5px;
+    color:var(--t55); line-height:1.5; padding:3px 0; }
+  .wz-pnl-did .tk{ flex:none; color:#7bd88f; font-family:ui-monospace,monospace; }
+  .wz-pnl-did span:last-child{ min-width:0; overflow-wrap:anywhere; }
+
+  /* ---- step 1 at scale ---- */
+  .wz-acc{ min-width:0; }
+  .wz-acc-sel{ max-width:420px; }
+  .wz-acc-sel .nsel-btn, .wz-acc-sel select{ font-size:14px; }
+  .wz-acc-note{ margin:11px 0 26px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .wz-acc-note .pill-count{ flex:none; }
+  .chip-grid.wz-chips-big{ gap:13px; }
+  .wz-chips-big .pchip{ min-width:122px; padding:19px 21px; border-radius:19px; gap:11px; }
+  .wz-chips-big .pchip .pcn{ font-size:13px; }
+  .wz-chips-big .pchip.wz-add .plus{ width:54px; height:54px; font-size:23px; }
+  .wz-sec-lead{ margin:0 0 18px; max-width:74ch; }
+  .wz-sec-lead #wz-order-tip{ color:var(--t35); }
+  /* Spacing between sections is the container's gap, not each section's own
+     bottom margin. A margin cannot see across a wrapper - the route cards and
+     the panel below them are in two different divs, so "last section has no
+     margin" left them touching - and a hidden wrapper still has to contribute
+     nothing. Flex gap gets both right without a single exception rule. */
+  /* app.js shows a pane with style.display = '' (i.e. no inline value), so the
+     rule below is what it falls back to; it hides one with an inline 'none',
+     which still wins. Do not change the show path to an explicit 'block'. */
+  .wz-pane{ display:flex; flex-direction:column; gap:34px; min-width:0; }
+  #wz-mode-simple, #wz-mode-advanced, #wz-route-aiostreams, #wz-route-native,
+  #wz-account-body{ display:flex; flex-direction:column; gap:34px; min-width:0; }
   .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
   .wz-step{ display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); background:transparent;
     color:var(--t55); border-radius:999px; padding:7px 15px 7px 7px; font-size:12.5px; font-weight:600;
@@ -769,28 +858,49 @@
   .wz-target .muted{ font-size:12px; }
   .wz-target .btn{ flex:none; }
 
-  /* Cards inside a pane own their own rhythm; the grid owns the gap, so the
-     card's default bottom margin is dropped in both places to stop the
-     18-vs-36px unevenness between a grid row and the card under it. */
-  .wz-pane > .card, .wz-pane > div > .card{ margin-bottom:16px; }
-  .wz-pane > .panel-cols{ margin-bottom:16px; }
-  .wz-pane > .panel-cols > .card{ margin-bottom:0; }
-  /* A grid column that stacks its own cards, so a short card and the one below
-     it together balance a tall card in the next column. */
-  .wz-acc-col{ display:flex; flex-direction:column; gap:18px; min-width:0; }
-  .wz-acc-col > .card{ margin-bottom:0; }
-  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:2px; padding-bottom:4px; }
+  /* ---- flat sections -------------------------------------------------------
+     A wizard step is a heading, a hairline and its controls. It used to be a
+     stack of glass cards, each holding more cards, each holding a bordered row
+     - three or four outlines deep before you reached anything you could press.
+     The outlines that are left in this panel all mean the same one thing now:
+     you can pick this, or type in it. Nothing else draws a box. */
+  .wz-sec{ min-width:0; }
+  .wz-sec > .chead{ margin-bottom:15px; padding-bottom:11px; border-bottom:1px solid var(--line-2); }
+  .wz-sec > .chead h3{ font-size:16.5px; font-weight:700; letter-spacing:-.01em; min-width:0; }
+  .wz-sec > .chead .muted{ min-width:0; text-align:right; }
+  .wz-sec > .chead .btn, .wz-sec > .chead .pill-count{ flex:none; }
+
+  /* Step 1's two halves. A rule between them rather than two boxes, and the
+     account side is capped because a lone select does not want half a window. */
+  .wz-acc-grid{ display:grid; grid-template-columns:minmax(240px,340px) 1fr; gap:34px; align-items:start; }
+  .wz-acc-grid > .wz-sec{ margin-bottom:0; }
+  .wz-acc-grid > .wz-sec + .wz-sec{ border-left:1px solid var(--line-2); padding-left:34px; }
+  @media (max-width:860px){
+    .wz-acc-grid{ grid-template-columns:1fr; gap:28px; }
+    .wz-acc-grid > .wz-sec + .wz-sec{ border-left:0; padding-left:0; }
+  }
+
+  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:30px; padding-top:16px; padding-bottom:4px;
+    border-top:1px solid var(--line-2); }
   .wz-foot .spacer{ flex:1; }
   .wz-foot .btn{ flex:none; }
+  .wz-run{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px; }
+  .wz-run .btn{ flex:none; }
+  .wz-run .inline-status{ min-width:0; }
+  .wz-run .inline-status:empty{ display:none; }
 
   /* choice cards - routes, debrid. NOT <button>: they carry their own buttons. */
-  /* align-items:start, for the same reason .wz-debrid has it: these cards now
-     expand when their "?" is pressed, and a stretching row would drag every
-     other card in it to the opened card's height. */
-  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; align-items:start; }
+  /* align-items:stretch: two cards side by side have to be the same height, or
+     the row reads as broken. That means a card whose "?" is open makes its
+     neighbour equally tall - which is the trade, and the right way round. */
+  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; align-items:stretch; }
   .wz-pick{ text-align:left; font-family:inherit; color:inherit; cursor:pointer; position:relative; min-width:0;
+    display:flex; flex-direction:column;
     background:var(--surface); border:2px solid var(--line); border-radius:16px; padding:16px 17px;
     transition:border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
+  /* The one-liner takes the slack, so every card in a row lines its rule and
+     its disclosure up at the same height however long the text above is. */
+  .wz-pick > .wz-pick-one{ flex:1 1 auto; }
   .wz-pick:hover{ border-color:rgba(255,255,255,.26); }
   .wz-pick:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
   .wz-pick.on{ border-color:var(--accent); background:rgba(229,57,53,.07); }
@@ -811,6 +921,16 @@
   .wz-pc .s{ flex:none; width:11px; font-family:ui-monospace,monospace; font-weight:700; }
   .wz-pc .pro .s{ color:#7bd88f; } .wz-pc .con .s{ color:#f0a060; }
   .wz-pc .con{ color:var(--t55); }
+  /* "What you're getting" behind the simple card's "?" - prose lines between
+     the ticked ones, so the preset reads as a description and not as a score. */
+  .wz-pc-b{ font-size:12px; line-height:1.55; color:var(--t55); }
+
+  /* A card that presents rather than selects (the torrent add-on options): same
+     shape as .wz-pick so the two sit in one grid, without the picked state. */
+  .wz-pick-static{ cursor:default; }
+  .wz-pick-static:hover{ border-color:var(--line); }
+  .wz-pick-act{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px; }
+  .wz-pick-act .btn{ flex:none; }
 
   /* Debrid cards keep their reasoning folded away - there are seven of them and
      fully expanded the grid was a wall of text. Opens on hover, on keyboard
@@ -838,10 +958,10 @@
 
   /* align-items:start so opening one card's detail does not stretch every other
      card in its row to match. */
-  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; align-items:start; }
-  .wz-nodebrid{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); }
-  .wz-nodebrid .btn{ flex:none; }
-  .wz-nodebrid .muted{ min-width:0; flex:1 1 240px; line-height:1.5; }
+  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; align-items:stretch; }
+  /* Two options, so two columns - auto-fit would put them side by side at any
+     width and then strand the second one on its own row just below 660px. */
+  .wz-p2p{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
 
   /* instance rows - name, uptime, open */
   .wz-inst{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
@@ -885,24 +1005,10 @@
   .wz-inst-sq .sp{ flex:1 1 auto; min-height:0; }
   .wz-inst-sq .btn{ flex:none; align-self:flex-start; }
 
-  /* Host rows in the simple path are a choice, not a link out, so they carry a
-     picked state instead of an Open button. Same shape as .wz-inst so the two
-     lists read as the same list. NOT <button>: they carry their own Open link. */
-  .wz-host{ display:flex; align-items:center; gap:11px; width:100%; text-align:left; font-family:inherit; color:inherit;
-    cursor:pointer; background:var(--surface); border:2px solid var(--line); border-radius:11px; padding:9px 13px; margin-bottom:8px;
-    transition:border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
-  .wz-host:hover{ border-color:rgba(255,255,255,.26); }
-  .wz-host:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
-  .wz-host.on{ border-color:var(--accent); background:rgba(229,57,53,.07); }
-  .wz-host .tick{ flex:none; width:15px; height:15px; border-radius:50%; border:2px solid var(--line);
-    display:grid; place-items:center; }
-  .wz-host.on .tick{ border-color:var(--accent); background:var(--accent); }
-  .wz-host.on .tick::after{ content:''; width:5px; height:5px; border-radius:50%; background:#fff; }
-  .wz-host .nm{ font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .wz-host .up{ font-family:ui-monospace,monospace; font-size:11.5px; color:#7bd88f; flex:none; }
-  .wz-host .up.low{ color:#f0c060; }
-  .wz-host .spacer{ flex:1 1 auto; min-width:0; }
-  .wz-host .btn{ flex:none; }
+  /* The simple path's host list is gone: the wizard takes one of the four
+     best-uptime AIOStreams hosts itself (app.js wzPickHost), because it was a
+     question with twelve answers and no way to tell them apart. .wz-host went
+     with it — .wz-inst still draws the instance list on the advanced path. */
 
   /* What the simple path hands back: the link, and the two things AIOStreams
      cannot recover for you. Monospace and selectable, with a copy button each. */
@@ -932,26 +1038,18 @@
   .chead h3{ display:flex; align-items:center; min-width:0; }
 
   /* ---- the two front doors on step 1 -------------------------------------- */
-  /* The shared .panel-cols track is minmax(430px,1fr), which cannot go below
-     430px and so hangs 75px off the side of a phone. min(430px,100%) keeps
-     the two-column layout everywhere it fits and collapses cleanly where it
-     does not. Scoped to this step rather than changed globally. */
-  #wz-have .panel-cols{ grid-template-columns:repeat(auto-fit,minmax(min(430px,100%),1fr)); }
+  /* Step 1's two halves are .wz-acc-grid now, not the shared .panel-cols track;
+     see that rule above for why (a rule instead of two boxes, and an account
+     column that is not made half a window wide by a single select). */
   .wz-branch-bar{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
   .wz-branch-bar .btn{ flex:none; }
   .wz-branch-bar .muted{ min-width:0; }
   .wz-narrow{ max-width:520px; }
   #wz-entry{ margin-bottom:16px; }
 
-  /* ---- a card with some light in it --------------------------------------
-     The keys step was a black rectangle with three password boxes on it. This
-     is a single accent wash behind the card, not a per-row gradient: one light
-     source reads as depth, several read as noise. */
-  .card.wz-lit{ position:relative; overflow:hidden; }
-  .card.wz-lit::before{ content:''; position:absolute; z-index:0; pointer-events:none;
-    width:640px; height:640px; top:-58%; right:-14%; border-radius:50%;
-    background:radial-gradient(circle, rgba(229,57,53,.16) 0%, rgba(229,57,53,.04) 44%, transparent 70%); }
-  .card.wz-lit > *{ position:relative; z-index:1; }
+  /* The keys step used to be a glass card with an accent wash inside it. The
+     card is gone, and a wash with no box to sit in has nothing to light, so it
+     went with it. The rows below are the only outlines on that step now. */
 
   /* ---- api key rows ------------------------------------------------------ */
   .wz-key{ position:relative; background:var(--surface); border:1px solid var(--line); border-radius:15px;
@@ -996,27 +1094,61 @@
   .wz-key-v.good{ color:#7bd88f; } .wz-key-v.bad{ color:#ff8a80; } .wz-key-v.unknown{ color:#ffd9a0; }
   .wz-key-v:empty{ display:none; }
 
-  /* ---- metadata tiles ---------------------------------------------------- */
-  .wz-meta-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; align-items:start; }
+  /* ---- other people's logos ----------------------------------------------
+     One element for every third party the wizard names - TMDB, MDBList, Anime
+     Skip, TorBox, Premiumize, AIOStreams, Torrentio, and the metadata add-ons.
+     It is decoration with a job: it is how you recognise the thing you already
+     know. Every logo sits on top of a monogram, and app.js removes the <img> if
+     it fails to load, so a host that goes away degrades to a letter and never
+     to a broken-image icon. object-fit:contain, because these are marks with
+     their own padding and cropping them square mangles half of them. */
+  .wz-logo{ position:relative; flex:none; width:40px; height:40px; border-radius:11px; overflow:hidden;
+    display:grid; place-items:center; background:var(--surface-2); border:1px solid var(--line); }
+  .wz-logo .mono{ font-size:17px; font-weight:800; color:var(--t45); }
+  .wz-logo img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  .wz-logo.lg{ width:46px; height:46px; border-radius:13px; }
+  .wz-logo.lg .mono{ font-size:19px; }
+  .wz-logo.sm{ width:34px; height:34px; border-radius:10px; }
+  .wz-logo.sm .mono{ font-size:15px; }
+  .wz-logo.xs{ width:21px; height:21px; border-radius:6px; }
+  .wz-logo.xs .mono{ font-size:10px; }
+  /* Two marks for a route that names two services. Overlapped rather than set
+     side by side, so the pair reads as one badge and takes about the width of
+     one and a half - a card header has a name and a tag to fit as well. */
+  .wz-logo-pair{ display:inline-flex; flex:none; align-items:center; }
+  .wz-logo-pair > .wz-logo + .wz-logo{ margin-left:-11px; }
+  .wz-logo-pair > .wz-logo:last-child{ box-shadow:-3px 0 0 0 var(--bg); }
+
+  /* ---- metadata tiles ----------------------------------------------------
+     align-items:stretch plus a card that is a full-height flex column: four
+     tiles whose text runs to different lengths still line up, and each one's
+     paste-the-link box sits on the same baseline as its neighbours'. */
+  /* Fixed counts, not auto-fit. There are four tiles, and auto-fit's answer at
+     most window sizes was three of them plus one stranded on its own row —
+     which is the lopsided look, not a spacing problem. 4, then 2x2, then 1:
+     every one of those is a full row.
+
+     Measured against .wz-main, NOT the window: the profile panel takes a fixed
+     322px, so a 1500px window leaves this column about 800px. A viewport
+     breakpoint would have put four tiles in 800px and made each one 185px. */
+  .wz-meta-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:stretch; }
+  @container wzmain (min-width:1150px){ .wz-meta-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
+  @container wzmain (max-width:560px){ .wz-meta-grid{ grid-template-columns:1fr; } }
   .wz-meta-card{ display:flex; flex-direction:column; gap:11px; background:var(--surface); border:1px solid var(--line);
     border-radius:16px; padding:17px 18px; min-width:0; overflow:hidden; position:relative;
     transition:border-color .2s ease, background .2s ease; }
   .wz-meta-card:hover{ border-color:rgba(255,255,255,.2); background:var(--surface-2); }
   .wz-meta-card.on{ border-color:rgba(67,160,71,.38); }
   .wz-meta-top{ display:flex; align-items:center; gap:12px; min-width:0; }
-  /* The logo is decoration with a job: it is how you recognise the add-on you
-     already know. A dead host degrades to the monogram underneath, never to a
-     broken-image icon. */
-  .wz-meta-logo{ position:relative; flex:none; width:46px; height:46px; border-radius:13px; overflow:hidden;
-    display:grid; place-items:center; background:var(--surface-2); border:1px solid var(--line); }
-  .wz-meta-logo .mono{ font-size:19px; font-weight:800; color:var(--t45); }
-  .wz-meta-logo img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
   .wz-meta-hd{ min-width:0; flex:1 1 auto; }
   .wz-meta-hd .nm{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:15px; font-weight:700;
     letter-spacing:-.01em; min-width:0; overflow-wrap:anywhere; }
   .wz-meta-b{ font-size:12.5px; color:var(--t70); line-height:1.5; overflow-wrap:anywhere; }
   .wz-meta-w{ font-size:12px; color:var(--t45); line-height:1.5; overflow-wrap:anywhere; }
-  .wz-meta-act{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  /* Pushed to the bottom of the card together with the box below it, which is
+     what keeps four tiles' buttons and paste boxes on one line instead of at
+     four different heights. */
+  .wz-meta-act{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:auto; padding-top:3px; }
   .wz-meta-act .btn{ flex:none; }
   .wz-meta-tag{ display:inline-flex; }
   .wz-meta-slot{ margin-top:2px; }
@@ -1040,8 +1172,11 @@
   .wz-pane .mk-install .mk-hint{ margin-top:-4px; line-height:1.5; }
   .wz-pane .mk-install .btn{ align-self:flex-start; }
   .wz-pane .mk-install .inline-status:empty, .wz-pane .mk-install .mk-res:empty{ display:none; }
-  .wz-pane .switch-row{ align-items:flex-start; }
+  /* A tick inside a tile inside a section does not also need a box around it.
+     Only the outlines that mean "pick this / type here" are left in the panel. */
+  .wz-pane .switch-row{ align-items:flex-start; background:none; border:0; padding:0; gap:10px; }
   .wz-pane .switch-row input[type=checkbox]{ margin-top:2px; flex:none; }
+  .wz-pane .switch-row .tx b{ font-size:12.5px; font-weight:600; color:var(--t70); }
 
   /* new-profile inline form */
   .wz-newprof{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:14px;
@@ -1703,9 +1838,15 @@
     <div class="topbar"><span class="crumb">Numax&nbsp;/&nbsp;<b id="crumb">Nuvio accounts</b></span></div>
 
     <!-- setup wizard -->
+    <!-- Every step is a flat section: a heading, a hairline under it, and the
+         controls. The only outlines left in this panel are on things you can
+         actually pick or type into, so nothing is a box inside a box inside a
+         box any more. .wz-body holds the panes and grows, which is what keeps
+         the footer on the bottom edge of a short step instead of leaving a
+         screenful of nothing under it. -->
     <section class="panel" data-panel="wizard" style="display:none">
       <div class="phead"><span class="eyebrow">Setup wizard</span><h1>A working Nuvio, start to finish.</h1>
-        <p>Five steps, all written straight into the profile you pick — nothing is kept by Numax.</p></div>
+        <p>Five steps, all written straight into the profile you pick &mdash; nothing is kept by Numax.</p></div>
 
       <div class="wz-rail" id="wz-rail">
         <button class="wz-step on" data-wzstep="account"><span class="n">1</span><span class="t">Account &amp; profile</span></button>
@@ -1717,12 +1858,19 @@
 
       <div class="wz-target" id="wz-target" style="display:none"></div>
 
-      <!-- 1 — account & profile -->
+      <!-- The step's own question on the left, and a live read of the profile
+           it is all going to on the right. The panel is read-only and writes
+           nothing; see app.js wzRenderPanel for why it holds no state. -->
+      <div class="wz-body">
+       <div class="wz-main">
+        <div class="wz-head" id="wz-head" style="display:none"></div>
+
+      <!-- 1 - account & profile -->
       <!-- Opens on one question, not on every control at once. The account
            picker, the profile picker and the sign-up form are all still here;
            they just wait behind whichever of the two answers applies. -->
       <div class="wz-pane on" data-wzpane="account">
-        <div class="card" id="wz-signin-card" style="display:none">
+        <div class="wz-sec" id="wz-signin-card" style="display:none">
           <div class="chead"><h3>Sign in with Google first</h3></div>
           <p class="muted sm">Numax keeps your linked Nuvio accounts in your own Google Drive, so the wizard needs that connection before it can do anything.</p>
         </div>
@@ -1730,44 +1878,35 @@
         <div id="wz-account-body">
           <div class="wz-routes" id="wz-entry"></div>
 
+          <!-- The headline above already asks the question, so the numbered
+               "1 Account / 2 Profile" sub-sections are gone: two labels for one
+               question. What is left is the account, then the profiles, at a
+               size that owns the screen. -->
           <div class="wz-branch" id="wz-have" style="display:none">
             <div class="wz-branch-bar">
               <button class="btn btn-ghost btn-xs wz-entry-back">Back</button>
-              <span class="muted sm">Pick the account, then the profile you want set up.</span>
             </div>
-            <div class="panel-cols">
-              <div class="wz-acc-col">
-                <div class="card">
-                  <div class="chead"><h3><span class="wz-n">1</span>Account</h3></div>
-                  <div class="field-col">
-                    <div class="nsel-slot"><select class="sel" id="wz-account"></select></div>
-                  </div>
-                  <p class="muted sm" style="margin-top:12px">Not there? Link it on the <b>Nuvio accounts</b> tab, then come back.</p>
-                </div>
+            <div class="wz-acc" id="wz-profile-card">
+              <div class="nsel-slot wz-acc-sel"><select class="sel" id="wz-account"></select></div>
+              <p class="muted sm wz-acc-note">Not the right one? Link another on the <b>Nuvio accounts</b> tab.
+                <span class="pill-count" id="wz-profile-count"></span></p>
+              <div class="chip-grid wz-chips-big" id="wz-profiles"></div>
+              <div class="wz-newprof" id="wz-newprof" style="display:none">
+                <input type="text" id="wz-prof-name" placeholder="Profile name" maxlength="60">
+                <input type="color" id="wz-prof-color" value="#1E88E5" aria-label="Profile colour">
+                <button class="btn btn-solid btn-xs" id="wz-prof-create">Create</button>
+                <button class="btn btn-ghost btn-xs" id="wz-prof-cancel">Cancel</button>
               </div>
-
-              <div class="card" id="wz-profile-card">
-                <div class="chead"><h3><span class="wz-n">2</span>Profile</h3><span class="spacer"></span><span class="pill-count" id="wz-profile-count"></span></div>
-                <p class="muted sm" style="margin-bottom:14px">Everything the wizard writes goes to this one profile. Nuvio allows six per account.</p>
-                <div class="chip-grid" id="wz-profiles"></div>
-                <div class="wz-newprof" id="wz-newprof" style="display:none">
-                  <input type="text" id="wz-prof-name" placeholder="Profile name" maxlength="60">
-                  <input type="color" id="wz-prof-color" value="#1E88E5" aria-label="Profile colour">
-                  <button class="btn btn-solid btn-xs" id="wz-prof-create">Create</button>
-                  <button class="btn btn-ghost btn-xs" id="wz-prof-cancel">Cancel</button>
-                </div>
-                <div class="inline-status" id="wz-profile-status" style="margin-top:12px"></div>
-              </div>
+              <div class="inline-status" id="wz-profile-status" style="margin-top:14px"></div>
             </div>
           </div>
 
           <div class="wz-branch" id="wz-new" style="display:none">
             <div class="wz-branch-bar">
               <button class="btn btn-ghost btn-xs wz-entry-back">Back</button>
-              <span class="muted sm">You'll be signed straight in — there's no confirmation email to wait for.</span>
+              <span class="muted sm">You'll be signed straight in &mdash; there's no confirmation email to wait for.</span>
             </div>
-            <div class="card wz-narrow">
-              <div class="chead"><h3>Create a Nuvio account</h3></div>
+            <div class="wz-sec wz-narrow">
               <div class="field-col">
                 <input type="email" id="wz-new-email" placeholder="Email address" autocomplete="off">
                 <input type="password" id="wz-new-pass" placeholder="Password (6 characters or more)" autocomplete="new-password">
@@ -1781,144 +1920,125 @@
         </div>
       </div>
 
-      <!-- 2 — api keys -->
+      <!-- 2 - api keys -->
       <!-- One line of copy per key and nothing else on the surface: the how-to
            steps fold away, and the tick to the right of each box is the live
            answer from the provider itself, so nobody has to wonder whether a
            pasted key is the right one. -->
       <div class="wz-pane" data-wzpane="keys" style="display:none">
-        <div class="card wz-lit">
-          <div class="chead"><h3>Keys worth having</h3><span class="spacer"></span><span class="muted sm">All three are free. TMDB is required.</span></div>
+        <div class="wz-sec">
           <div id="wz-keys"></div>
           <div class="inline-status" id="wz-keys-status" style="margin-top:14px"></div>
           <div class="mk-res" id="wz-keys-res"></div>
         </div>
       </div>
 
-      <!-- 3 — streams -->
+      <!-- 3 - streams -->
       <div class="wz-pane" data-wzpane="streams" style="display:none">
-        <div class="card">
-          <div class="chead"><h3>Where your streams come from</h3></div>
-          <p class="muted sm" style="margin-bottom:16px">Nuvio needs an add-on that goes and finds something to play.</p>
+        <div class="wz-sec">
           <div class="wz-routes" id="wz-modes"></div>
         </div>
 
-        <!-- simple: key, host, one button -->
+        <!-- simple: one key, one button. What the preset actually does used to
+             be a whole section above this; it lives behind the card's "?" now. -->
         <div id="wz-mode-simple" style="display:none">
           <div class="wz-catch" id="wz-sim-off" style="display:none;margin-bottom:16px"></div>
-          <div class="card">
-            <div class="chead"><h3 id="wz-sim-preset-t">What you're getting</h3></div>
-            <p class="muted sm" id="wz-sim-preset-b" style="margin-bottom:12px"></p>
-            <ul class="wz-steps" id="wz-sim-preset"></ul>
-            <p class="muted sm" id="wz-sim-preset-n" style="margin-top:12px"></p>
-          </div>
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">1</span>Your TorBox key</h3><span class="spacer"></span>
+          <div class="wz-sec">
+            <div class="chead"><h3>Your TorBox key</h3><span class="spacer"></span>
               <button class="btn btn-ghost btn-xs" id="wz-sim-key-open">Open TorBox settings</button></div>
             <p class="muted sm" id="wz-sim-key-b" style="margin-bottom:12px"></p>
-            <input type="password" id="wz-sim-key" class="wz-key-input" placeholder="TorBox API key" autocomplete="off" spellcheck="false">
+            <div class="wz-key-row wz-narrow">
+              <input type="password" id="wz-sim-key" class="wz-key-input" placeholder="TorBox API key" autocomplete="off" spellcheck="false">
+              <span class="wz-chk idle" id="wz-chk-sim"></span>
+            </div>
+            <div class="wz-key-v" id="wz-keyv-sim"></div>
             <div class="muted sm" id="wz-sim-key-h" style="margin-top:8px"></div>
             <div class="muted sm" id="wz-sim-key-no" style="margin-top:10px"></div>
-          </div>
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">2</span>Pick a host</h3><span class="spacer"></span><span class="pill-count" id="wz-sim-host-count"></span>
-              <button class="btn btn-ghost btn-xs" id="wz-sim-hosts-refresh">Refresh</button></div>
-            <p class="muted sm" id="wz-sim-hosts-b" style="margin-bottom:12px"></p>
-            <div class="inline-status" id="wz-sim-hosts-status" style="margin-bottom:10px"></div>
-            <div id="wz-sim-hosts"></div>
-          </div>
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">3</span>That's it</h3></div>
-            <p class="muted sm" style="margin-bottom:14px">Numax builds the configuration on the host you picked and brings the link back.</p>
-            <button class="btn btn-primary" id="wz-sim-run">Set it up for me</button>
-            <div class="inline-status" id="wz-sim-status" style="margin-top:12px"></div>
+            <div class="wz-run">
+              <button class="btn btn-primary" id="wz-sim-run">Set it up for me</button>
+              <span class="inline-status" id="wz-sim-status"></span>
+            </div>
             <div id="wz-sim-result" style="display:none;margin-top:16px"></div>
             <div id="wz-sim-install" style="display:none;margin-top:16px"></div>
           </div>
         </div>
 
-        <!-- advanced: the two routes, exactly as before -->
+        <!-- advanced: the two routes -->
         <div id="wz-mode-advanced" style="display:none">
-          <div class="card">
-            <div class="chead"><h3>Pick a route</h3></div>
-            <p class="muted sm" style="margin-bottom:16px">Both routes need a source add-on — the difference is where your debrid key lives.</p>
+          <div class="wz-sec">
+            <div class="chead"><h3>Pick a route</h3><span class="spacer"></span>
+              <span class="muted sm">Both routes need a source add-on &mdash; the difference is where your debrid key lives.</span></div>
             <div class="wz-routes" id="wz-routes"></div>
           </div>
         </div>
 
+        <!-- AIOStreams asks for your debrid service on its own site, so this
+             path no longer asks first: picking one here changed nothing. -->
         <div id="wz-route-aiostreams" style="display:none">
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">1</span>Pick a debrid service</h3><span class="spacer"></span><span class="muted sm">Sorted by what I'd pick first.</span></div>
-            <div class="wz-debrid" id="wz-debrid"></div>
-            <div class="wz-nodebrid">
-              <button class="btn btn-ghost btn-xs" id="wz-nodebrid-btn">I don't want a debrid service</button>
-              <span class="muted sm" id="wz-debrid-picked"></span>
-            </div>
-          </div>
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">2</span>Pick an instance</h3><span class="spacer"></span><span class="pill-count" id="wz-inst-count"></span>
+          <div class="wz-sec">
+            <div class="chead"><h3><span class="wz-n">1</span>Pick an instance</h3><span class="spacer"></span><span class="pill-count" id="wz-inst-count"></span>
               <button class="btn btn-ghost btn-xs" id="wz-inst-refresh">Refresh</button></div>
-            <p class="muted sm" style="margin-bottom:12px">Pick one with good uptime and it opens in a new tab.</p>
+            <p class="muted sm" style="margin-bottom:12px">Pick one with good uptime and it opens in a new tab. Your debrid service goes in there, on its own site.</p>
             <div class="inline-status" id="wz-inst-status" style="margin-bottom:10px"></div>
             <div id="wz-instances"></div>
           </div>
-          <div class="card">
-            <div class="chead"><h3><span class="wz-n">3</span>Bring the link back</h3><span class="spacer"></span>
+          <div class="wz-sec">
+            <div class="chead"><h3><span class="wz-n">2</span>Manifest URL</h3><span class="spacer"></span>
               <button class="btn btn-ghost btn-xs" id="wz-guide-btn">Guide</button></div>
             <div id="wz-aio-install"></div>
           </div>
         </div>
 
         <div id="wz-route-native" style="display:none">
-          <div class="card">
-            <div class="chead"><h3>Read this first</h3></div>
-            <div class="wz-catch" id="wz-native-catch"></div>
-          </div>
-          <div class="card">
+          <div class="wz-sec">
             <div class="chead"><h3><span class="wz-n">1</span>Connect your account</h3></div>
-            <p class="muted sm" style="margin-bottom:14px">Paste the API key and Numax connects it and switches link resolving on.</p>
-            <div class="wz-debrid" id="wz-native-debrid"></div>
-            <div class="field-col" style="margin-top:16px">
-              <input type="password" id="wz-native-key" placeholder="API key" autocomplete="off">
-              <button class="btn btn-primary" id="wz-native-save">Connect and turn on resolving</button>
-              <div class="inline-status" id="wz-native-status"></div>
-              <div class="mk-res" id="wz-native-res"></div>
+            <div class="wz-catch" id="wz-native-catch"></div>
+            <div class="wz-debrid" id="wz-native-debrid" style="margin-top:18px"></div>
+            <div class="wz-key-row wz-narrow" style="margin-top:18px">
+              <input type="password" id="wz-native-key" placeholder="API key" autocomplete="off" spellcheck="false">
+              <span class="wz-chk idle" id="wz-chk-native"></span>
             </div>
+            <div class="wz-key-v" id="wz-keyv-native"></div>
+            <div class="inline-status" id="wz-native-status" style="margin-top:10px"></div>
+            <div class="mk-res" id="wz-native-res"></div>
           </div>
-          <div class="card">
+          <div class="wz-sec">
             <div class="chead"><h3><span class="wz-n">2</span>Add a torrent add-on</h3></div>
-            <p class="muted sm" style="margin-bottom:14px">Configure one with <b>no debrid key of its own</b>, then paste its link into the box below.</p>
-            <div id="wz-p2p"></div>
-            <div id="wz-p2p-install" style="margin-top:16px"></div>
+            <p class="muted sm" style="margin-bottom:16px">Configure one with <b>no debrid key of its own</b>, then paste its link into the box below.</p>
+            <div class="wz-routes wz-p2p" id="wz-p2p"></div>
+            <div id="wz-p2p-install" style="margin-top:20px"></div>
           </div>
         </div>
       </div>
 
-      <!-- 4 — metadata -->
+      <!-- 4 - metadata -->
       <div class="wz-pane" data-wzpane="meta" style="display:none">
-        <div class="card">
-          <div class="chead"><h3>Posters, descriptions and your home screen</h3><span class="spacer"></span>
-            <span class="muted sm" id="wz-order-tip"></span></div>
-          <p class="muted sm" style="margin-bottom:16px">Set each one up on its own site, bring the link back, and Numax writes it in.</p>
+        <div class="wz-sec">
+          <p class="muted sm wz-sec-lead">Set each one up on its own site and paste the link back &mdash; &ldquo;Save and move to next step&rdquo; at the bottom writes them all in.
+            <span id="wz-order-tip"></span></p>
           <div class="wz-meta-grid" id="wz-meta"></div>
         </div>
       </div>
 
-      <!-- 5 — done -->
+      <!-- 5 - done -->
       <div class="wz-pane" data-wzpane="done" style="display:none">
-        <div class="card">
+        <div class="wz-sec">
           <div class="chead"><h3>What the wizard did</h3></div>
           <div id="wz-summary"></div>
         </div>
-        <div class="card">
+        <div class="wz-sec">
           <div class="chead"><h3>Worth doing next</h3></div>
           <ul class="wz-next">
-            <li>Open <b>Nuvio</b> on your device and sign in with this account — it pulls everything down on first sync.</li>
+            <li>Open <b>Nuvio</b> on your device and sign in with this account &mdash; it pulls everything down on first sync.</li>
             <li>Take a backup on the <b>Google Drive</b> tab, so this setup is recoverable.</li>
             <li>Use <b>Sync desk</b> to copy this profile onto your other profiles instead of doing all this again.</li>
             <li>Browse <b>Marketplace</b> for extra add-ons, plugins and community collections.</li>
           </ul>
         </div>
+      </div>
+
+       </div>
+       <aside class="wz-panel" id="wz-panel" style="display:none"></aside>
       </div>
 
       <div class="wz-foot">

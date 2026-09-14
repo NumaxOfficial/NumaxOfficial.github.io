@@ -45,10 +45,19 @@
   // provider — so it lives there, next to the other network code, not here).
   // All three were confirmed cross-origin-callable from a neutral origin on
   // 2026-09-11: each answers with Access-Control-Allow-Origin: *.
+  //
+  // `logo` is the provider's own mark, so a row is recognisable before it is
+  // read. Every one below was fetched and looked at on 2026-09-13 (200, a real
+  // image, square). They are drawn through app.js's wzLogo, which falls back to
+  // `mono` if the host ever stops serving one — so a dead logo degrades to a
+  // letter, never to a broken-image icon. TMDB's asset path carries a content
+  // hash and will change when TMDB next redeploys; that is what the fallback is
+  // for, and it is the only square "THE MOVIE DB" mark they publish.
   const KEYS = [
     {
       id: 'tmdb', name: 'TMDB', provider: 'tmdb', field: 'api_key',
       tag: 'Required', required: true,
+      logo: 'https://www.themoviedb.org/assets/apple-touch-icon-57ed4b3b0450fd5e9a0c20f34e814b82adaa1085c79bdde2f00ca8787b63d2c4.png', mono: 'T',
       blurb: 'Better artwork, cast, episode titles and descriptions on every title.',
       shape: /^[A-Za-z0-9]{32}$/, verify: 'tmdb',
       getUrl: 'https://www.themoviedb.org/settings/api',
@@ -69,6 +78,7 @@
     {
       id: 'mdblist', name: 'MDBList', provider: 'mdblist', field: 'api_key',
       tag: 'Recommended',
+      logo: 'https://mdblist.com/static/apple-touch-icon.png', mono: 'M',
       blurb: 'Ratings from IMDb, TMDB, Rotten Tomatoes, Metacritic, Trakt, Letterboxd and MyAnimeList.',
       shape: /^[A-Za-z0-9]{16,}$/, verify: 'mdblist',
       getUrl: 'https://mdblist.com/preferences/',
@@ -88,6 +98,7 @@
     {
       id: 'animeskip', name: 'Anime Skip', provider: 'animeskip', field: 'client_id',
       tag: 'Optional',
+      logo: 'https://anime-skip.com/static/apple-touch-icon.png', mono: 'A',
       blurb: 'Skips anime intros, recaps and credits automatically.',
       shape: /^[A-Za-z0-9_-]{16,}$/, verify: 'animeskip',
       getUrl: 'https://anime-skip.com',
@@ -117,9 +128,24 @@
   //
   // Prices are the community wiki's figures and move around; they're shown as
   // "roughly", never as a quote.
+  //
+  // `shape` / `verify` work exactly as they do on KEYS above, and only the two
+  // native services carry them because they are the only two whose key Numax
+  // ever writes. The two are NOT symmetrical, and this was measured on
+  // 2026-09-13, not assumed:
+  //   - Premiumize answers a plain cross-origin GET from any page
+  //     (account/info?apikey=…), so its tick is a direct call from the browser.
+  //   - TorBox runs an origin ALLOWLIST containing only https://torbox.app —
+  //     every other origin gets "Disallowed CORS origin" on the preflight, so a
+  //     page cannot check a TorBox key at all. Its tick therefore goes through
+  //     the relay Worker, which already had to check TorBox keys for the
+  //     "Do it all for me" path. If the deployed Worker predates that op the
+  //     tick says "couldn't check" — it never shows a cross it cannot justify.
   const DEBRID = [
     {
       id: 'torbox', name: 'TorBox', tag: 'Recommended', native: true,
+      logo: 'https://torbox.app/apple-touch-icon.png', mono: 'T',
+      shape: /^[A-Za-z0-9-]{16,}$/, verify: 'torbox',
       price: 'from roughly $3/month',
       pros: ['No limit on how many connections or locations you use it from', 'Fast caching and a modern API', 'Usenet included on the top tier'],
       cons: ['Newer than the others, so occasional wobbles'],
@@ -128,6 +154,8 @@
     },
     {
       id: 'premiumize', name: 'Premiumize', tag: 'Also great', native: true,
+      logo: 'https://www.premiumize.me/apple-touch-icon.png', mono: 'P',
+      shape: /^[A-Za-z0-9_-]{8,}$/, verify: 'premiumize',
       price: 'roughly €10/month, cheaper yearly',
       pros: ['1TB of personal cloud storage included', 'Built-in VPN', 'Fine with multiple connections at once'],
       cons: ['Noticeably more expensive than the rest', 'Monthly points allowance rather than unlimited'],
@@ -179,6 +207,12 @@
   // The honest case for paying for one, and the honest consequence of not.
   // Both halves matter: the "are you sure?" is not a scare screen, and skipping
   // is a supported choice, not a wrong answer.
+  //
+  // CURRENTLY UNUSED (2026-09-13). The advanced path's "pick a debrid service"
+  // section was removed on Furqan's instruction — AIOStreams asks for the
+  // service on its own site, so choosing one here was a question Numax could
+  // not act on. Kept as copy rather than deleted, the same way market.js keeps
+  // mkSelect; nothing reads it, so it costs nothing.
   const NO_DEBRID = {
     title: 'Carry on without a debrid service?',
     why: [
@@ -196,22 +230,20 @@
   // ======================================================================
   // The first thing the streams step asks. Everything that was here before is
   // still here, one card further in.
+  //
+  // The simple card deliberately carries NO pros/cons: behind its "?" app.js
+  // renders PRESET instead, because "what am I actually getting" is the only
+  // question anyone had about that card, and it used to sit in a separate box
+  // below taking up a whole screen. PRESET is declared further down this file,
+  // so app.js resolves it by id rather than this entry linking to it — a
+  // reference here would read it before it exists.
   const MODES = [
     {
-      id: 'simple', name: 'Do it all for me', tag: 'Recommended',
-      oneLiner: 'Paste your TorBox key, pick a host, and Numax builds and installs a tuned AIOStreams setup for you.',
-      pros: [
-        'Nothing to configure on another website',
-        'Sources, filters, sorting and formatting are already set up sensibly',
-        'The finished link is written into this profile for you',
-      ],
-      cons: [
-        'TorBox only — any other debrid service goes through the manual path',
-        'You can still change anything afterwards on the host you picked',
-      ],
+      id: 'simple', name: 'Do it all for me', tag: '',
+      oneLiner: 'Paste your TorBox key and Numax builds and installs a tuned AIOStreams setup for you.',
     },
     {
-      id: 'advanced', name: 'I’ve got it from here', tag: '',
+      id: 'advanced', name: 'Advanced setup', tag: '',
       oneLiner: 'Set it up yourself, with any debrid service and full control over sources and filters.',
       pros: [
         'Any debrid service, or none at all',
@@ -259,21 +291,24 @@
     note: 'It is your own configuration once it is made — change anything you like on the host afterwards.',
   };
 
+  // Picking a host was a question with no wrong answer and no information to
+  // answer it with, so it is no longer asked: app.js takes the uptime tracker's
+  // four best AIOStreams hosts and uses one of them. Deliberately not announced
+  // on screen — it is an implementation detail, not a decision the user made.
   const SIMPLE = {
     keyTitle: 'Your TorBox API key',
-    keyBlurb: 'The only thing Numax needs from you, and it goes to the host you pick below and nowhere else.',
+    keyBlurb: 'The only thing Numax needs from you, and it goes to the host that builds your setup and nowhere else.',
     keyHint: 'Sign in at torbox.app, open Settings, and copy the API key there.',
     keyPlaceholder: 'TorBox API key',
-    noTorbox: 'No TorBox? The manual path below works with every other debrid service.',
-    instTitle: 'Pick a host',
-    instBlurb: 'Your configuration lives on the host you choose, so pick one with good uptime.',
+    noTorbox: 'No TorBox? Advanced setup works with every other debrid service.',
     runLabel: 'Set it up for me',
     running: 'Building your setup…',
     // Shown with the finished link. The UUID and password are the only way to
     // edit the configuration later, and AIOStreams cannot recover either.
     saveWarn: 'Write these two down — they are the only way to edit this setup later, and the host cannot recover them.',
     installHint: 'The link Numax just made — press Next and it goes into this profile.',
-    notDeployed: 'Automatic setup is not switched on for this site yet — use “I’ve got it from here” below instead.',
+    notDeployed: 'Automatic setup is not switched on for this site yet — use “Advanced setup” above instead.',
+    noHosts: 'No AIOStreams host is answering right now, so there is nowhere to build your setup. Try again in a minute, or use Advanced setup.',
   };
 
   // ======================================================================
@@ -286,6 +321,7 @@
   const ROUTES = [
     {
       id: 'aiostreams', name: 'AIOStreams', tag: 'Recommended',
+      logo: 'https://aiostreams.elfhosted.com/apple-icon.png', mono: 'A',
       oneLiner: 'Your debrid key lives in AIOStreams, which finds, filters and resolves everything and hands Nuvio one clean list.',
       pros: [
         'Works with every debrid service, not just two',
@@ -300,7 +336,12 @@
       ],
     },
     {
-      id: 'native', name: 'Nuvio + TorBox', tag: '',
+      // Named for both services on purpose: these two are the whole list Nuvio
+      // can drive itself, and calling the route "Nuvio + TorBox" read as though
+      // Premiumize were not an option. `logos` (plural) draws both marks.
+      id: 'native', name: 'Nuvio + TorBox/Premiumize', tag: '',
+      logos: ['https://torbox.app/apple-touch-icon.png', 'https://www.premiumize.me/apple-touch-icon.png'],
+      mono: 'N',
       oneLiner: 'Your debrid key lives in Nuvio, and a torrent add-on finds raw magnets for Nuvio to resolve.',
       pros: [
         'Nothing to configure on another website — the key goes straight into Nuvio',
@@ -318,13 +359,23 @@
     },
   ];
 
-  // The add-on half of the Nuvio+TorBox route. These are the ones that can
-  // hand back raw magnets; ElfHosted's AIOStreams is deliberately absent
-  // because that instance disables P2P.
+  // The add-on half of the Nuvio+TorBox route: one recommendation and one way
+  // out of it. Three near-identical options here was a choice nobody wanted to
+  // make — Torrentio is the one that needs no configuring at all, and anyone
+  // who already knows they want Comet or AIOStreams in P2P mode wants the
+  // marketplace, not a third card. `browse: true` sends them there.
   const P2P_ADDONS = [
-    { name: 'Torrentio', blurb: 'The simplest option — leave every debrid field empty and it returns magnets.', url: 'https://torrentio.strem.fun/configure' },
-    { name: 'Comet', blurb: 'Broader coverage than Torrentio, with the same rule: no debrid key in it.', url: 'https://comet.elfhosted.com/stremio/configure' },
-    { name: 'AIOStreams (P2P mode)', blurb: 'Skip the Services menu entirely, then set P2P to Required and exclude the cached/uncached debrid stream types.', instances: 'AIOStreams' },
+    {
+      name: 'Torrentio', tag: 'Recommended',
+      logo: 'https://torrentio.strem.fun/images/logo_v1.png', mono: 'T',
+      blurb: 'The simplest option — leave every debrid field empty and it returns magnets.',
+      url: 'https://torrentio.strem.fun/configure',
+    },
+    {
+      name: 'Choose my own', mono: '+',
+      blurb: 'Any add-on that returns raw magnets works — Comet and AIOStreams in P2P mode both do.',
+      browse: true,
+    },
   ];
 
   // ======================================================================
@@ -417,8 +468,111 @@
   // on metadata installs rather than a silent reorder.
   const ORDER_TIP = 'Nuvio reads metadata add-ons from the top of the list down, so metadata belongs above your stream sources.';
 
+  // ======================================================================
+  // The step headline — one question per screen
+  // ======================================================================
+  // Each step opens with the question it is actually asking, at size, instead
+  // of a filing-cabinet label. This is half of what stops the sparse steps
+  // reading as a page that failed to load; the live panel is the other half.
+  const STEP_HEADS = {
+    account: {
+      q: 'Which profile are we setting up?',
+      sub: 'Everything the wizard writes — keys, add-ons, settings — goes to this one profile.',
+    },
+    keys: {
+      q: 'Which keys do you want to use?',
+      sub: 'All three are free. TMDB is the only one Nuvio really needs; the other two are worth having.',
+    },
+    streams: {
+      q: 'Where should Nuvio find things to play?',
+      sub: 'Nuvio has no sources of its own — an add-on goes and finds them. This is the step that matters most.',
+    },
+    meta: {
+      q: 'How should your home screen look?',
+      sub: 'Posters, descriptions and the rows you see first. All optional — a new profile already has the basics.',
+    },
+    done: {
+      q: 'That’s the setup done.',
+      sub: 'Here is everything the wizard changed, and what is worth doing next.',
+    },
+  };
+
+  // ======================================================================
+  // Recognising an installed add-on
+  // ======================================================================
+  // WHY THIS EXISTS, and why it is not the obvious thing: Nuvio stores an
+  // add-on as nothing but `{url, name, enabled, sort_order}` — checked against
+  // a real account's export on 2026-09-14, those are ALL the fields there are.
+  // There is no type, no category, no cached manifest. And `name` is whatever
+  // the user typed: the test account's two AIOStreams instances are called
+  // "Main" and "Niche". So the name cannot classify anything, and the URL has
+  // to.
+  //
+  // The authoritative answer is the add-on's own manifest — `resources` says
+  // 'stream', 'subtitles', or 'catalog'/'meta' — and app.js reads that first,
+  // straight from the stored URL (which works even for a self-hosted
+  // AIOStreams whose URL carries an encoded config in the path). This table is
+  // the fallback for the ones a browser cannot read cross-origin, plus the
+  // handful whose manifest does not answer the question:
+  //
+  //   - Cinemeta publishes no `logo` at all.
+  //   - AIOMetadata publishes an EMPTY `resources` array, so nothing but the
+  //     host says what it is (checked live 2026-09-14).
+  //
+  // Every pattern below comes from a URL already hand-checked elsewhere in
+  // this repo — market.js's ADDON_GROUPS (whose groups are stream sources
+  // except its Subtitles group) and STAPLES, and this file's own METADATA and
+  // P2P_ADDONS. Nothing here is a guessed host.
+  const ADDON_KINDS = [
+    // --- metadata / catalogs ---
+    { re: /cinemeta/i, name: 'Cinemeta', kind: 'meta', logo: 'https://dl.strem.io/addon-logo.png' },
+    { re: /aiometadata/i, name: 'AIOMetadata', kind: 'meta', logo: 'https://aiometadata.elfhosted.com/favicon.png' },
+    { re: /bingecat/i, name: 'BingeCat', kind: 'meta', logo: 'https://bingecat.com/static/logo.png' },
+    { re: /xperience-app/i, name: 'Xperience', kind: 'meta', logo: 'https://xperience-app.com/icon-192.png' },
+    // --- subtitles ---
+    // Its own manifest publishes an http: logo, which an https page blocks as
+    // mixed content, so the https form is pinned here instead (checked live).
+    { re: /opensubtitles/i, name: 'OpenSubtitles', kind: 'subs', logo: 'https://www.strem.io/images/addons/opensubtitles-logo.png' },
+    { re: /subsource/i, name: 'SubSource', kind: 'subs' },
+    { re: /submaker/i, name: 'SubMaker', kind: 'subs' },
+    { re: /subsense/i, name: 'SubSense', kind: 'subs' },
+    { re: /community-subtitles/i, name: 'Community Subtitles', kind: 'subs' },
+    // --- stream sources ---
+    { re: /aiostreams/i, name: 'AIOStreams', kind: 'stream', logo: 'https://aiostreams.elfhosted.com/apple-icon.png' },
+    { re: /torrentio/i, name: 'Torrentio', kind: 'stream', logo: 'https://torrentio.strem.fun/images/logo_v1.png' },
+    { re: /stremthru/i, name: 'StremThru', kind: 'stream' },
+    { re: /peerflix/i, name: 'Peerflix', kind: 'stream' },
+    { re: /torrentsdb/i, name: 'TorrentsDB', kind: 'stream' },
+    { re: /torrentclaw/i, name: 'TorrentClaw', kind: 'stream' },
+    { re: /(^|\.)comet\.|elfhosted\.com\/.*comet/i, name: 'Comet', kind: 'stream' },
+    { re: /mediafusion/i, name: 'MediaFusion', kind: 'stream' },
+    { re: /meteorfortheweebs/i, name: 'Meteor', kind: 'stream' },
+    { re: /jackettio/i, name: 'Jackettio', kind: 'stream' },
+    { re: /pengu\.uk|penguplay/i, name: 'PenguPlay', kind: 'stream' },
+    { re: /sooti\.click|sootio/i, name: 'Sootio', kind: 'stream' },
+    { re: /webstreamr/i, name: 'WebStreamr', kind: 'stream' },
+    { re: /hdhub/i, name: 'HDHub', kind: 'stream' },
+    { re: /flixnest/i, name: 'Flix-Streams', kind: 'stream' },
+    { re: /torii\.nexioapp/i, name: 'Nexio Torii', kind: 'stream' },
+    { re: /dramayo/i, name: 'Dramayo', kind: 'stream' },
+    { re: /yukistreams/i, name: 'YukiStreams', kind: 'stream' },
+    { re: /yastream/i, name: 'YaStream', kind: 'stream' },
+    { re: /stravo/i, name: 'Stravo', kind: 'stream' },
+  ];
+
+  // The panel's section order and wording. 'other' is deliberately last and
+  // deliberately vague — an add-on nobody could identify is reported as one,
+  // not filed under a guess.
+  const PANEL_SECTIONS = [
+    { kind: 'stream', label: 'Streams', empty: 'nothing yet' },
+    { kind: 'meta', label: 'Metadata', empty: 'nothing yet' },
+    { kind: 'subs', label: 'Subtitles', empty: 'none' },
+    { kind: 'other', label: 'Other add-ons', empty: '' },
+  ];
+
   window.NumaxWizard = {
     KEYS, DEBRID, NO_DEBRID, MODES, RELAY, TEMPLATE_URL, PRESET, SIMPLE,
     ROUTES, P2P_ADDONS, AIO_GUIDE, METADATA, ORDER_TIP,
+    STEP_HEADS, ADDON_KINDS, PANEL_SECTIONS,
   };
 })();

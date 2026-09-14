@@ -41,6 +41,26 @@ A correct deployment answers **403** with
 `example.com is not on the public AIOStreams instance list…`. That single reply
 proves the Worker is live, parsing JSON, and enforcing its allowlist.
 
+## Re-paste it after 2026-09-13
+
+`aio-create.js` gained a second, much smaller job on 2026-09-13: answering
+"is this TorBox API key real?" for the wizard's **Nuvio + TorBox** path. The
+page cannot ask TorBox itself — `api.torbox.app` only accepts cross-origin
+calls from `https://torbox.app` and refuses every other origin outright.
+
+Nothing breaks if you do not re-paste it. The tick next to the TorBox key box
+simply says **couldn't check** instead of going green, which is what it also
+says when TorBox itself is down. Re-pasting is steps 2 and 3 above again.
+
+Check it worked:
+
+    curl -i -X POST https://numax-aio-create.<your-subdomain>.workers.dev \
+      -H 'Content-Type: application/json' \
+      -d '{"op":"verify","provider":"torbox","key":"notarealkey"}'
+
+The new version answers **200** with `{"ok":false}`. The old one answers
+**400** with `No instance was given.`
+
 ## If you ever want it on your own domain instead
 
 Add a route for `numaxofficial.website/relay/aio-create` pointing at the Worker,
