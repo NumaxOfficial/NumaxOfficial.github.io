@@ -761,8 +761,7 @@
   .panel[data-panel="wizard"]{ max-width:1400px; display:flex; flex-direction:column; }
   .panel[data-panel="wizard"] > .phead,
   .panel[data-panel="wizard"] > .wz-rail,
-  .panel[data-panel="wizard"] > .wz-target,
-  .panel[data-panel="wizard"] > .wz-foot{ flex:none; }
+  .panel[data-panel="wizard"] > .wz-target{ flex:none; }
   .panel[data-panel="wizard"] .phead{ margin-bottom:14px; }
   .panel[data-panel="wizard"] .phead h1{ font-size:clamp(20px,2.1vw,26px); margin-top:4px; }
   .panel[data-panel="wizard"] .phead > p{ font-size:13px; margin-top:4px; max-width:78ch; }
@@ -815,8 +814,7 @@
   @media (min-width:1181px) and (max-height:660px){
     .panel[data-panel="wizard"] .phead{ display:none; }
     .wz-rail{ margin-bottom:10px; }
-    .wz-target{ margin-bottom:10px; padding:7px 12px; }
-    .wz-foot{ margin-top:12px; padding-top:10px; }
+    .wz-target{ margin-bottom:10px; padding:6px 8px 6px 12px; }
   }
   /* Below this width the two columns stack, and two stacked scrollers inside a
      fixed-height panel is worse than one page scroll — so the panel goes back
@@ -938,13 +936,27 @@
   .wz-step:disabled:not(.did):not(.on){ opacity:.4; }
   .wz-step.did{ color:var(--t55); border-color:var(--line); }
 
-  /* the "you are writing to X" strip that follows you from step 2 onward */
+  /* The one action bar. It carries the run's target AND its primary button,
+     which is why there is no bar at the bottom any more and why the step block
+     can run all the way to the bottom of the window. Always present: on step 1
+     with nothing picked it simply says so, rather than appearing out of nowhere
+     and shifting everything down the moment a profile is chosen.
+     No "Change" button by design — see wzPaintTarget. */
   .wz-target{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
-    border-left:3px solid var(--accent); border-radius:12px; padding:10px 14px; margin-bottom:16px; font-size:12.5px; }
-  .wz-target > span:not(.wz-pick-sp){ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    border-left:3px solid var(--accent); border-radius:12px; padding:9px 10px 9px 14px; margin-bottom:14px;
+    font-size:12.5px; }
+  .wz-target.bare{ border-left-color:var(--line); }
+  .wz-target-id{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .wz-target-tx{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-target-none{ color:var(--t35); white-space:nowrap; }
   .wz-target b{ font-weight:600; }
   .wz-target .muted{ font-size:12px; }
-  .wz-target .btn{ flex:none; }
+  .wz-target .btn, .wz-target .wz-tag, .wz-target .av{ flex:none; }
+  /* What the button is about to do, beside the button. Ellipsised rather than
+     wrapped: this bar must stay one row tall, or the block below it moves. */
+  .wz-target #wz-foot-note{ min-width:0; text-align:right; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .wz-target #wz-foot-note:empty{ display:none; }
 
   /* ---- flat sections -------------------------------------------------------
      A wizard step is a heading, a hairline and its controls. It used to be a
@@ -968,10 +980,6 @@
     .wz-acc-grid > .wz-sec + .wz-sec{ border-left:0; padding-left:0; }
   }
 
-  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:18px; padding-top:14px; padding-bottom:2px;
-    border-top:1px solid var(--line-2); }
-  .wz-foot .spacer{ flex:1; }
-  .wz-foot .btn{ flex:none; }
   .wz-run{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:18px; }
   .wz-run .btn{ flex:none; }
   .wz-run .inline-status{ min-width:0; }
@@ -2031,7 +2039,16 @@
         <button class="wz-step" data-wzstep="done"><span class="n">5</span><span class="t">Done</span></button>
       </div>
 
-      <div class="wz-target" id="wz-target" style="display:none"></div>
+      <!-- One bar, always on screen: who the run is writing to, what the
+           primary button is about to do, and the button. It replaced the
+           bottom action bar, which is what lets the step block below reach the
+           bottom of the window. -->
+      <div class="wz-target bare" id="wz-target">
+        <div class="wz-target-id" id="wz-target-id"></div>
+        <span class="wz-pick-sp"></span>
+        <span class="muted sm" id="wz-foot-note"></span>
+        <button class="btn btn-primary" id="wz-next">Next</button>
+      </div>
 
       <!-- The step's own question on the left, and a live read of the profile
            it is all going to on the right. The panel is read-only and writes
@@ -2059,7 +2076,7 @@
                size that owns the screen. -->
           <div class="wz-branch" id="wz-have" style="display:none">
             <div class="wz-branch-bar">
-              <button class="btn btn-ghost btn-xs wz-entry-back">Back</button>
+              <button class="btn btn-ghost btn-xs wz-entry-swap"></button>
             </div>
             <div class="wz-acc" id="wz-profile-card">
               <div class="nsel-slot wz-acc-sel"><select class="sel" id="wz-account"></select></div>
@@ -2078,7 +2095,7 @@
 
           <div class="wz-branch" id="wz-new" style="display:none">
             <div class="wz-branch-bar">
-              <button class="btn btn-ghost btn-xs wz-entry-back">Back</button>
+              <button class="btn btn-ghost btn-xs wz-entry-swap"></button>
               <span class="muted sm">You'll be signed straight in &mdash; there's no confirmation email to wait for.</span>
             </div>
             <div class="wz-sec wz-narrow">
@@ -2238,15 +2255,6 @@
        <aside class="wz-panel" id="wz-panel" style="display:none"></aside>
       </div>
 
-      <!-- No Back button, by design. A wizard you can step backwards through is
-           a wizard that can end up half set up from one set of answers and half
-           from another; the way out of a run is "Exit and undo" on the target
-           strip above, which puts the profile back as it was. -->
-      <div class="wz-foot">
-        <span class="spacer"></span>
-        <span class="muted sm" id="wz-foot-note"></span>
-        <button class="btn btn-primary" id="wz-next">Next</button>
-      </div>
     </section>
 
     <!-- accounts -->

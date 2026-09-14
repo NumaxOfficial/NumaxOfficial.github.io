@@ -3462,13 +3462,21 @@
   let wz = wzBlank();
 
   const wzTarget = () => (wz.aid && wz.idx != null) ? { aid: wz.aid, idx: wz.idx, name: wzProfileName() } : null;
-  function wzProfileName() {
-    const p = (wzProfiles || []).find(x => x.index === wz.idx);
-    if (p) return p.name;
+  // The whole profile record, not just its name: `avatar()` needs avatarUrl /
+  // avatarId / colour to draw the real picture, and passing it `{name}` alone
+  // is why the strip and the panel were showing a letter while the chips two
+  // inches away showed the actual avatar. Every source here is normProfiles()
+  // shaped, so they are interchangeable.
+  function wzProfileRec() {
+    const live = (wzProfiles || []).find(x => x.index === wz.idx);
+    if (live) return live;
+    const cached = (profilesCached(wz.aid) || []).find(x => x.index === wz.idx);
+    if (cached) return cached;
     const rec = cache[wz.aid];
     const c = rec && rec.profiles.find(x => x.index === wz.idx);
-    return c ? c.name : 'Profile ' + wz.idx;
+    return c || { name: 'Profile ' + wz.idx };
   }
+  const wzProfileName = () => wzProfileRec().name;
   // Every successful write ends here. The "This run" box is repainted straight
   // away because it costs nothing, and the rest of the panel re-reads — the
   // write paths have just called inval() on the account, so that read is fresh.
@@ -3822,9 +3830,17 @@
     box.style.display = on ? 'none' : '';
     if ($('wz-have')) $('wz-have').style.display = on === 'have' ? '' : 'none';
     if ($('wz-new')) $('wz-new').style.display = on === 'new' ? '' : 'none';
-    document.querySelectorAll('.wz-entry-back').forEach(b => {
+    // The only control on step 1 that used to go backwards. It is a sideways
+    // move now: each branch offers the OTHER one directly, rather than a "Back"
+    // that returns to a question already answered. Same escape route — somebody
+    // who has no Nuvio account and picked the wrong door can still get to the
+    // sign-up form — without a second thing on screen that looks like a way to
+    // step back through the wizard.
+    document.querySelectorAll('.wz-entry-swap').forEach(b => {
+      const onHave = !!b.closest('#wz-have');
       b.style.display = wz.locked ? 'none' : '';
-      b.onclick = () => { wz.entry = 'choose'; wzPaintEntry(); wzPaintHead(); wzPaintNext(); };
+      b.textContent = onHave ? 'I need to make an account' : 'I already have an account';
+      b.onclick = () => { wz.entry = onHave ? 'new' : 'have'; wzPaintEntry(); wzPaintHead(); wzPaintNext(); };
     });
     if ($('wz-account')) $('wz-account').disabled = !!wz.locked;
     // The chips are normally already on screen when the first write happens, so
@@ -4104,23 +4120,31 @@
     if (copy.sub) h.appendChild(el('p', null, copy.sub));
   }
 
-  // "Writing to X" strip — present from step 2 on, so there is never any doubt
-  // which profile a button on this page is about to change. Once the run is
-  // locked it also appears on step 1, because that is where the way out is.
+  // The one bar: who this run writes to on the left, what the primary button
+  // will do and the primary button itself on the right. It replaced the bottom
+  // action bar entirely, which is what lets the step block below reach the
+  // bottom of the window — so unlike the old strip it is ALWAYS on screen, and
+  // only its left-hand half changes.
+  //
+  // There is no "Change" button any more. Once a profile is picked the run is
+  // about that profile; the way out is Exit and undo, which puts it back.
   function wzPaintTarget() {
-    const t = $('wz-target'); if (!t) return;
+    const t = $('wz-target'), id = $('wz-target-id'); if (!t || !id) return;
     const ready = !!wzTarget();
-    if (!ready || (wz.step === 'account' && !wz.locked)) { t.style.display = 'none'; return; }
-    clr(t); t.style.display = ''; t.classList.toggle('locked', !!wz.locked);
-    t.appendChild(avatar({ name: wzProfileName() }, 26));
-    const tx = el('span');
+    clr(id);
+    t.classList.toggle('locked', !!wz.locked);
+    t.classList.toggle('bare', !ready);
+    if (!ready) { id.appendChild(el('span', 'wz-target-none', 'No profile picked yet')); return; }
+    id.appendChild(avatar(wzProfileRec(), 26));
+    const tx = el('span', 'wz-target-tx');
     tx.innerHTML = 'Setting up <b>' + esc(wzProfileName()) + '</b> <span class="muted">on ' + esc(accountName(wz.aid)) + '</span>';
-    t.appendChild(tx);
-    if (wz.locked) t.appendChild(wzTag('Locked in', 'plain'));
-    t.appendChild(el('span', 'wz-pick-sp'));
-    const b = el('button', 'btn btn-ghost btn-xs', wz.locked ? 'Exit and undo' : 'Change');
-    b.onclick = wz.locked ? wzExitAndUndo : () => wzShow('account');
-    t.appendChild(b);
+    id.appendChild(tx);
+    if (wz.locked) {
+      id.appendChild(wzTag('Locked in', 'plain'));
+      const b = el('button', 'btn btn-ghost btn-xs', 'Exit and undo');
+      b.onclick = wzExitAndUndo;
+      id.appendChild(b);
+    }
   }
 
   // What Next would write if it were pressed right now, which is both its label
@@ -4268,7 +4292,7 @@
 
     clr(host);
     const who = el('div', 'wz-pnl-who');
-    who.appendChild(avatar({ name: t.name }, 34));
+    who.appendChild(avatar(wzProfileRec(), 34));
     const wh = el('div', null);
     wh.appendChild(el('div', 'nm', t.name));
     wh.appendChild(el('div', 'sub', accountName(t.aid) + ' · profile ' + t.idx));
