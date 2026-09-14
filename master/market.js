@@ -81,7 +81,13 @@
   // Empty means "not deployed" and the whole picker hides itself — a tick that
   // cannot be honoured is worse than no tick. Paste the Worker's URL here to
   // switch it on everywhere at once.
-  const PLUGIN_FILTER_RELAY = '';
+  //
+  // Deployed and live-verified 2026-09-14 against the real Worker: a filtered
+  // manifest returns exactly the picked providers, the provider's relative
+  // filename resolves back through it and serves the real code, a
+  // non-allowlisted host is refused 400, and a selection that no longer
+  // matches anything upstream answers 409 rather than an empty repository.
+  const PLUGIN_FILTER_RELAY = 'https://addon-review.nuviobaymax.workers.dev/';
 
   // base64url, because the payload rides in a PATH segment: it has to survive
   // Nuvio storing it, and `+` and `/` do not.
