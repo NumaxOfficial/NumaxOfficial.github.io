@@ -791,6 +791,15 @@
     backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
     border:1px solid rgba(255,255,255,.09); border-radius:18px;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 18px 46px rgba(0,0,0,.42); }
+  /* Step 1's front door has nothing to read from yet - no profile, no
+     account - so the frosted block behind it is just an empty frame with
+     two cards in the corner. Drop the glass there only; the cards carry
+     their own shape, and the pane grows to center them in the space that
+     freed up. */
+  .wz-main:has(> .wz-pane[data-wzpane="account"].on){
+    background:none; backdrop-filter:none; -webkit-backdrop-filter:none;
+    border-color:transparent; box-shadow:none; }
+  .wz-pane[data-wzpane="account"]{ flex:1 1 auto; justify-content:center; }
   .wz-main{ min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
     display:flex; flex-direction:column; gap:20px;
     padding:clamp(16px,1.6vw,24px);
@@ -914,6 +923,15 @@
   .wz-pane .wz-pick:hover{ background:rgba(0,0,0,.1); border-color:rgba(255,255,255,.24); }
   .wz-pane .wz-pick.on{ border-color:var(--accent); background:rgba(229,57,53,.09); }
   .wz-pane .wz-pick-static:hover{ background:rgba(255,255,255,.022); }
+  /* The two front-door cards own the whole step, so they get more room and a
+     faint sheen instead of the flat fill every other choice card uses. */
+  #wz-entry{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+  #wz-entry .wz-pick{ padding:30px 26px; min-height:200px; justify-content:center; gap:12px;
+    background:linear-gradient(155deg, rgba(255,255,255,.07), rgba(255,255,255,.015) 55%, rgba(0,0,0,.1)); }
+  #wz-entry .wz-pick:hover{ background:linear-gradient(155deg, rgba(255,255,255,.1), rgba(255,255,255,.02) 55%, rgba(0,0,0,.08)); }
+  #wz-entry .wz-pick-n{ font-size:18px; }
+  #wz-entry .wz-pick-one{ font-size:13.5px; }
+  @media (max-width:640px){ #wz-entry{ grid-template-columns:1fr; } }
   #wz-mode-simple, #wz-mode-advanced, #wz-route-aiostreams, #wz-route-native,
   #wz-route-plugins, #wz-account-body{ display:flex; flex-direction:column; gap:22px; min-width:0; }
   .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
