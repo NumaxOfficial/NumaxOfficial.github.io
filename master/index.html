@@ -751,24 +751,81 @@
      bar sits on the bottom edge of the window on a short step instead of
      floating halfway up it with a screenful of nothing underneath. A long step
      simply pushes it down and the panel scrolls as before. */
+  /* Viewport-fit, the same way Accounts, Profile and Sync desk are: the panel
+     is exactly as tall as the window, the rail / target strip / Back-Next bar
+     are fixed, and the step itself is the only thing that moves. The page
+     behind it cannot scroll at all, which is the point — a wizard whose Next
+     button is somewhere below the fold is a wizard you have to hunt through.
+     The header is trimmed here too (Sync desk does the same), because five
+     steps have to fit under it. */
   .panel[data-panel="wizard"]{ max-width:1400px; display:flex; flex-direction:column; }
-  /* Grows so the Back/Next bar sits on the bottom edge of the window like a
-     dialog's action bar. It is deliberately NOT centred: centring made every
-     step begin at a different height (85px below the rail on one, 217px on
-     another), so moving between steps jumped the whole page around. Content
-     starts in the same place on all five. */
+  .panel[data-panel="wizard"] > .phead,
+  .panel[data-panel="wizard"] > .wz-rail,
+  .panel[data-panel="wizard"] > .wz-target,
+  .panel[data-panel="wizard"] > .wz-foot{ flex:none; }
+  .panel[data-panel="wizard"] .phead{ margin-bottom:14px; }
+  .panel[data-panel="wizard"] .phead h1{ font-size:clamp(20px,2.1vw,26px); margin-top:4px; }
+  .panel[data-panel="wizard"] .phead > p{ font-size:13px; margin-top:4px; max-width:78ch; }
   /* Two columns: the step on the left, a live read of the target profile on
      the right. The panel is what claims the space a short step leaves over,
      and it is useful rather than decorative - the wizard could not previously
      tell you what was on the profile you had just chosen. */
-  .wz-body{ flex:1 0 auto; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) 322px; gap:38px; }
-  /* Named container so grids inside can size against this column rather than
-     the window — the panel beside it takes a fixed 322px out of the reckoning. */
-  .wz-main{ min-width:0; display:flex; flex-direction:column; gap:34px;
+  .wz-body{ flex:1 1 auto; min-height:0; min-width:0; display:grid;
+    grid-template-columns:minmax(0,1fr) 322px; gap:32px; }
+  /* Each column scrolls on its own, and nothing scrolls the page. The profile
+     panel therefore stays where it is while a long step moves under it, which
+     is what "fix the panel and scroll only what needs it" means in layout.
+     Named container as well, so grids inside size against this column rather
+     than the window — the panel beside it takes a fixed 322px out of the
+     reckoning. */
+  /* THE BLOCK. One frosted panel per column, fixed to the height of the
+     window, with the step scrolling inside it — the question at the top of it
+     and every option under that, rather than a loose stack of outlined cards
+     sitting straight on the page. A full-height frame also means the step area
+     is the same shape on all five steps, so moving between them stops moving
+     everything else. Glass is otherwise the topbar, modals and .sy-card; this
+     is a deliberate fourth use.
+     The light wash is deliberate too: --glass-bg is darker than the page, and
+     over a near-black background a darker pane reads as a hole, not a block. */
+  .wz-main, .wz-panel{
+    background:linear-gradient(rgba(255,255,255,.045), rgba(255,255,255,.018));
+    backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+    border:1px solid rgba(255,255,255,.09); border-radius:18px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05), 0 18px 46px rgba(0,0,0,.42); }
+  .wz-main{ min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    display:flex; flex-direction:column; gap:20px;
+    padding:clamp(16px,1.6vw,24px);
     container-type:inline-size; container-name:wzmain; }
+  .wz-main::-webkit-scrollbar, .wz-panel::-webkit-scrollbar{ width:5px; }
+  .wz-main::-webkit-scrollbar-thumb, .wz-panel::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+  /* On a short window the title, the rail and the target strip were taking a
+     third of the height before the step itself began. The title is the first
+     thing to give up — the rail directly under it already says where you are —
+     and then the panel's own padding. Measured on a 1400x640 window, which is
+     a laptop with a browser toolbar and a dock. */
+  @media (min-width:1181px) and (max-height:780px){
+    .panel[data-panel="wizard"]{ padding:16px 22px; }
+    .panel[data-panel="wizard"] .phead{ margin-bottom:10px; }
+    .panel[data-panel="wizard"] .phead h1{ font-size:19px; }
+    .panel[data-panel="wizard"] .phead > p{ display:none; }
+    .wz-pane{ gap:18px; }
+    .wz-main, .wz-panel{ padding:14px 16px; }
+    .wz-head h2{ font-size:20px; }
+  }
+  @media (min-width:1181px) and (max-height:660px){
+    .panel[data-panel="wizard"] .phead{ display:none; }
+    .wz-rail{ margin-bottom:10px; }
+    .wz-target{ margin-bottom:10px; padding:7px 12px; }
+    .wz-foot{ margin-top:12px; padding-top:10px; }
+  }
+  /* Below this width the two columns stack, and two stacked scrollers inside a
+     fixed-height panel is worse than one page scroll — so the panel goes back
+     to growing, exactly as the other viewport-fit panels do. */
   @media (max-width:1180px){
-    .wz-body{ grid-template-columns:minmax(0,1fr); gap:30px; }
-    .wz-panel{ border-left:0 !important; padding-left:0 !important; border-top:1px solid var(--line-2); padding-top:26px !important; }
+    .panel.mo-fit[data-panel="wizard"]{ flex:1 0 auto; min-height:auto; }
+    .wz-body{ grid-template-columns:minmax(0,1fr); gap:26px; }
+    .wz-main{ overflow:visible; min-height:auto; }
+    .wz-panel{ overflow:visible; }
   }
 
   /* ---- the step's question, at size (one question per screen) ---- */
@@ -780,7 +837,8 @@
 
   /* ---- the live profile panel ---- */
   .wz-panel{
-    min-width:0; border-left:1px solid var(--line-2); padding-left:32px;
+    min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+    padding:clamp(16px,1.6vw,22px);
     display:flex; flex-direction:column; font-size:12px; }
   .wz-pnl-who{ display:flex; align-items:center; gap:11px; margin-bottom:20px; min-width:0; }
   .wz-pnl-who > div{ min-width:0; }
@@ -820,11 +878,13 @@
   .wz-acc-sel .nsel-btn, .wz-acc-sel select{ font-size:14px; }
   .wz-acc-note{ margin:11px 0 26px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .wz-acc-note .pill-count{ flex:none; }
-  .chip-grid.wz-chips-big{ gap:13px; }
-  .wz-chips-big .pchip{ min-width:122px; padding:19px 21px; border-radius:19px; gap:11px; }
-  .wz-chips-big .pchip .pcn{ font-size:13px; }
-  .wz-chips-big .pchip.wz-add .plus{ width:54px; height:54px; font-size:23px; }
-  .wz-sec-lead{ margin:0 0 18px; max-width:74ch; }
+  .chip-grid.wz-chips-big{ gap:11px; }
+  .wz-chips-big .pchip{ min-width:104px; padding:14px 16px; border-radius:17px; gap:9px; }
+  .wz-chips-big .pchip .pcn{ font-size:12.5px; }
+  .wz-chips-big .pchip.wz-add .plus{ width:44px; height:44px; font-size:20px; }
+  .wz-acc-note{ margin:10px 0 16px; }
+  .wz-sec-lead{ margin:0 0 14px; max-width:74ch; }
+  .wz-sec-foot{ margin:12px 0 0; max-width:74ch; }
   .wz-sec-lead #wz-order-tip{ color:var(--t35); }
   /* Spacing between sections is the container's gap, not each section's own
      bottom margin. A margin cannot see across a wrapper - the route cards and
@@ -834,10 +894,31 @@
   /* app.js shows a pane with style.display = '' (i.e. no inline value), so the
      rule below is what it falls back to; it hides one with an inline 'none',
      which still wins. Do not change the show path to an explicit 'block'. */
-  .wz-pane{ display:flex; flex-direction:column; gap:34px; min-width:0; }
+  /* ---- one block per step -------------------------------------------------
+     A step used to be a loose stack of outlined cards straight on the page
+     background: six or seven rectangles all drawn at the same weight, which is
+     what made the streams step read as clutter rather than as a question with
+     answers. The step is one frosted block now, and the outlines left inside
+     it are only on the things you can pick or type into — drawn lighter,
+     because the block around them is already doing the containing.
+     Glass is otherwise reserved for the topbar, modals and .sy-card; this is
+     a deliberate fourth use, not a drift. */
+  /* The wash is a light one over the blur, not --glass-bg's dark one: the page
+     behind this is already near-black, so a darker pane reads as a hole rather
+     than as a block. Layered over the blur so the animated background still
+     shows through it, softened. */
+  .wz-pane{ display:flex; flex-direction:column; gap:22px; min-width:0; }
+  /* Inside the block, a choice card is a hairline and a faint fill, and the
+     accent belongs to the one you picked. The border width is the same in both
+     states on purpose: a card that thickens when chosen nudges every card
+     beside it. */
+  .wz-pane .wz-pick{ border-width:1px; background:rgba(0,0,0,.22); }
+  .wz-pane .wz-pick:hover{ background:rgba(0,0,0,.1); border-color:rgba(255,255,255,.24); }
+  .wz-pane .wz-pick.on{ border-color:var(--accent); background:rgba(229,57,53,.09); }
+  .wz-pane .wz-pick-static:hover{ background:rgba(255,255,255,.022); }
   #wz-mode-simple, #wz-mode-advanced, #wz-route-aiostreams, #wz-route-native,
-  #wz-account-body{ display:flex; flex-direction:column; gap:34px; min-width:0; }
-  .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:18px; }
+  #wz-route-plugins, #wz-account-body{ display:flex; flex-direction:column; gap:22px; min-width:0; }
+  .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
   .wz-step{ display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line); background:transparent;
     color:var(--t55); border-radius:999px; padding:7px 15px 7px 7px; font-size:12.5px; font-weight:600;
     cursor:pointer; font-family:inherit; white-space:nowrap;
@@ -848,7 +929,14 @@
   .wz-step.on{ background:var(--surface-3); color:var(--t); border-color:rgba(255,255,255,.2); }
   .wz-step.on .n{ background:var(--accent); color:#fff; }
   .wz-step.did .n{ background:rgba(67,160,71,.22); color:#7bd88f; }
-  .wz-step:disabled{ opacity:.4; cursor:not-allowed; }
+  /* Every step but the current one is disabled now: the rail reports progress,
+     it does not navigate. So a disabled step must not read as broken — it is
+     the resting state of four of the five. The "not yet" ones stay faint; a
+     step you have COMPLETED keeps its green tick at full strength, because
+     that tick is the only thing on screen saying you did it. */
+  .wz-step:disabled{ cursor:default; }
+  .wz-step:disabled:not(.did):not(.on){ opacity:.4; }
+  .wz-step.did{ color:var(--t55); border-color:var(--line); }
 
   /* the "you are writing to X" strip that follows you from step 2 onward */
   .wz-target{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
@@ -880,7 +968,7 @@
     .wz-acc-grid > .wz-sec + .wz-sec{ border-left:0; padding-left:0; }
   }
 
-  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:30px; padding-top:16px; padding-bottom:4px;
+  .wz-foot{ display:flex; align-items:center; gap:12px; margin-top:18px; padding-top:14px; padding-bottom:2px;
     border-top:1px solid var(--line-2); }
   .wz-foot .spacer{ flex:1; }
   .wz-foot .btn{ flex:none; }
@@ -962,6 +1050,13 @@
   /* Two options, so two columns - auto-fit would put them side by side at any
      width and then strand the second one on its own row just below 660px. */
   .wz-p2p{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
+  /* Three routes, so three columns wherever there is room for them and one
+     column where there is not. auto-fit's answer in this column is two plus a
+     third stranded on its own row, which reads as a broken grid rather than as
+     a tighter fit — the same trap the metadata tiles hit. Measured against
+     .wz-main, not the window: the profile panel takes a fixed 322px out of it. */
+  #wz-routes{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  @container wzmain (max-width:760px){ #wz-routes{ grid-template-columns:1fr; } }
 
   /* instance rows - name, uptime, open */
   .wz-inst{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line);
@@ -1112,6 +1207,11 @@
   .wz-logo.sm .mono{ font-size:15px; }
   .wz-logo.xs{ width:21px; height:21px; border-radius:6px; }
   .wz-logo.xs .mono{ font-size:10px; }
+  /* The one mark that is drawn rather than borrowed: Nuvio's plugin format is
+     not a company and has no logo to use. Stroke, not fill, so it sits at the
+     same visual weight as the sidebar's own icons. */
+  .wz-logo.drawn{ background:rgba(229,57,53,.13); border-color:rgba(229,57,53,.3); color:#ff8a80; }
+  .wz-logo.drawn svg{ width:58%; height:58%; }
   /* Two marks for a route that names two services. Overlapped rather than set
      side by side, so the pair reads as one badge and takes about the width of
      one and a half - a card header has a name and a tag to fit as well. */
@@ -1134,24 +1234,36 @@
   .wz-meta-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-items:stretch; }
   @container wzmain (min-width:1150px){ .wz-meta-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); } }
   @container wzmain (max-width:560px){ .wz-meta-grid{ grid-template-columns:1fr; } }
-  .wz-meta-card{ display:flex; flex-direction:column; gap:11px; background:var(--surface); border:1px solid var(--line);
-    border-radius:16px; padding:17px 18px; min-width:0; overflow:hidden; position:relative;
+  /* A size down all round. These were laid out for a page that scrolled; the
+     step has to fit in a fixed column now, and four tiles that each took a
+     third of it were the biggest thing in the way. Nothing was removed — the
+     type, the mark and the padding are simply no longer oversized. */
+  .wz-meta-card{ display:flex; flex-direction:column; gap:8px; background:var(--surface); border:1px solid var(--line);
+    border-radius:13px; padding:12px 13px; min-width:0; overflow:hidden; position:relative;
     transition:border-color .2s ease, background .2s ease; }
   .wz-meta-card:hover{ border-color:rgba(255,255,255,.2); background:var(--surface-2); }
   .wz-meta-card.on{ border-color:rgba(67,160,71,.38); }
-  .wz-meta-top{ display:flex; align-items:center; gap:12px; min-width:0; }
+  .wz-meta-top{ display:flex; align-items:center; gap:10px; min-width:0; }
   .wz-meta-hd{ min-width:0; flex:1 1 auto; }
-  .wz-meta-hd .nm{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:15px; font-weight:700;
+  .wz-meta-hd .nm{ display:flex; align-items:center; gap:7px; flex-wrap:wrap; font-size:13.5px; font-weight:700;
     letter-spacing:-.01em; min-width:0; overflow-wrap:anywhere; }
-  .wz-meta-b{ font-size:12.5px; color:var(--t70); line-height:1.5; overflow-wrap:anywhere; }
-  .wz-meta-w{ font-size:12px; color:var(--t45); line-height:1.5; overflow-wrap:anywhere; }
+  .wz-meta-card .wz-logo.lg{ width:34px; height:34px; border-radius:10px; }
+  .wz-meta-card .wz-logo.lg .mono{ font-size:15px; }
+  .wz-meta-b{ font-size:11.5px; color:var(--t70); line-height:1.45; overflow-wrap:anywhere; }
+  /* The second line is detail, not headline: clamped so one wordy add-on
+     cannot make its tile twice the height of the three beside it. */
+  .wz-meta-w{ font-size:11px; color:var(--t45); line-height:1.45; overflow-wrap:anywhere;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
   /* Pushed to the bottom of the card together with the box below it, which is
      what keeps four tiles' buttons and paste boxes on one line instead of at
      four different heights. */
-  .wz-meta-act{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-top:auto; padding-top:3px; }
+  .wz-meta-act{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:auto; padding-top:2px; }
   .wz-meta-act .btn{ flex:none; }
+  .wz-meta-go{ flex:none; align-self:center; }
+  /* The paste box is what has to sit on the same line across all four tiles,
+     now that the button is up in the header. */
+  .wz-meta-slot{ margin-top:auto; padding-top:2px; }
   .wz-meta-tag{ display:inline-flex; }
-  .wz-meta-slot{ margin-top:2px; }
 
   /* ---- locked to one profile --------------------------------------------
      Once the wizard has written anything, the target stops being a choice. The
@@ -1167,6 +1279,18 @@
 
   /* the paste-the-link-back box: one column, even spacing, nothing overflowing */
   .wz-pane .mk-install{ display:flex; flex-direction:column; gap:10px; }
+  /* ...except on the metadata step, where four of these sit side by side and
+     the box was two thirds of each tile's height. Same fields and the same
+     write path — laid out across instead of down, with the link and the name
+     sharing a row and the hint as one line under them. */
+  .wz-meta-slot .mk-install{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,116px); gap:7px 8px; }
+  .wz-meta-slot .mk-install > *{ grid-column:1/-1; }
+  .wz-meta-slot .mk-install > input[type=url]{ grid-column:1; grid-row:1; }
+  .wz-meta-slot .mk-install > input.mk-name{ grid-column:2; grid-row:1; }
+  .wz-meta-slot .mk-install > .mk-hint{ grid-row:2; }
+  .wz-meta-slot .mk-install input{ padding:7px 10px; font-size:12px; }
+  .wz-meta-slot .mk-install .mk-hint{ margin-top:-1px; font-size:10.5px; line-height:1.4; }
+  .wz-meta-slot .mk-install .switch-row .tx b{ font-size:11.5px; }
   .wz-pane .mk-install > *{ margin:0; }
   .wz-pane .mk-install input[type=url], .wz-pane .mk-install input.mk-name{ width:100%; }
   .wz-pane .mk-install .mk-hint{ margin-top:-4px; line-height:1.5; }
@@ -1240,6 +1364,14 @@
   .mk-staple .mk-st-top{ display:flex; align-items:center; gap:10px; }
   .mk-ic{ width:32px; height:32px; border-radius:9px; display:grid; place-items:center; font-weight:800; font-size:13px; flex:none; background:var(--surface-3); color:var(--t70); }
   .mk-ic.accent{ background:rgba(229,57,53,.16); color:#ff8a80; }
+  /* Same rule as the wizard's logos: the monogram is underneath and the image
+     sits on top of it, so a host that stops serving one degrades to a letter
+     rather than to a broken-image icon. object-fit:contain because these are
+     marks with their own padding — cropping them square mangles half of them. */
+  .mk-ic-l{ position:relative; overflow:hidden; background:var(--surface-2); border:1px solid var(--line); }
+  .mk-ic-l .mk-ic-m{ font-weight:800; color:var(--t45); }
+  .mk-ic-l img{ position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
+  .mk-ic-s{ width:26px; height:26px; border-radius:7px; font-size:11px; }
   .mk-nm{ font-size:13.5px; font-weight:700; }
   .mk-sub{ font-size:11px; color:var(--t35); margin-top:2px; }
   .mk-acts{ display:flex; gap:7px; margin-top:auto; }
@@ -1340,6 +1472,10 @@
     background:transparent; color:var(--t45); display:grid; place-items:center; cursor:pointer; }
   .mk-dlg-x:hover{ background:var(--surface-2); color:var(--t); }
   .mk-dlg-x svg{ width:15px; height:15px; }
+  /* The plugin and collection browsers need more than a profile picker does:
+     a repository row carries a mark, a name, a provider count and two buttons,
+     and a collection grid wants three or four across. Same dialog, more room. */
+  .mk-dlg-wide .mk-dlg{ width:min(1020px,96vw); height:min(86dvh, 100% - 32px); }
   .mk-dlg-b{ padding:16px 18px; overflow-y:auto; flex:1 1 auto; min-height:0; }
   .mk-dlg-b::-webkit-scrollbar{ width:5px; }
   .mk-dlg-b::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
@@ -1442,8 +1578,47 @@
   .mk-warn{ border-color:rgba(240,160,32,.35); background:rgba(240,160,32,.06); color:#f0c060; }
   .mk-warn svg{ color:#f0c060; }
 
+  /* ---- the plugin repository browser (Setup Wizard, streams step) --------
+     A repository row, and its providers underneath as CONTEXT rather than as a
+     picker: Nuvio syncs one row per repository and keeps the per-provider
+     switches on the device, so a tick here would be a control Numax could not
+     honour. Showing what is inside before you add it is the part that can
+     honestly be done. */
+  .wz-plug-bar{ display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  /* .modal-input's own 14px top margin belongs to the confirm dialog, not to
+     a search box in a toolbar row. */
+  .wz-plug-search{ flex:1 1 auto; min-width:0; margin-top:0; }
+  .wz-plug-bar .pill-count{ flex:none; }
+  .wz-plug-list{ display:flex; flex-direction:column; gap:8px; }
+  .wz-plug{ border:1px solid var(--line); border-radius:12px; background:var(--surface); min-width:0;
+    transition:border-color .16s ease; }
+  .wz-plug:hover{ border-color:rgba(255,255,255,.2); }
+  .wz-plug.on{ border-color:rgba(67,160,71,.4); }
+  .wz-plug.dead{ opacity:.72; }
+  .wz-plug-h{ display:flex; align-items:center; gap:11px; padding:10px 12px; min-width:0; }
+  .wz-plug-tx{ flex:1 1 auto; min-width:0; }
+  .wz-plug-n{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px; font-weight:600;
+    min-width:0; overflow-wrap:anywhere; }
+  .wz-plug-m{ font-size:11px; color:var(--t35); font-family:ui-monospace,monospace; margin-top:2px;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wz-plug-m.bad{ color:#ff8a80; }
+  .wz-plug-h .btn, .wz-plug-h .mk-lang{ flex:none; }
+  .wz-plug-b{ padding:0 12px 12px; min-width:0; }
+  .wz-plug-scr{ max-height:300px; overflow-y:auto; padding-right:4px; }
+  .wz-plug-scr::-webkit-scrollbar{ width:5px; }
+  .wz-plug-scr::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:4px; }
+  .wz-plug-note{ margin-top:14px; }
+  .mk-dlg-f .inline-status:empty, .mk-dlg-f .mk-res:empty{ display:none; }
+
   /* community collections grid */
   .mk-coll-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; margin-top:14px; }
+  /* Inside a dialog rather than a whole tab, so the cards are a size smaller
+     and the artwork is shorter — a browse list, not a shop front. */
+  .wz-coll-grid{ grid-template-columns:repeat(auto-fill,minmax(196px,1fr)); gap:11px; }
+  .wz-coll-grid .mk-coll-img{ aspect-ratio:2/1; }
+  .wz-coll-grid .mk-coll-body{ padding:10px 11px 11px; gap:5px; }
+  .wz-coll-grid .mk-coll-title{ font-size:12.5px; }
+  .wz-coll-grid .mk-coll-desc{ -webkit-line-clamp:2; }
   .mk-coll-card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r-lg); overflow:hidden; display:flex; flex-direction:column; }
   .mk-coll-img{ width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:var(--surface-2); }
   .mk-coll-body{ padding:12px 13px 13px; display:flex; flex-direction:column; gap:6px; flex:1; }
@@ -1844,7 +2019,7 @@
          box any more. .wz-body holds the panes and grows, which is what keeps
          the footer on the bottom edge of a short step instead of leaving a
          screenful of nothing under it. -->
-    <section class="panel" data-panel="wizard" style="display:none">
+    <section class="panel mo-fit" data-panel="wizard" style="display:none">
       <div class="phead"><span class="eyebrow">Setup wizard</span><h1>A working Nuvio, start to finish.</h1>
         <p>Five steps, all written straight into the profile you pick &mdash; nothing is kept by Numax.</p></div>
 
@@ -2009,6 +2184,18 @@
             <div id="wz-p2p-install" style="margin-top:20px"></div>
           </div>
         </div>
+
+        <!-- Plugins. Nuvio's own on-device format rather than a stream add-on,
+             so it needs neither an instance nor a debrid key. Numax can put a
+             repository on the profile and that syncs; the per-provider
+             switches are device-local and the pane says so rather than
+             offering a control it cannot honour. -->
+        <div id="wz-route-plugins" style="display:none">
+          <div class="wz-sec">
+            <div class="chead"><h3><span class="wz-n">1</span>Add a plugin repository</h3></div>
+            <div id="wz-plugins"></div>
+          </div>
+        </div>
       </div>
 
       <!-- 4 - metadata -->
@@ -2017,6 +2204,16 @@
           <p class="muted sm wz-sec-lead">Set each one up on its own site and paste the link back &mdash; &ldquo;Save and move to next step&rdquo; at the bottom writes them all in.
             <span id="wz-order-tip"></span></p>
           <div class="wz-meta-grid" id="wz-meta"></div>
+        </div>
+
+        <!-- Collections last and marked optional: a collection is a list of
+             titles, and the metadata add-ons above are what draw the posters
+             for it. Browse opens the same dialog the Marketplace uses; Add
+             writes straight to the profile this run is setting up. -->
+        <div class="wz-sec">
+          <div class="chead"><h3>Collections</h3><span class="spacer"></span>
+            <span class="wz-tag plain">Optional</span></div>
+          <div id="wz-collections"></div>
         </div>
       </div>
 
@@ -2041,8 +2238,11 @@
        <aside class="wz-panel" id="wz-panel" style="display:none"></aside>
       </div>
 
+      <!-- No Back button, by design. A wizard you can step backwards through is
+           a wizard that can end up half set up from one set of answers and half
+           from another; the way out of a run is "Exit and undo" on the target
+           strip above, which puts the profile back as it was. -->
       <div class="wz-foot">
-        <button class="btn btn-ghost" id="wz-back">Back</button>
         <span class="spacer"></span>
         <span class="muted sm" id="wz-foot-note"></span>
         <button class="btn btn-primary" id="wz-next">Next</button>

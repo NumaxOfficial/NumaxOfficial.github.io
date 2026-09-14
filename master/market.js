@@ -114,6 +114,36 @@
   function configureUrl(u) { return String(u || '').replace(/\/manifest\.json(\?[^#]*)?(#.*)?$/i, '/configure'); }
 
   // ======================================================================
+  // who publishes a plugin repo, and its mark
+  // ======================================================================
+  // A plugin repo's manifest publishes NO logo of its own — checked live on
+  // 2026-09-13 against the community index: the top-level keys are exactly
+  // { name, version, scrapers } and nothing else. The individual scrapers
+  // inside DO each carry a `logo`, and those are drawn wherever a scraper is
+  // listed, but a repo row needed a mark of its own.
+  //
+  // The one real per-repo mark that exists is the account that publishes it.
+  // Both forges serve it at a stable address, no API call and no token:
+  //   github.com/<login>.png       codeberg.org/<login>.png
+  // Checked 2026-09-13 against all 19 indexed repos: 18 answered 200 with a
+  // real image; one (AlvitoSR) 404s because that account is gone — which is
+  // exactly what the monogram underneath is for.
+  //
+  // The Codeberg API form has to be tested FIRST: a rewritten Codeberg URL
+  // starts /api/v1/repos/<owner>/, so the plain pattern would read the owner
+  // as "api".
+  function pluginOwner(u) {
+    const str = String(u || '');
+    let m = /^https:\/\/raw\.githubusercontent\.com\/([^/]+)\/([^/]+)/.exec(str)
+         || /^https:\/\/github\.com\/([^/]+)\/([^/]+)/.exec(str);
+    if (m) return { forge: 'GitHub', login: m[1], repo: m[2], logo: 'https://github.com/' + encodeURIComponent(m[1]) + '.png?size=128' };
+    m = /^https:\/\/codeberg\.org\/api\/v1\/repos\/([^/]+)\/([^/]+)/.exec(str)
+     || /^https:\/\/codeberg\.org\/([^/]+)\/([^/]+)/.exec(str);
+    if (m) return { forge: 'Codeberg', login: m[1], repo: m[2], logo: 'https://codeberg.org/' + encodeURIComponent(m[1]) + '.png' };
+    return null;
+  }
+
+  // ======================================================================
   // plugin index (Notion table)
   // ======================================================================
   // A cell is [[text, [['a', href], ...]], ...]. Pull the plain text and the
@@ -179,11 +209,17 @@
       const url = cellLink(p[repoCol]);
       const name = cellText(p[repoCol]);
       if (!url || !name) continue;
+      const own = pluginOwner(url);
       out.push({
         name,
         lang: (langCol && cellText(p[langCol])) || 'Unknown',
         manifestUrl: normalizeManifestUrl(url),
         rawUrl: url,
+        owner: own,
+        // Drawn through app.js's shared logo helper, which puts a monogram
+        // underneath and drops the <img> if it fails — a gone account shows a
+        // letter, never a broken-image icon.
+        logo: own ? own.logo : '',
       });
     }
     if (!out.length) throw new Error('index returned no providers');
@@ -652,6 +688,6 @@
     configureUrl, normalizeManifestUrl, loadCollectionsSnapshot, loadCollectionInstall,
     loadCollectionsLive, loadCollectionInstallLive,
     toInstalledCollection, installedCollectionId, isInstalledForm,
-    resolveManifestUrl, probeManifest,
+    resolveManifestUrl, probeManifest, pluginOwner,
   };
 })();

@@ -357,6 +357,36 @@
       // Stated once, plainly, wherever this route is chosen.
       catch: 'Nuvio’s built-in debrid only <b>resolves</b> links — it can’t find anything on its own. So the add-on you use must return raw magnets with <b>its own debrid field empty</b>, or it resolves first and Nuvio’s side never gets used.',
     },
+    {
+      // The third route is not a debrid decision at all, which is why it does
+      // not fit the sentence the other two share. A plugin is Nuvio's own
+      // format: the scraper's code is downloaded and run on the device inside
+      // a sandboxed QuickJS runtime, rather than a server being asked for an
+      // answer. So there is no instance, no key and no subscription — and
+      // equally no debrid, so it sits alongside either route above rather than
+      // replacing one. (Nuvio wiki, Integrations → Plugins.)
+      //
+      // No third party to borrow a mark from, so this one carries a drawn one.
+      // `svg` is the general-logo path in app.js's wzLogo; every other entry in
+      // this file uses `logo` (a URL) or falls back to `mono`.
+      id: 'plugins', name: 'Nuvio plugins', tag: 'Free',
+      svg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2.6v5.2M15 2.6v5.2"/><path d="M5.8 7.8h12.4v3.1a6.2 6.2 0 0 1-12.4 0Z"/><path d="M12 17.1v4.3"/></svg>',
+      mono: 'P',
+      oneLiner: 'Nuvio does the scraping itself, on your device — no add-on server, no debrid key, nothing to pay for.',
+      pros: [
+        'Nothing to set up on another website and nothing to subscribe to',
+        'No third-party instance that has to stay online',
+        'One repository can carry dozens of sources at once',
+        'Sits alongside the two routes above rather than replacing either',
+      ],
+      cons: [
+        '<b>Only sideloaded builds of Nuvio support plugins at all</b> — a copy installed from an app store has no plugins section',
+        'A plugin is code that runs on your device, not data from a server — only add repositories you trust',
+        'Free sources, so speed and reliability vary and links break as sites do',
+        'Which providers inside a repository actually run is chosen on the device, not from here',
+      ],
+      catch: 'Numax can put a repository on this profile, and that syncs to your devices. It <b>cannot</b> turn the individual providers inside it on — Nuvio keeps that on the device, under <b>Settings → Content &amp; Discovery → Plugins</b>, and it is not part of what an account syncs.',
+    },
   ];
 
   // The add-on half of the Nuvio+TorBox route: one recommendation and one way
@@ -377,6 +407,48 @@
       browse: true,
     },
   ];
+
+  // ======================================================================
+  // Step 3, third route — plugins
+  // ======================================================================
+  // Everything here is from the community Nuvio Wiki's own Plugins page
+  // (github.com/haaihond/Nuvio-Wiki, docs/integrations/plugins.md, read
+  // 2026-09-13) plus what the repo manifests actually contain, checked live
+  // the same day. Nothing below is inferred from the name of anything.
+  //
+  // The two caveats are not hedging and must not be softened:
+  //   - App-store builds of Nuvio have no plugin support at all, so a
+  //     repository written to the profile would simply never appear. Saying so
+  //     before the write is the difference between "it didn't work" and "this
+  //     build can't".
+  //   - The per-provider switches are device-local. Nuvio's sync stores one
+  //     row per REPOSITORY — { url, name, enabled, sort_order, repo_type } and
+  //     nothing else — so there is no field for them to travel in.
+  const PLUGINS = {
+    lead: 'A plugin repository is one manifest file listing many providers. Nuvio downloads each enabled provider\u2019s code and runs it on the device, so nothing here needs a server, a key or a subscription.',
+    caveat: '<b>Sideloaded builds only.</b> App-store copies of Nuvio have no plugins section, so a repository added here would never show up on them.',
+    ondevice: 'Adding a repository is all Numax can do, and it is all it claims to do. <b>Turning the individual providers on happens on the device</b>, under Settings \u2192 Content &amp; Discovery \u2192 Plugins \u2014 those switches are not part of what a Nuvio account syncs, so nothing on this page can reach them.',
+    trust: 'A plugin runs code on your device rather than returning data like an add-on does. Only add repositories from a source you trust.',
+    browse: 'Browse plugin repositories',
+    dlgTitle: 'Plugin repositories',
+    dlgSub: 'The community index, read live. Open one to see what is inside it before adding it.',
+    empty: 'The community plugin index returned nothing.',
+    added: 'Repository added to this profile.',
+  };
+
+  // ======================================================================
+  // Step 4 — community collections (optional)
+  // ======================================================================
+  // Deliberately framed as the last, optional thing on the metadata step
+  // rather than a step of its own: a collection is a list of titles, and it
+  // has nothing to draw with until a metadata add-on above it is in place.
+  const COLLECTIONS_STEP = {
+    lead: 'Ready-made rows someone else has already put together \u2014 a genre, a franchise, a director. They land on the home screen of this profile.',
+    note: 'Entirely optional, and you can add as many as you like. A collection is only a list of titles: the metadata add-ons above are what draw the posters for it.',
+    browse: 'Browse collections',
+    dlgTitle: 'Community collections',
+    dlgSub: 'Read from Nuvio\u2019s own community catalogue. Add goes straight to the profile you are setting up.',
+  };
 
   // ======================================================================
   // Adapted AIOStreams guide
@@ -489,7 +561,7 @@
     },
     meta: {
       q: 'How should your home screen look?',
-      sub: 'Posters, descriptions and the rows you see first. All optional — a new profile already has the basics.',
+      sub: 'Posters, descriptions and the rows you see first, plus any community collections you want on it. All optional — a new profile already has the basics.',
     },
     done: {
       q: 'That’s the setup done.',
@@ -572,7 +644,7 @@
 
   window.NumaxWizard = {
     KEYS, DEBRID, NO_DEBRID, MODES, RELAY, TEMPLATE_URL, PRESET, SIMPLE,
-    ROUTES, P2P_ADDONS, AIO_GUIDE, METADATA, ORDER_TIP,
+    ROUTES, P2P_ADDONS, PLUGINS, AIO_GUIDE, METADATA, COLLECTIONS_STEP, ORDER_TIP,
     STEP_HEADS, ADDON_KINDS, PANEL_SECTIONS,
   };
 })();
