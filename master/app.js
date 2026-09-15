@@ -54,6 +54,19 @@
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.classList.toggle('on', b.dataset.pftab === kind));
     document.querySelectorAll('.pf-pane').forEach(p => p.style.display = (p.id === 'pf-pane-' + kind) ? '' : 'none');
     $('pf-editor-pane-title').textContent = PF_TAB_LABEL[kind] || kind;
+    // One button, relabelled per tab. The Marketplace has a tab for exactly
+    // these three and nothing that corresponds to settings, watched or watch
+    // progress — so on those it is not there at all rather than disabled.
+    paintBarCat($('pf-editor-tabs'), kind);
+    const br = $('pf-browse');
+    if (br) {
+      const shop = kind === 'addons' || kind === 'plugins' || kind === 'collections';
+      br.style.display = shop ? '' : 'none';
+      if (shop) {
+        br.textContent = 'Browse ' + (PF_TAB_LABEL[kind] || kind).toLowerCase();
+        br.onclick = () => { nav('market'); switchMkTab(kind); };
+      }
+    }
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
@@ -401,6 +414,48 @@
     // populate avatar catalog for built-in Nuvio avatars
     A.fetchAvatarCatalog().then(map => { Object.assign(avatarCatalog, map); }).catch(() => {});
   }
+  // ---- theme -------------------------------------------------------------
+  // A device preference, like "Read API keys" above it in Settings: it is not
+  // part of an account and nothing syncs it. The <head> applies it before first
+  // paint; this only handles the switch and keeps the two in step.
+  const THEME_KEY = 'numax.theme';
+  function themeNow() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  }
+  function paintTheme() {
+    const b = $('st-theme');
+    if (b) { const on = themeNow() === 'light'; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }
+  }
+  function setTheme(on) {
+    if (on) document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(THEME_KEY, on ? 'light' : 'dark'); } catch (e) {}
+    paintTheme();
+    // The canvas backgrounds read their colours once when they mount.
+    if (M && M.refresh) M.refresh();
+    logAct('Switched to ' + (on ? 'light' : 'dark') + ' mode', 'info');
+  }
+
+  // ---- one colour per kind of thing --------------------------------------
+  // A sliding indicator is a single element per bar, so the colour cannot live
+  // on the items. Setting it on the BAR means the colour travels with the
+  // slide instead of snapping when the tab changes.
+  const CAT_COLOUR = {
+    addons: ['--cat-addons', '--cat-addons-rgb'],
+    plugins: ['--cat-plugins', '--cat-plugins-rgb'],
+    collections: ['--cat-collections', '--cat-collections-rgb'],
+    settings: ['--cat-settings', '--cat-settings-rgb'],
+    keys: ['--cat-keys', '--cat-keys-rgb'],
+  };
+  function paintBarCat(bar, kind) {
+    if (!bar) return;
+    const c = CAT_COLOUR[kind];
+    if (!c) { bar.style.removeProperty('--cat'); bar.style.removeProperty('--cat-rgb'); return; }
+    const cs = getComputedStyle(document.documentElement);
+    bar.style.setProperty('--cat', cs.getPropertyValue(c[0]).trim());
+    bar.style.setProperty('--cat-rgb', cs.getPropertyValue(c[1]).trim());
+  }
+
   function nav(panel) {
     document.querySelectorAll('[data-panel]').forEach(p => p.style.display = p.dataset.panel === panel ? '' : 'none');
     document.querySelectorAll('.navbtn').forEach(b => b.classList.toggle('on', b.dataset.nav === panel));
@@ -612,13 +667,33 @@
       loadAccount(rec.accountId).then(({ profiles }) => {
         if (gen !== acGen) return; // a newer refreshAccounts() already replaced this row — don't paint a detached one
         clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
-        profiles.forEach(p => { const c = el('span', 'pmini'); c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name)); prof.appendChild(c); });
+        const made = profiles.map(p => {
+          const c = el('button', 'pmini'); c.type = 'button';
+          c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name));
+          c.onclick = () => gotoProfile(rec.accountId, p.index);
+          prof.appendChild(c);
+          return { c, p };
+        });
         // Summary-only list, so the avatars overlap and spread on hover. Names stay
         // in the DOM (and in the accessibility tree) collapsed, never removed.
         if (M.avatarGroup) M.avatarGroup(prof, 6);
+        // avatarGroup labels each chip from its own textContent, which starts
+        // with the letter inside the avatar — "SSetupWizard2". Harmless when
+        // these were captions; now that the chip is a button that goes
+        // somewhere, its tooltip has to say where. Set after, so it wins.
+        made.forEach(({ c, p }) => {
+          const label = 'Open ' + p.name + ' on the Profile tab';
+          c.title = label; c.setAttribute('aria-label', label);
+        });
       })
         .catch(e => { if (gen !== acGen) return; clr(prof); prof.appendChild(el('span', 'muted sm err-text', "Couldn't load: " + e.message)); });
     }
+  }
+  function gotoProfile(aid, idx) {
+    pfA = aid; pfI = idx;
+    const sel = $('pf-account');
+    if (sel && [...sel.options].some(o => o.value === aid)) sel.value = aid;
+    nav('profile');
   }
   function startRename(nm, id) {
     const i = el('input'); i.type = 'text'; i.value = nm.textContent; i.maxLength = 40; i.className = 'rename-input'; nm.parentNode.replaceChild(i, nm); i.focus(); i.select();
@@ -797,6 +872,14 @@
       wireRowDrag(row, list, i, () => { dirty(kind); renderPfList(kind); });
       const tog = el('button', 'tog' + (item.enabled !== false ? ' on' : '')); tog.onclick = () => { item.enabled = !(item.enabled !== false); tog.classList.toggle('on', item.enabled); dirty(kind); };
       row.appendChild(tog);
+      // Same mark the Marketplace draws, so an add-on looks like itself
+      // wherever it appears. A plugin repo publishes no logo of its own, so it
+      // carries its publisher's avatar exactly as the Marketplace rows do.
+      if (window.NumaxMarket) {
+        row.appendChild(kind === 'plugins'
+          ? mkLogo(item.name || host(item.url), (MK.pluginOwner(item.url) || {}).logo || '', 'mk-ic-s')
+          : mkAddonLogo(item.name || host(item.url), item.url, 'mk-ic-s'));
+      }
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', item.name || host(item.url))); b.appendChild(el('div', 'es', host(item.url))); row.appendChild(b);
       // Configure — same behaviour as Nuvio's own account page: shown only when
       // the add-on's manifest declares behaviorHints.configurable, and it just
@@ -825,7 +908,9 @@
       const b = el('div', 'eb'); b.appendChild(el('div', 'en', collLabel(c)));
       const folders = (c && Array.isArray(c.folders)) ? c.folders : [];
       b.appendChild(el('div', 'es', folders.length ? folders.length + ' folder' + (folders.length === 1 ? '' : 's') : 'No folders')); row.appendChild(b);
-      const ed = el('button', 'iconbtn', '⇅'); ed.title = 'Reorder folders'; ed.disabled = folders.length < 2; ed.onclick = () => toggleFolders(row, c, i); row.appendChild(ed);
+      const ed = el('button', 'btn btn-ghost btn-xs', 'Edit');
+      ed.title = 'Open this collection and reorder its folders';
+      ed.onclick = () => openCollectionEditor(c); row.appendChild(ed);
       const del = el('button', 'iconbtn', '✕'); del.onclick = () => { list.splice(i, 1); dirty('collections'); renderPfCollections(); }; row.appendChild(del);
       box.appendChild(row);
       const fbox = el('div', 'subrow'); fbox.dataset.folders = i; fbox.style.display = 'none'; box.appendChild(fbox);
@@ -833,6 +918,49 @@
     if (list && list.length) wireListDropzone(box, list, () => { dirty('collections'); renderPfCollections(); });
     updateHeadStats();
   }
+  // The collection editor.
+  //
+  // Scope is deliberate and it is narrower than Nuvio's own screen: Nuvio edits
+  // a collection on the device, and the only part of it that reaches an account
+  // is the stored collections_json. Folder ORDER is inside that blob and is
+  // therefore something Numax can genuinely change; the sources inside a folder
+  // are listed for context and are not editable, because nothing in this app has
+  // ever written one and a control that silently does nothing is worse than no
+  // control. Nothing here writes — it edits pfEdit in place, exactly as the
+  // inline reorder did, and "Save to profile" is still what commits it.
+  function openCollectionEditor(coll) {
+    const pop = openMkPop(null, collLabel(coll),
+      'Drag to reorder the folders. Saved to Nuvio when you press “Save to profile”.');
+    const draw = () => {
+      clr(pop.body);
+      const folders = (coll && Array.isArray(coll.folders)) ? coll.folders : [];
+      if (!folders.length) { pop.body.appendChild(el('p', 'empty sm', 'This collection has no folders.')); return; }
+      const list = el('div', 'pf-coll-folders');
+      folders.forEach((f, j) => {
+        const r = el('div', 'erow');
+        r.appendChild(el('span', 'pf-coll-n', String(j + 1)));
+        r.appendChild(dragHandle());
+        wireRowDrag(r, folders, j, () => { dirty('collections'); draw(); renderPfCollections(); });
+        const b = el('div', 'eb');
+        b.appendChild(el('div', 'en', (f && (f.title || f.name)) || 'Folder ' + (j + 1)));
+        const n = (f && Array.isArray(f.sources)) ? f.sources.length : null;
+        b.appendChild(el('div', 'es', n == null ? 'no source list' : n + ' source' + (n === 1 ? '' : 's')));
+        r.appendChild(b);
+        list.appendChild(r);
+      });
+      wireListDropzone(list, folders, () => { dirty('collections'); draw(); renderPfCollections(); });
+      pop.body.appendChild(list);
+      if (folders.length < 2) pop.body.appendChild(el('p', 'muted sm', 'One folder, so there is nothing to reorder.'));
+    };
+    draw();
+    const done = el('button', 'btn btn-primary', 'Done');
+    done.onclick = closeMkPop;
+    pop.foot.appendChild(done);
+  }
+
+  // CURRENTLY UNUSED (2026-09-15): the inline folder list this opened is a
+  // dialog now (openCollectionEditor above). Kept, with the empty .subrow
+  // renderPfCollections still emits, rather than deleted in passing.
   function toggleFolders(row, coll, idx) {
     const box = row.nextSibling; if (!box) return;
     if (box.style.display !== 'none') { box.style.display = 'none'; clr(box); return; }
@@ -2156,6 +2284,7 @@
   }
   function switchMkTab(kind) {
     mkTab = kind;
+    paintBarCat(document.querySelector('.mk-tabs'), kind);
     document.querySelectorAll('.mk-tab').forEach(b => b.classList.toggle('on', b.dataset.mktab === kind));
     document.querySelectorAll('.mk-pane').forEach(p => p.style.display = (p.id === 'mk-pane-' + kind) ? '' : 'none');
     if (kind === 'addons') renderMkAddons();
@@ -2183,8 +2312,13 @@
   function mkPopKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeMkPop(); } }
   function closeMkPop() {
     if (!mkPop) return;
-    const root = mkPop.root; mkPop = null;
+    const root = mkPop.root, after = mkPop.onClose; mkPop = null;
     document.removeEventListener('keydown', mkPopKey, true);
+    // A dialog that BORROWED a live node rather than building one — the
+    // wizard's three route panes do this, the same way ui-motion relocates
+    // .sy-carry-chooser — has to give it back before the root is removed, or
+    // the node is removed along with it and the step is left with a hole.
+    if (after) { try { after(); } catch (e) {} }
     // Hand the exit animation to ui-motion (it watches display on .modal-root),
     // then take the node out once that animation has had its 130 ms.
     root.style.display = 'none';
@@ -2239,6 +2373,66 @@
     return t;
   }
 
+  // Every add-on mark in the app resolves the same way, and none of it is a
+  // guessed URL. wizard.js's hand-checked ADDON_KINDS table answers first; if
+  // it has nothing, the add-on's own manifest `logo` is read; if that cannot be
+  // read cross-origin, the row keeps the monogram mkLogo has already drawn.
+  //
+  // The curated list stores /configure pages rather than manifests, so the
+  // address goes through market.js's resolveManifestUrl — the same repair the
+  // Add box uses. Only the FIRST candidate is tried: this runs once per row in
+  // a thirty-row list, and probing three URLs each would be ninety requests to
+  // fill in some artwork.
+  const _mkLogoCache = new Map();
+  function mkFetchJson(url, ms) {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), ms || 8000);
+    return fetch(url, { signal: ctl.signal })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status))))
+      .finally(() => clearTimeout(t));
+  }
+  function mkAddonLogoSrc(name, url) {
+    const key = String(url || name || '');
+    if (_mkLogoCache.has(key)) return _mkLogoCache.get(key);
+    // AIOStreams and AIOMetadata are run by many hosts, so the curated list
+    // carries no URL for them at all — it opens an instance picker instead.
+    // Match the table against the name in exactly that case, which is the only
+    // way those two can be recognised.
+    const known = ((WZ && WZ.ADDON_KINDS) || []).find(k => k.re.test(String(url || name || '')));
+    let p;
+    if (known && known.logo) p = Promise.resolve(known.logo);
+    else {
+      // Two candidates, not one and not all of them. Measured on the curated
+      // list: the first alone leaves MediaFusion blank (its listed address is
+      // /app, whose manifest lives one level up), and a third buys nothing at
+      // all. A candidate that PARSES is the final answer even when it carries
+      // no logo — Jackettio and Peerflix publish none, so asking again would be
+      // a wasted request for a monogram we are already going to draw.
+      const cands = ((MK && MK.resolveManifestUrl) ? MK.resolveManifestUrl(url) : []) || [];
+      p = (async () => {
+        for (const c of cands.slice(0, 2)) {
+          try { const j = await mkFetchJson(c, 7000); return wzHttps((j && j.logo) || ''); }
+          catch (e) { /* not a manifest here — try the next candidate */ }
+        }
+        return '';
+      })();
+    }
+    _mkLogoCache.set(key, p);
+    return p;
+  }
+  function mkAddonLogo(name, url, cls) {
+    const t = mkLogo(name, '', cls);
+    mkAddonLogoSrc(name, url).then(src => {
+      if (!src || !t.isConnected) return;
+      const i = document.createElement('img');
+      i.alt = ''; i.referrerPolicy = 'no-referrer';
+      i.onerror = () => i.remove();
+      i.src = src;
+      t.appendChild(i);
+    }).catch(() => {});
+    return t;
+  }
+
   // One wiring for all three marketplace search boxes: debounced so a long list
   // is not rebuilt on every keystroke, Escape clears, and the clear button and
   // the input stay in step.
@@ -2258,7 +2452,7 @@
     MK.STAPLES.forEach(s => {
       const c = el('div', 'mk-staple');
       const top = el('div', 'mk-st-top');
-      const ic = el('div', 'mk-ic' + (s.instances ? ' accent' : '')); ic.textContent = s.name[0];
+      const ic = mkAddonLogo(s.name, s.url || '', s.instances ? 'accent' : '');
       const tx = el('div'); tx.style.minWidth = '0';
       tx.appendChild(el('div', 'mk-nm', s.name));
       tx.appendChild(el('div', 'mk-sub', s.blurb));
@@ -2332,7 +2526,7 @@
       const rows = el('div', 'mk-rows');
       items.forEach(it => {
         const r = el('div', 'mk-row');
-        const ic = el('div', 'mk-ic'); ic.style.cssText = 'width:26px;height:26px;font-size:11px'; ic.textContent = it.name[0];
+        const ic = mkAddonLogo(it.name, it.url, 'mk-ic-s');
         const b = el('div', 'mk-rb');
         b.appendChild(el('div', 'mk-rn', it.name));
         b.appendChild(el('div', 'mk-ru', host(it.url)));
@@ -2615,6 +2809,22 @@
     // paint the counts once everything is in the document
     const firstSec = wrap.querySelector('.mk-pick-acct');
     if (firstSec && firstSec.__syncTop) firstSec.__syncTop();
+    // The chips are one width now (a grid track), so a long name would simply
+    // be cut. Step its type down instead, and only then let it ellipse. Run
+    // synchronously and only when the dialog actually has a width: a hidden
+    // dialog measures every name as overflowing and would shrink them all.
+    wrap.querySelectorAll('.mk-pick-chip .pcn').forEach(fitChipName);
+  }
+
+  // Shrink a profile name until it fits its chip, down to a floor — below that
+  // it would be smaller than the surrounding labels, so the ellipsis takes over.
+  function fitChipName(n) {
+    n.style.fontSize = '';
+    if (!n.clientWidth || n.scrollWidth <= n.clientWidth) return;
+    for (let px = 12; px >= 9.5; px -= 0.5) {
+      n.style.fontSize = px + 'px';
+      if (n.scrollWidth <= n.clientWidth) return;
+    }
   }
 
   // Merge / Overwrite as a two-button segment rather than a dropdown. It stays
@@ -2970,6 +3180,37 @@
     if (q) $('mk-prov-count').textContent = list.length + ' of ' + mkProviders.length + ' repos';
     if (!list.length) { box.appendChild(el('p', 'mk-find-none', 'No repo matches \u201c' + q + '\u201d.')); return; }
     const grid = el('div', 'mk-prov-grid'); box.appendChild(grid);
+    // A repo whose manifest this browser cannot read is moved OUT of the main
+    // grid instead of sitting in it with an error where its scraper count
+    // should be. They are not hidden: the broken-robot button in the header
+    // opens them, and the count on it says how many there are. Three of the
+    // nineteen indexed repos are genuinely dead, and that is worth being able
+    // to see — it is just not worth three error rows among sixteen good ones.
+    const deadWrap = el('div', 'mk-dead-wrap'); deadWrap.style.display = 'none';
+    deadWrap.appendChild(el('p', 'muted sm', 'These are listed in the community index but their manifest did not answer here. Nuvio fetches plugins on the device rather than through this tab, so this is not absolute proof a repo is gone — but it usually means it is.'));
+    const deadGrid = el('div', 'mk-prov-grid'); deadWrap.appendChild(deadGrid);
+    box.appendChild(deadWrap);
+    let deadN = 0;
+    const deadBtn = $('mk-prov-dead');
+    if (deadBtn) {
+      deadBtn.style.display = 'none';
+      deadBtn.classList.remove('on');
+      deadBtn.onclick = () => {
+        const show = deadWrap.style.display === 'none';
+        deadWrap.style.display = show ? '' : 'none';
+        deadBtn.classList.toggle('on', show);
+        deadBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      };
+    }
+    const markDead = row => {
+      deadN++;
+      deadGrid.appendChild(row);
+      if (!deadBtn) return;
+      deadBtn.style.display = '';
+      deadBtn.title = deadN + ' repo' + (deadN === 1 ? '' : 's') + ' could not be read from here';
+      const c = deadBtn.querySelector('.mk-dead-n');
+      if (c) c.textContent = deadN;
+    };
     list.forEach(p => {
       const row = el('div', 'mk-prov'); row.dataset.url = p.manifestUrl;
       const ic = mkLogo(p.name, p.logo);
@@ -3000,6 +3241,7 @@
         row.classList.add('dead');
         meta.textContent = 'could not preview — ' + e.message;
         meta.style.color = '#ff8a80';
+        markDead(row);
       });
     });
   }
@@ -3223,6 +3465,13 @@
 
     const isLive = !!mkCollectionsCache.live;
     const when = mkCollectionsCache.capturedAt ? new Date(mkCollectionsCache.capturedAt).toLocaleString() : 'unknown time';
+    // The bar exists to say when what is on screen is NOT the live catalogue.
+    // On the normal path — a live read that came back whole — it has nothing to
+    // add, so it is not drawn at all. A fallback to the captured snapshot, or a
+    // live read that paged short, still says so: that warning is the whole
+    // reason the bar exists and it must never be the thing that gets tidied
+    // away. "Browse on Nuvio" moved to the panel header so it survives this.
+    const quiet = isLive && !mkCollectionsCache.short;
     // The caveat is real and must stay readable, but it was a four-line wall of
     // text sitting above every visit. One line now, with the detail a click away.
     const n = el('div', 'mk-note mk-note-row');
@@ -3243,7 +3492,7 @@
     if (!isLive) acts.appendChild(more);
     acts.appendChild(brw);
     n.appendChild(acts); n.appendChild(why);
-    box.appendChild(n);
+    if (!quiet) box.appendChild(n);
 
     const grid = el('div', 'mk-coll-grid');
     box.appendChild(grid);
@@ -3328,13 +3577,24 @@
       }
       body.appendChild(tg);
     }
+    // Three figures, each with its own label under it, instead of one dim
+    // monospace run-on at 11px. Same three numbers — they are just readable now.
     const s = c.stats || {};
-    const statsText = [
-      s.folderCount != null ? s.folderCount + ' folders' : null,
-      s.sourceCount != null ? s.sourceCount + ' sources' : null,
-      s.addonCount != null ? s.addonCount + ' add-ons' : null,
-    ].filter(Boolean).join(' · ');
-    if (statsText) body.appendChild(el('div', 'mk-coll-stats', statsText));
+    const figures = [
+      [s.folderCount, 'folder', 'folders'],
+      [s.sourceCount, 'source', 'sources'],
+      [s.addonCount, 'add-on', 'add-ons'],
+    ].filter(f => f[0] != null);
+    if (figures.length) {
+      const st = el('div', 'mk-coll-stats');
+      figures.forEach(([v, one, many]) => {
+        const cell = el('div', 'mk-stat');
+        cell.appendChild(el('span', 'mk-stat-v', String(v)));
+        cell.appendChild(el('span', 'mk-stat-l', Number(v) === 1 ? one : many));
+        st.appendChild(cell);
+      });
+      body.appendChild(st);
+    }
     if (Array.isArray(c.requiredAddons) && c.requiredAddons.length) {
       const names = c.requiredAddons.map(a => a.addonName || a.addonId);
       const req = el('div', 'mk-coll-req', 'Needs: ' + names.join(', '));
@@ -3852,11 +4112,26 @@
   // Both branches existed before and still do; they just wait behind whichever
   // of the two answers applies, instead of being two full columns of controls
   // that only one of them will ever use.
+  // The two front doors are the only thing on their screen, so they carry the
+  // screen. `art` is drawn here rather than borrowed: there is no third party
+  // to take a mark from, and the wizard's own step icon is the only other
+  // drawn thing in the app. Line weight matches the sidebar icons.
   const WZ_ENTRY = [
     { id: 'have', name: 'I already have a Nuvio account',
-      one: 'Pick the account, then the profile you want set up from scratch.' },
+      one: 'Pick the account, then the profile you want set up from scratch.',
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<rect x="12" y="20" width="56" height="44" rx="7" opacity=".35"/>'
+         + '<rect x="28" y="29" width="56" height="44" rx="7" opacity=".6"/>'
+         + '<rect x="44" y="38" width="56" height="44" rx="7"/>'
+         + '<circle cx="63" cy="54" r="6.5"/><path d="M53 71a10.5 10.5 0 0 1 20 0"/>'
+         + '<path d="m86 24 4.6 4.6L100 19"/></svg>' },
     { id: 'new', name: 'I need to make a Nuvio account',
-      one: 'Creates a real Nuvio account, links it here, and signs you straight in.' },
+      one: 'Creates a real Nuvio account, links it here, and signs you straight in.',
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<rect x="27" y="21" width="60" height="54" rx="9" stroke-dasharray="7 7"/>'
+         + '<path d="M57 37v22M46 48h22"/>'
+         + '<path d="m99 22 1.7 4.8 4.8 1.7-4.8 1.7L99 35l-1.7-4.8-4.8-1.7 4.8-1.7Z"/>'
+         + '<path d="m20 60 1.3 3.7 3.7 1.3-3.7 1.3L20 70l-1.3-3.7L15 65l3.7-1.3Z"/></svg>' },
   ];
   function wzRenderEntry() {
     const box = $('wz-entry'); if (!box) return;
@@ -3865,6 +4140,7 @@
       WZ_ENTRY.forEach(e => {
         const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); wzPaintHead(); });
         card.dataset.wzentry = e.id;
+        if (e.art) { const a = el('div', 'wz-entry-art'); a.innerHTML = e.art; card.appendChild(a); }
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', e.name));
         card.appendChild(h);
         card.appendChild(el('div', 'wz-pick-one', e.one));
@@ -4289,6 +4565,8 @@
   const wzCredKey = () => { const t = wzTarget(); return t ? t.aid + ':' + t.idx : ''; };
   const wzHasCred = p => wzCreds.key === wzCredKey() && wzCreds.set.has(p);
   function wzPaintNext() {
+    const back = $('wz-back');
+    if (back) back.style.display = wzCanGoBack() ? '' : 'none';
     const b = $('wz-next'); if (!b) return;
     const i = WZ_STEPS.indexOf(wz.step), ready = !!wzTarget(), last = i === WZ_STEPS.length - 1;
     // The Done step's button is the end of the run rather than a dead control.
@@ -4306,7 +4584,11 @@
     const dirty = ready && !last && wzStepDirty(wz.step);
     const can = ready && !last && wzCanAdvance(wz.step);
     b.textContent = dirty ? 'Save and move to next step' : (i === WZ_STEPS.length - 2 ? 'Finish' : 'Next');
-    b.className = 'btn ' + (can ? 'btn-primary' : 'btn-ghost');
+    // A button that brightens under the pointer is promising to do something.
+    // When the step is not answered yet this one cannot, so it stays exactly as
+    // it looks at rest. It is still pressable — pressing it is what surfaces
+    // WZ_BLOCKED, which is the only thing that says what is missing.
+    b.className = 'btn ' + (can ? 'btn-primary' : 'btn-ghost wz-next-idle');
     const note = $('wz-foot-note');
     if (note) {
       note.textContent = !ready ? 'Pick or create a profile to carry on.'
@@ -4315,10 +4597,55 @@
         : dirty ? '' : 'Nothing to save on this step.';
     }
   }
-  // Forward only. There is no caller with a negative d any more — the Back
-  // button is gone and the rail no longer navigates — but the bound check stays
-  // so this cannot walk off either end of the list.
   const wzGo = d => { const i = WZ_STEPS.indexOf(wz.step) + d; if (i >= 0 && i < WZ_STEPS.length) wzShow(WZ_STEPS[i]); };
+
+  // ---- going back ---------------------------------------------------------
+  // Back was deliberately removed on 2026-09-14 so a run could not end up half
+  // set up from one set of answers and half from another. It is here again on
+  // Furqan's instruction (2026-09-15) WITH the thing that made it safe to bring
+  // back: a step with something typed into it never loses that silently. The
+  // choice is explicit and three-way, because "cancel" and "discard" are
+  // different answers and a two-button dialog cannot tell them apart.
+  //
+  // Shown on the middle steps only: step 1 has nothing behind it, and the Done
+  // step is finished — its button ends the run.
+  function wzCanGoBack() {
+    const i = WZ_STEPS.indexOf(wz.step);
+    return i > 0 && i < WZ_STEPS.length - 1;
+  }
+  function wzAskLeaveStep() {
+    return new Promise(resolve => {
+      const pop = openMkPop(null, 'Save this step before going back?',
+        'You have filled something in here that has not been written to the profile yet.');
+      let answered = false;
+      const pick = v => { answered = true; resolve(v); closeMkPop(); };
+      pop.onClose = () => { if (!answered) resolve('stay'); };
+      const save = el('button', 'btn btn-primary', 'Save, then go back');
+      save.onclick = () => pick('save');
+      const drop = el('button', 'btn btn-ghost', 'Go back without saving');
+      drop.onclick = () => pick('discard');
+      const stay = el('button', 'btn btn-ghost', 'Stay on this step');
+      stay.onclick = () => pick('stay');
+      pop.foot.appendChild(save); pop.foot.appendChild(drop); pop.foot.appendChild(stay);
+      pop.foot.classList.add('wz-leave-foot');
+    });
+  }
+  async function wzBack() {
+    if (!wzCanGoBack()) return;
+    if (wzStepDirty(wz.step)) {
+      const ans = await wzAskLeaveStep();
+      if (ans === 'stay') return;
+      if (ans === 'save') {
+        const b = $('wz-back'); if (b) b.disabled = true;
+        let ok = false;
+        try { ok = await wzCommitStep(wz.step); }
+        catch (e) { logAct('Wizard: could not save this step — ' + e.message, 'err'); }
+        if (b) b.disabled = false;
+        if (!ok) { wzPaintNext(); return; }
+      }
+    }
+    wzGo(-1);
+  }
 
   // ---- shared: pros/cons block ----
   // A selectable card. NOT a <button>: these cards carry their own "Open site"
@@ -4388,6 +4715,12 @@
   function wzRenderPanel() {
     const host = $('wz-panel'); if (!host) return;
     const t = wzTarget();
+    // The body is a two-column grid and the second track is a fixed 322px. A
+    // hidden panel does not collapse that track, so with no profile picked the
+    // step block was 920px inside 1274px of space with the rest simply empty.
+    // `.solo` drops the grid to one column for exactly that state.
+    const bodyEl = document.querySelector('.wz-body');
+    if (bodyEl) bodyEl.classList.toggle('solo', !t);
     if (!t) { host.style.display = 'none'; return; }
     host.style.display = '';
     const gen = ++wzPanelGen;
@@ -5043,7 +5376,7 @@
     if (box && box.dataset.built !== '1') {
       clr(box);
       WZ.ROUTES.forEach(r => {
-        const c = wzCard('', () => { wz.route = r.id; wzRenderStreams(); wzPaintNext(); });
+        const c = wzCard('', () => { wz.route = r.id; wzRenderStreams(); wzPaintNext(); wzOpenRoute(r.id); });
         c.dataset.wzroute = r.id;
         const h = el('div', 'wz-pick-h');
         h.appendChild(wzLogo(r, 'sm'));
@@ -5061,14 +5394,60 @@
     }
     document.querySelectorAll('[data-wzroute]').forEach(b => b.classList.toggle('on', b.dataset.wzroute === wz.route));
     const adv = wz.mode === 'advanced';
-    $('wz-route-aiostreams').style.display = adv && wz.route === 'aiostreams' ? '' : 'none';
-    $('wz-route-native').style.display = adv && wz.route === 'native' ? '' : 'none';
-    $('wz-route-plugins').style.display = adv && wz.route === 'plugins' ? '' : 'none';
+    // The three route panes are DIALOG content now, not step content. Each one
+    // is a page in its own right — the AIOStreams guide is seven steps — and
+    // stacking it under the cards is what made this step scroll. A pane the
+    // dialog is currently holding is left exactly where it is.
+    ['aiostreams', 'native', 'plugins'].forEach(k => {
+      const n = $('wz-route-' + k);
+      if (n && !n.closest('.mk-dlg')) n.style.display = 'none';
+    });
+    wzPaintRouteHint(adv);
     if (adv) wzRenderStreamAddons();
     if (wz.mode === 'simple') wzRenderSimple();
     if (adv && wz.route === 'aiostreams') wzRenderAio();
     if (adv && wz.route === 'native') wzRenderNative();
     if (adv && wz.route === 'plugins') wzRenderPlugins();
+  }
+
+  // Opens one route's setup in a dialog, by MOVING the live pane into it
+  // rather than rebuilding it: every handler, every input value and every
+  // pending-commit entry those inputs registered belongs to that node, and a
+  // rebuilt copy would register a second set. A comment node holds its place so
+  // it goes back exactly where it came from when the dialog closes.
+  function wzOpenRoute(id) {
+    const pane = $('wz-route-' + id); if (!pane) return;
+    const r = (WZ.ROUTES || []).find(x => x.id === id) || {};
+    if (pane.closest('.mk-dlg')) return;            // already open
+    const mark = document.createComment('wz-route-' + id);
+    pane.parentNode.insertBefore(mark, pane);
+    const pop = openMkPop(null, r.name || 'Set this up', r.oneLiner || '');
+    pop.root.classList.add('mk-dlg-wide');
+    pane.style.display = '';
+    pop.body.appendChild(pane);
+    pop.onClose = () => {
+      pane.style.display = 'none';
+      if (mark.parentNode) { mark.parentNode.insertBefore(pane, mark); mark.remove(); }
+    };
+    const done = el('button', 'btn btn-primary', 'Done');
+    done.onclick = closeMkPop;
+    pop.foot.appendChild(done);
+  }
+  // The chosen route, and the way back into its dialog. Without this, reopening
+  // it means clicking a card that already looks chosen — which reads as inert.
+  function wzPaintRouteHint(adv) {
+    const hint = $('wz-route-hint'); if (!hint) return;
+    const r = adv ? (WZ.ROUTES || []).find(x => x.id === wz.route) : null;
+    clr(hint);
+    if (!r) { hint.style.display = 'none'; return; }
+    hint.style.display = '';
+    const tx = el('span', 'wz-route-hint-tx');
+    tx.innerHTML = '<b>' + esc(r.name) + '</b> is your route.';
+    hint.appendChild(tx);
+    hint.appendChild(el('span', 'wz-pick-sp'));
+    const b = el('button', 'btn btn-primary btn-xs', 'Open its setup');
+    b.onclick = () => wzOpenRoute(r.id);
+    hint.appendChild(b);
   }
 
   // ---- step 3: every other stream add-on ----------------------------------
@@ -5083,12 +5462,44 @@
     box.appendChild(el('p', 'muted sm wz-sec-lead', S.lead));
     const run = el('div', 'wz-run');
     const b = el('button', 'btn btn-primary', S.browse);
-    b.onclick = wzStreamAddonDialog;
+    b.onclick = () => wzStreamAddonDialog();
     run.appendChild(b);
     box.appendChild(run);
-    const slot = el('div'); slot.style.marginTop = '18px'; box.appendChild(slot);
-    wzInstallBox(slot, { step: 'streams', label: S.boxLabel, hint: S.hint });
+    // The queued link, on the step. The box that actually holds it is parked
+    // out of sight in the dialog's second layer, so without this line there
+    // would be nothing on the step saying Next has something to write.
+    const sum = el('div', 'wz-queued'); sum.id = 'wz-stream-queued'; sum.style.display = 'none';
+    box.appendChild(sum);
+    // Parked, not hidden-and-forgotten: `active` keeps it counting toward Next.
+    const slot = el('div'); slot.style.display = 'none'; box.appendChild(slot);
+    wzInstallBox(slot, { step: 'streams', label: S.boxLabel, hint: S.hint, active: () => true });
+    box.__wzSlot = slot;
+    wzPaintQueuedAddon();
     box.dataset.built = '1';
+  }
+  // What the parked box is currently holding, in one line, with a way to undo it.
+  function wzPaintQueuedAddon() {
+    const box = $('wz-stream-addons'); if (!box) return;
+    const sum = $('wz-stream-queued'), slot = box.__wzSlot;
+    if (!sum || !slot || !slot.__wzBox) return;
+    const { url, nm } = slot.__wzBox;
+    const u = (url.value || '').trim();
+    clr(sum);
+    if (!u) { sum.style.display = 'none'; return; }
+    sum.style.display = '';
+    const tx = el('span', 'wz-queued-tx');
+    tx.innerHTML = '<b>' + esc((nm.value || '').trim() || host(u)) + '</b> ready to add';
+    sum.appendChild(tx);
+    sum.appendChild(el('span', 'wz-pick-sp'));
+    const edit = el('button', 'btn btn-ghost btn-xs', 'Change');
+    edit.onclick = () => wzStreamAddonDialog(u);
+    const drop = el('button', 'btn btn-ghost btn-xs', 'Remove');
+    drop.onclick = () => {
+      url.value = ''; nm.value = '';
+      url.dispatchEvent(new Event('input', { bubbles: true }));
+      wzPaintQueuedAddon(); wzPaintNext();
+    };
+    sum.appendChild(edit); sum.appendChild(drop);
   }
 
   // The curated list market.js already hand-maintains, minus its Subtitles
@@ -5097,7 +5508,14 @@
   // service and no configuring, so it is the only one that can be added from
   // here directly. Every other row opens its own site, because a stream
   // add-on's manifest URL is the thing its configure page hands you.
-  async function wzStreamAddonDialog() {
+  // Two layers in ONE dialog, never two stacked dialogs: openMkPop closes
+  // whatever is open before it opens, so a second one would tear the first out
+  // from under the caller. Layer 1 is the list; pressing Add on a row swaps the
+  // body for layer 2, which is where the link goes in. "Back" swaps it again.
+  //
+  // `prefill` reopens straight on layer 2 with a link already in it — that is
+  // the step's "Change" button coming back to edit what it queued.
+  async function wzStreamAddonDialog(prefill) {
     const t = wzTarget(); if (!t || !MK) return;
     const S = WZ.STREAM_ADDONS;
     const pop = openMkPop(null, S.dlgTitle, 'Adding goes straight to ' + wzProfileName() + '. ' + S.dlgSub);
@@ -5105,81 +5523,173 @@
     const mine = pop;
     const stale = () => mkPop !== mine;
 
-    const st = el('div', 'inline-status'); pop.foot.appendChild(st);
-    const res = el('div', 'mk-res'); pop.foot.appendChild(res);
-
     const groups = (MK.ADDON_GROUPS || []).filter(g => !/subtitle/i.test(g.title));
     const top = groups.reduce((f, g) => f || (g.items || []).find(i => i.name === S.topName), null);
 
-    const bar = el('div', 'wz-plug-bar');
-    const inp = el('input', 'wz-plug-search modal-input'); inp.type = 'search'; inp.autocomplete = 'off';
-    inp.placeholder = 'Search stream add-ons…';
-    const cnt = el('span', 'pill-count');
-    bar.appendChild(inp); bar.appendChild(cnt);
-    pop.body.appendChild(bar);
-    const list = el('div', 'wz-plug-list'); pop.body.appendChild(list);
+    // ---------- layer 2: this add-on's link ----------
+    function showAdd(it, group, link) {
+      clr(pop.body); clr(pop.foot);
+      const v = el('div', 'wz-add-view');
+      const back = el('button', 'btn btn-ghost btn-xs wz-add-back', '\u2190 All add-ons');
+      back.onclick = showList;
+      v.appendChild(back);
 
-    const row = (it, group, isTop) => {
-      const r = el('div', 'wz-plug' + (isTop ? ' wz-plug-top' : ''));
-      const h = el('div', 'wz-plug-h');
-      h.appendChild(mkLogo(it.name, ''));
-      const tx = el('div', 'wz-plug-tx');
-      const nm = el('div', 'wz-plug-n');
-      nm.appendChild(el('span', '', it.name));
-      if (isTop) nm.appendChild(wzTag(S.topTag));
-      tx.appendChild(nm);
-      tx.appendChild(el('div', 'wz-plug-m', isTop ? S.topWhy : (group.note || group.title)));
-      h.appendChild(tx);
-      const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
-      open.title = S.openHint;
-      open.onclick = () => wzOpen(it.url);
-      h.appendChild(open);
-      if (isTop) {
+      const head = el('div', 'wz-add-head');
+      head.appendChild(mkAddonLogo(it.name, it.url || ''));
+      const ht = el('div'); ht.style.minWidth = '0';
+      ht.appendChild(el('div', 'wz-add-n', it.name || 'Stream add-on'));
+      const sub = (group && (group.note || group.title)) || '';
+      if (sub) ht.appendChild(el('div', 'muted sm', sub));
+      head.appendChild(ht);
+      head.appendChild(el('span', 'wz-pick-sp'));
+      if (it.url) {
+        const o = el('button', 'btn btn-primary btn-xs', 'Open its site');
+        o.title = S.openHint;
+        o.onclick = () => wzOpen(it.url);
+        head.appendChild(o);
+      }
+      v.appendChild(head);
+      v.appendChild(el('p', 'muted sm', S.openHint));
+
+      const f1 = el('div', 'wz-add-field');
+      f1.appendChild(el('label', '', 'Manifest link'));
+      const ui = el('input', 'modal-input'); ui.type = 'url'; ui.autocomplete = 'off';
+      ui.placeholder = 'https://\u2026/manifest.json';
+      if (link) ui.value = link;
+      f1.appendChild(ui);
+      const probe = el('div', 'inline-status'); f1.appendChild(probe);
+      v.appendChild(f1);
+
+      const f2 = el('div', 'wz-add-field');
+      f2.appendChild(el('label', '', 'Name it in Nuvio'));
+      const ni = el('input'); ni.type = 'text'; ni.maxLength = 60;
+      ni.value = it.name || '';
+      f2.appendChild(ni);
+      v.appendChild(f2);
+      pop.body.appendChild(v);
+
+      const use = el('button', 'btn btn-primary', 'Use this link');
+      const sync = () => { use.disabled = !ui.value.trim(); };
+      use.onclick = () => {
+        const host_ = $('wz-stream-addons');
+        const b = host_ && host_.__wzSlot && host_.__wzSlot.__wzBox;
+        if (!b) return;
+        b.url.value = ui.value.trim();
+        b.nm.value = (ni.value || '').trim() || it.name || '';
+        // The box's own input listener is what re-arms it and clears any stale
+        // result, so the value is announced rather than just assigned.
+        b.url.dispatchEvent(new Event('input', { bubbles: true }));
+        wzPaintQueuedAddon();
+        wzPaintNext();
+        closeMkPop();
+      };
+      ui.addEventListener('input', sync);
+      sync();
+      pop.foot.appendChild(use);
+
+      // Its listed address is a configure page, not a manifest, so resolve it
+      // the same way the Marketplace's Add box does rather than assume. A
+      // manifest this browser cannot read is NOT an error — plenty of working
+      // add-ons refuse outside reads, and Nuvio never validates one either.
+      if (it.url && !link) {
+        status(probe, 'Looking for its manifest\u2026');
+        MK.probeManifest(it.url).then(r => {
+          if (stale()) return;
+          if (r.ok) { ui.value = r.url; status(probe, 'Found a manifest at this address.', 'ok'); }
+          else if (r.reason === 'blocked') {
+            ui.value = (MK.resolveManifestUrl(it.url) || [])[0] || '';
+            status(probe, 'Could not read it from here \u2014 common, and not a problem. If this link does not work, paste the one from its own page.');
+          } else {
+            status(probe, 'No manifest at its listed address \u2014 set it up on its site and paste the link it gives you.');
+          }
+          sync();
+        }).catch(() => { if (!stale()) sync(); });
+      }
+      setTimeout(() => { try { ui.focus({ preventScroll: true }); } catch (e) {} }, 60);
+    }
+
+    // ---------- layer 1: the list ----------
+    function showList() {
+      clr(pop.body); clr(pop.foot);
+      const bar = el('div', 'wz-plug-bar');
+      const inp = el('input', 'wz-plug-search modal-input'); inp.type = 'search'; inp.autocomplete = 'off';
+      inp.placeholder = 'Search stream add-ons\u2026';
+      const cnt = el('span', 'pill-count');
+      bar.appendChild(inp); bar.appendChild(cnt);
+      pop.body.appendChild(bar);
+      const list = el('div', 'wz-plug-list'); pop.body.appendChild(list);
+
+      const row = (it, group, isTop) => {
+        const r = el('div', 'wz-plug' + (isTop ? ' wz-plug-top' : ''));
+        const h = el('div', 'wz-plug-h');
+        h.appendChild(mkAddonLogo(it.name, it.url));
+        const tx = el('div', 'wz-plug-tx');
+        const nm = el('div', 'wz-plug-n');
+        nm.appendChild(el('span', '', it.name));
+        if (isTop) nm.appendChild(wzTag(S.topTag));
+        tx.appendChild(nm);
+        tx.appendChild(el('div', 'wz-plug-m', isTop ? S.topWhy : (group.note || group.title)));
+        h.appendChild(tx);
+        const open = el('button', 'btn btn-ghost btn-xs', 'Open site');
+        open.title = S.openHint;
+        open.onclick = () => wzOpen(it.url);
+        h.appendChild(open);
         const add = el('button', 'btn btn-primary btn-xs', 'Add');
-        add.title = S.addHint;
-        add.onclick = () => wzAddCuratedAddon(it, { btn: add, st, res });
+        add.onclick = () => showAdd(it, group);
         h.appendChild(add);
-      }
-      r.appendChild(h);
-      return r;
-    };
+        r.appendChild(h);
+        return r;
+      };
 
-    let timer = null;
-    const draw = () => {
-      const q = inp.value.trim().toLowerCase();
-      clr(list);
-      let n = 0, all = 0;
-      if (top) {
-        all++;
-        if (!q || top.name.toLowerCase().includes(q)) { list.appendChild(row(top, {}, true)); n++; }
-      }
-      groups.forEach(g => {
-        const items = (g.items || []).filter(i => i !== top && (!q ||
-          (i.name + ' ' + g.title + ' ' + (g.note || '')).toLowerCase().includes(q)));
-        all += (g.items || []).filter(i => i !== top).length;
-        if (!items.length) return;
-        const head = el('div', 'wz-grp-h');
-        head.appendChild(el('span', '', g.title));
-        if (g.note) head.appendChild(el('span', 'wz-grp-n', g.note));
-        list.appendChild(head);
-        items.forEach(i => { list.appendChild(row(i, g, false)); n++; });
-      });
-      cnt.textContent = q ? n + ' of ' + all : all + ' add-ons';
-      if (!n) list.appendChild(el('p', 'mk-find-none', 'No add-on matches “' + q + '”.'));
-    };
-    inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { draw(); pop.body.scrollTop = 0; }, 110); });
-    inp.addEventListener('keydown', e => { if (e.key === 'Escape') { inp.value = ''; draw(); pop.body.scrollTop = 0; } });
+      let timer = null;
+      const draw = () => {
+        const q = inp.value.trim().toLowerCase();
+        clr(list);
+        let n = 0, all = 0;
+        if (top) {
+          all++;
+          if (!q || top.name.toLowerCase().includes(q)) { list.appendChild(row(top, {}, true)); n++; }
+        }
+        groups.forEach(g => {
+          const items = (g.items || []).filter(i => i !== top && (!q ||
+            (i.name + ' ' + g.title + ' ' + (g.note || '')).toLowerCase().includes(q)));
+          all += (g.items || []).filter(i => i !== top).length;
+          if (!items.length) return;
+          const head = el('div', 'wz-grp-h');
+          head.appendChild(el('span', '', g.title));
+          if (g.note) head.appendChild(el('span', 'wz-grp-n', g.note));
+          list.appendChild(head);
+          items.forEach(i => { list.appendChild(row(i, g, false)); n++; });
+        });
+        cnt.textContent = q ? n + ' of ' + all : all + ' add-ons';
+        if (!n) list.appendChild(el('p', 'mk-find-none', 'No add-on matches \u201c' + q + '\u201d.'));
+      };
+      inp.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => { draw(); pop.body.scrollTop = 0; }, 110); });
+      inp.addEventListener('keydown', e => { if (e.key === 'Escape') { inp.value = ''; draw(); pop.body.scrollTop = 0; } });
+      draw();
+      pop.body.scrollTop = 0;
+      setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 60);
+    }
+
     if (stale()) return;
-    draw();
-    pop.body.scrollTop = 0;
-    setTimeout(() => { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 60);
+    if (typeof prefill === 'string' && prefill) {
+      const host_ = $('wz-stream-addons');
+      const b = host_ && host_.__wzSlot && host_.__wzSlot.__wzBox;
+      showAdd({ name: (b && (b.nm.value || '').trim()) || 'Stream add-on', url: '' }, null, prefill);
+    } else showList();
   }
 
-  // The pinned row's own Add. The curated list stores configure pages, not
-  // manifests, so the address is resolved the same way the Marketplace's Add
-  // box resolves a pasted one (market.js probeManifest) rather than assumed —
-  // writing a /configure URL is exactly the "it said it added but nothing
-  // happened" bug that resolution exists to stop.
+  // CURRENTLY UNUSED (2026-09-15, Furqan's instruction). The pinned row used to
+  // carry its own Add on the grounds that PenguPlay needs no configuring first.
+  // It does, so that one click wrote a manifest URL for a setup nobody had
+  // made. Every row in the dialog now opens its own site like the rest.
+  //
+  // Kept rather than deleted, the same way market.js keeps mkSelect and
+  // wizard.js keeps NO_DEBRID: nothing calls it, so it costs nothing, and
+  // deleting a verified write path is not a decision to take in passing.
+  // The curated list stores configure pages, not manifests, so the address is
+  // resolved the same way the Marketplace's Add box resolves a pasted one
+  // (market.js probeManifest) rather than assumed.
   async function wzAddCuratedAddon(it, o) {
     const t = wzTarget(); if (!t) return;
     o.btn.disabled = true;
@@ -5642,8 +6152,10 @@
     if (wzNativeRecheck) wzNativeRecheck();
     wzPaintNext();
   }
-  // Reuses the marketplace's own instance bubble rather than a second one.
-  function wzShowInstancePicker() { nav('market'); switchMkTab('addons'); }
+  // Opens the same browse dialog the streams step uses, rather than navigating
+  // out of the wizard to the Marketplace tab — leaving a run half-done to go
+  // and look at a list is how somebody loses their place in it.
+  function wzShowInstancePicker() { wzStreamAddonDialog(); }
 
   // Writes a debrid key the way Nuvio's own Connected Services screen ends up
   // storing it, and turns on the two switches that make it do anything.
@@ -6415,13 +6927,21 @@
     // entry would still be here, still reporting itself dirty, and Next would
     // commit from fields that are no longer on the page — so the old entry for
     // this same host goes first.
+    host_.__wzBox = { url, nm, host: host_, saved: () => saved };
     const q = wzPending[opts.step];
     for (let i = q.length - 1; i >= 0; i--) if (q[i].host === host_) q.splice(i, 1);
     q.push({
       host: host_,
-      // offsetParent is null for a hidden box, which is how an already-installed
-      // metadata card (its box collapsed) stays out of Next's way.
-      dirty: () => { const u = url.value.trim(); return !!u && u !== saved && host_.offsetParent !== null; },
+      // By default a hidden box is out of Next's way — that is how an
+      // already-installed metadata card (its box collapsed) stays quiet.
+      // A box that is deliberately PARKED out of sight while still holding a
+      // link the user chose passes its own `active`, because inferring
+      // "inactive" from "not visible" would silently drop that link.
+      dirty: () => {
+        const u = url.value.trim();
+        if (!u || u === saved) return false;
+        return opts.active ? !!opts.active() : host_.offsetParent !== null;
+      },
       commit: () => run(true),
       label: opts.label,
     });
@@ -6553,6 +7073,7 @@
     // and a missing one must not take the rest of wire() down with it.
     if (WZ) {
       $('wz-next').onclick = wzNext;
+      $('wz-back').onclick = wzBack;
       $('wz-account').onchange = () => wzRenderProfiles($('wz-account').value);
       $('wz-new-btn').onclick = wzCreateAccount;
       $('wz-new-pass2').addEventListener('keydown', e => { if (e.key === 'Enter') wzCreateAccount(); });
@@ -6586,6 +7107,9 @@
     mkFindWire('mk-addon-search', 'mk-addon-clear', renderMkAddonGroups);
     mkFindWire('mk-prov-search', 'mk-prov-clear', () => renderMkPlugins());
     mkFindWire('mk-coll-search', 'mk-coll-clear', renderMkCollGrid);
+    // Lives in the panel header now rather than inside the status bar, because
+    // that bar is only drawn when the list is a fallback or came back short.
+    if ($('mk-coll-site')) $('mk-coll-site').onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
     if ($('mk-coll-sort')) $('mk-coll-sort').addEventListener('change', renderMkCollGrid);
     $('mk-prov-refresh').onclick = () => renderMkPlugins(true);
     $('mk-prov-close').onclick = () => { $('mk-prov-detail-card').style.display = 'none'; };
@@ -6636,6 +7160,8 @@
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
     togWire('st-readkeys', setReadKeys);
+    togWire('st-theme', setTheme);
+    paintTheme();
     $('st-signout').onclick = async () => { if (!(await uiModal({
       title: 'Sign out of Google?',
       message: 'Numax will forget this session on this device.',

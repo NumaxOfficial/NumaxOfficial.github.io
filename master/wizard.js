@@ -467,11 +467,12 @@
     dlgTitle: 'Stream add-ons',
     dlgSub: 'The community list, in the order the community ranks it. Open one, set it up there, and bring its link back.',
     topName: 'PenguPlay',
-    topTag: 'Start here',
+    topTag: 'Recommended',
     topWhy: 'HTTP streaming: no debrid service, no subscription and nothing to configure. The fastest way to have something that plays.',
-    // Its manifest answers without any configuration at all, which is why this
-    // one row can offer a direct Add and the rest cannot.
-    addHint: 'Adds it straight to this profile — it needs no setting up first.',
+    // Every row in this dialog behaves the same way now: open the add-on's own
+    // site, set it up there, bring the link back. The pinned row used to offer a
+    // direct Add on the grounds that it needs no configuring — it does, so that
+    // shortcut wrote a manifest URL for a setup that had never been made.
     openHint: 'Opens its own site. Configure it there, then paste the link it gives you into the box on the step behind this.',
   };
 
