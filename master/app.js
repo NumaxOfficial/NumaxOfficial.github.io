@@ -67,6 +67,29 @@
         br.onclick = () => { nav('market'); switchMkTab(kind); };
       }
     }
+    // Settings is the one pane that is genuinely long — platform bar, section
+    // bar, then every group under it — inside a pane that is already the
+    // bottom third of a viewport-fit panel. This opens it full size.
+    const pop = $('pf-settings-pop');
+    if (pop) pop.style.display = kind === 'settings' ? '' : 'none';
+  }
+
+  // Moves the LIVE #pf-settings node into a big dialog and puts it back on
+  // close — the same borrow-don't-rebuild rule the wizard's route panes and
+  // ui-motion's carry chooser use. Rebuilding it here would mean a second copy
+  // of the settings tree with its own handlers, and two things that can
+  // disagree about what is selected.
+  function openPfSettingsDialog() {
+    const host = $('pf-settings'); if (!host || !pfEdit) return;
+    const home = host.parentNode;
+    const pop = openMkPop(null, 'Settings — ' + (pfEdit.meta.name || 'profile'),
+      'The same controls, with room to see them. Changes save with the profile as usual.');
+    pop.root.classList.add('mk-dlg-wide', 'pf-set-dlg');
+    pop.body.appendChild(host);
+    pop.onClose = () => { if (host.parentNode !== home) home.appendChild(host); };
+    const done = el('button', 'btn btn-primary', 'Done');
+    done.onclick = closeMkPop;
+    pop.foot.appendChild(done);
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
@@ -407,24 +430,37 @@
   // views + nav
   // ======================================================================
   function showView(id) { document.querySelectorAll('.view').forEach(v => v.classList.toggle('current', v.id === id)); }
-  const TITLES = { wizard: 'Setup wizard', accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', market: 'Marketplace', activity: 'Activity', settings: 'Settings' };
+  const TITLES = { wizard: 'Setup wizard', accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', market: 'Marketplace', activity: 'Activity' };
   function enterApp() {
     showView('view-app');
     nav('accounts');
     // populate avatar catalog for built-in Nuvio avatars
     A.fetchAvatarCatalog().then(map => { Object.assign(avatarCatalog, map); }).catch(() => {});
+    // Warm the community collections while the user is still on Accounts. It
+    // is the slowest read in the app (the catalogue is ~104 collections over
+    // several pages), and the Marketplace tab used to start it only when you
+    // opened it. Fire and forget: mkLoadCollections fills the same cache
+    // renderMkCollections reads, and a failure here changes nothing — the tab
+    // still shows its own error and Try again.
+    setTimeout(() => { mkLoadCollections(false).catch(() => {}); }, 0);
   }
   // ---- theme -------------------------------------------------------------
-  // A device preference, like "Read API keys" above it in Settings: it is not
-  // part of an account and nothing syncs it. The <head> applies it before first
-  // paint; this only handles the switch and keeps the two in step.
+  // A device preference: it is not part of an account and nothing syncs it.
+  // The <head> applies it before first paint; this only handles the switch in
+  // the sidebar rail and keeps the two in step.
   const THEME_KEY = 'numax.theme';
   function themeNow() {
     return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
   }
   function paintTheme() {
-    const b = $('st-theme');
-    if (b) { const on = themeNow() === 'light'; b.classList.toggle('on', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); }
+    const b = $('sb-theme');
+    if (b) {
+      const on = themeNow() === 'light';
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      const tx = b.querySelector('.sb-theme-tx');
+      if (tx) tx.textContent = on ? 'Light mode' : 'Dark mode';
+    }
   }
   function setTheme(on) {
     if (on) document.documentElement.setAttribute('data-theme', 'light');
@@ -648,13 +684,19 @@
     if (!list.length) { box.appendChild(el('p', 'empty', 'No accounts linked yet. Add one above.')); return; }
     for (const rec of list) {
       const card = el('div', 'acct'); const head = el('div', 'acct-head');
-      head.appendChild(avatar({ name: rec.label || rec.email }, 38));
+      // The account's own initial until its profiles arrive, then the first
+      // profile's actual picture. An account has no avatar of its own, so this
+      // was a coloured letter sitting directly above the very chips that were
+      // drawing the real thing. Same lesson as wzProfileRec: pass the whole
+      // profile record, never just its name, or avatar() has nothing to draw.
+      let headAv = avatar({ name: rec.label || rec.email }, 38);
+      head.appendChild(headAv);
       const who = el('div'); who.style.minWidth = '0';
       const nmRow = el('div', 'acct-name'); const nmText = el('span', 'acct-name-text', rec.label || rec.email || rec.accountId.slice(0, 10)); nmRow.appendChild(nmText);
       // this account's own "keys included" state, fixed at link time — no fetch needed to know it
       if (rec.keysIncluded) {
         const badge = el('span', 'api-badge'); badge.textContent = 'API keys included';
-        const dot = el('span'); dot.textContent = '●'; dot.style.cssText = 'font-size:8px;color:#7bd88f'; badge.insertBefore(dot, badge.firstChild);
+        const dot = el('span'); dot.textContent = '●'; dot.style.cssText = 'font-size:8px'; badge.insertBefore(dot, badge.firstChild);
         nmRow.appendChild(badge);
       }
       who.appendChild(nmRow);
@@ -667,6 +709,10 @@
       loadAccount(rec.accountId).then(({ profiles }) => {
         if (gen !== acGen) return; // a newer refreshAccounts() already replaced this row — don't paint a detached one
         clr(prof); if (!profiles.length) { prof.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
+        // Profiles are sorted by profile_index, so [0] is the account's first.
+        const nextAv = avatar(profiles[0], 38);
+        nextAv.title = profiles[0].name;
+        headAv.replaceWith(nextAv); headAv = nextAv;
         const made = profiles.map(p => {
           const c = el('button', 'pmini'); c.type = 'button';
           c.appendChild(avatar(p, 24)); c.appendChild(el('span', '', p.name));
@@ -719,7 +765,7 @@
   // sets the preference used the moment an account is next linked (or re-linked) —
   // does not touch any account already linked, since that's decided per account.
   function setReadKeys(on) {
-    readKeys = on; $('ac-readkeys').classList.toggle('on', on); $('st-readkeys').classList.toggle('on', on);
+    readKeys = on; $('ac-readkeys').classList.toggle('on', on);
     logAct('Accounts you link from now on will ' + (on ? 'include' : 'exclude') + ' API keys', 'info');
   }
 
@@ -758,7 +804,30 @@
     let profiles; try { profiles = (await loadAccount(id)).profiles; } catch (e) { clr(box); box.appendChild(el('span', 'muted sm err-text', e.message)); return; }
     clr(box); if (!profiles.length) { box.appendChild(el('span', 'muted sm', 'No profiles.')); return; }
     const keep = (id === pfA && profiles.some(p => p.index === pfI)) ? pfI : profiles[0].index;
-    profiles.forEach(p => { const c = el('button', 'pchip' + (p.index === keep ? ' on' : '')); c.type = 'button'; c.appendChild(avatar(p, 42)); c.appendChild(el('span', 'pcn', p.name)); c.onclick = () => openProfile(id, p.index); box.appendChild(c); });
+    profiles.forEach(p => {
+      const c = el('button', 'pchip' + (p.index === keep ? ' on' : '')); c.type = 'button';
+      c.appendChild(avatar(p, 42)); c.appendChild(el('span', 'pcn', p.name));
+      c.onclick = () => openProfile(id, p.index);
+      // The ✕ is a SIBLING of the chip, never a child of it. .pchip is a
+      // <button>, and a button inside a button is invalid HTML that lays out
+      // unpredictably — the same trap the wizard's choice cards hit. It also
+      // means refreshCurrentChip()'s clr(chip) cannot wipe the ✕.
+      // The last profile carries no ✕ at all: Nuvio needs one, so a control
+      // that could only ever refuse is worse than no control.
+      if (profiles.length > 1) {
+        const wrap = el('div', 'pchip-wrap');
+        wrap.appendChild(c);
+        const x = el('button', 'pchip-x'); x.type = 'button';
+        x.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M7 7l10 10M17 7 7 17"/></svg>';
+        x.title = 'Delete ' + p.name;
+        x.setAttribute('aria-label', 'Delete profile ' + p.name);
+        x.onclick = () => deleteProfileFlow(id, p.index, p.name, profiles.length - 1);
+        wrap.appendChild(x);
+        box.appendChild(wrap);
+        return;
+      }
+      box.appendChild(c);
+    });
     openProfile(id, keep);
   }
   async function openProfile(id, idx, silent) {
@@ -1137,6 +1206,109 @@
     if (live.map(p => p.profile_index).sort().join() !== next.map(p => p.profile_index).sort().join()) throw new Error('profile list changed — reload');
     await c.rpc('sync_push_profiles', { p_profiles: next, p_client_max_profiles: 6 });
   }
+  // ---- deleting a profile -------------------------------------------------
+  // Removing a profile is a whole-account full replace, exactly like creating
+  // one, so it carries the same envelope and for the same reason: TWO
+  // independent reads that have to agree (a self-consistent check is not a
+  // check — see wzReadProfiles), a check that nothing but the target would go,
+  // and a read-back afterwards proving every other profile survived.
+  //
+  // The read-back is what makes this safe against the thing that would be
+  // worst here: if Nuvio ever renumbered profile_index on a replace, the
+  // remaining profiles' add-ons and settings — which are keyed by that index —
+  // would silently belong to the wrong profile. `lost` catches exactly that
+  // and says to restore, rather than reporting a clean delete.
+  // `allowLast` is the wizard's Exit-and-undo: it is putting back a profile it
+  // created itself, so leaving the account with none is the correct outcome
+  // there. The user-facing ✕ never passes it.
+  async function deleteProfileIndex(aid, idx, allowLast) {
+    const c = A.client(store, aid);
+    const read = await wzReadProfiles(aid);
+    if (!read.crossChecked) throw new Error('could not double-check the profile list against Nuvio, and removing a profile rewrites the whole list — not risking it');
+    if (!read.idx.includes(idx)) throw new Error('that profile is not on the account any more');
+    if (read.idx.length <= 1 && !allowLast) throw new Error('this is the account’s only profile, and Nuvio needs at least one');
+    const keep = read.idx.filter(i => i !== idx);
+    const nextList = read.rows.map(normRow).filter(r => r.profile_index !== idx);
+    const missing = keep.filter(i => !nextList.some(x => x.profile_index === i));
+    if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost too');
+    await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
+    inval(aid);
+    const after = await wzReadProfiles(aid);
+    const lost = keep.filter(i => !after.idx.includes(i));
+    if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
+    if (after.idx.includes(idx)) throw new Error('Nuvio accepted the write but the profile is still there');
+    return { keep, after: after.idx };
+  }
+
+  // Same document shape backupNow() writes, so this lands in the Drive tab's
+  // Restore list like any other backup — a delete with no way back is not
+  // something to offer without one.
+  async function backupProfileToDrive(aid, idx, name) {
+    const c = A.client(store, aid);
+    const { backup } = await loadAccount(aid);
+    const slice = sliceProfile(backup, idx);
+    const keys = accountKeysIncluded(aid);
+    const settings = {};
+    for (const pl of PLATS) {
+      const row = await c.pullSettings(idx, pl);
+      if (row && row.settings_json) settings[pl] = keys ? row.settings_json : stripKeys(row.settings_json);
+    }
+    const out = {
+      app: 'numax', kind: 'backup', savedAt: new Date().toISOString(), includesKeys: keys,
+      profiles: [{
+        account: accountName(aid), accountId: aid, profileIndex: idx, name,
+        addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings,
+      }],
+    };
+    const file = safeName('numax-before-delete-' + name + '-' + new Date().toISOString().slice(0, 10)) + '.json';
+    const r = await driveUpload(file, out, { numax: 'backup' });
+    return r.name || file;
+  }
+
+  async function confirmDeleteProfile(aid, idx, name, others) {
+    const typed = await uiModal({
+      title: 'Delete “' + name + '”?',
+      message: 'This removes the profile from the Nuvio account itself. Type the profile name to confirm.',
+      details: [
+        'Affects your <b>real Nuvio account</b>, not just Numax — the profile and its add-ons, plugins, collections and settings go with it.',
+        'Its <b>watch history and progress</b> for that profile go too.',
+        'Numax saves a <b>backup to your Google Drive first</b>, and it shows up on the Drive tab under Restore.',
+        '<b>Nuvio cannot undo this.</b> Putting the profile back means restoring that backup onto a new profile.',
+        'The other ' + others + ' profile' + (others === 1 ? '' : 's') + ' on this account are left exactly as they are.',
+      ],
+      danger: true, okLabel: 'Delete profile', input: true, defaultVal: '',
+    });
+    if (typed == null) return false;
+    if (String(typed).trim() !== name) { await uiAlert('That did not match the profile name, so nothing was deleted.'); return false; }
+    return true;
+  }
+
+  async function deleteProfileFlow(aid, idx, name, others) {
+    if (!gAuth.token) { await uiAlert('Sign in with Google first — the backup taken before a delete goes to your Drive.'); return; }
+    if (!(await confirmDeleteProfile(aid, idx, name, others))) return;
+    const st = $('pf-save-status');
+    let file = '';
+    status(st, 'Backing up “' + name + '” to Drive…');
+    try { file = await backupProfileToDrive(aid, idx, name); }
+    catch (e) {
+      status(st, "Didn't delete anything — the backup failed: " + e.message, 'err');
+      logAct('Profile delete aborted, backup failed: ' + e.message, 'err');
+      return;
+    }
+    status(st, 'Deleting “' + name + '”…');
+    try {
+      const r = await deleteProfileIndex(aid, idx);
+      logAct('Deleted profile ' + name + ' (index ' + idx + '); remaining ' + r.after.join(','), 'ok');
+      if (pfA === aid && pfI === idx) { pfI = null; pfEdit = null; $('pf-editor').classList.remove('open'); }
+      await renderPfPicker(aid);
+      refreshAccounts();
+      status($('pf-save-status'), 'Deleted “' + name + '”. Backup saved to Drive as ' + file + '.', 'ok');
+    } catch (e) {
+      status(st, "Couldn't delete it: " + e.message + ' (your backup ' + file + ' is safe in Drive.)', 'err');
+      logAct('Profile delete failed: ' + e.message, 'err');
+    }
+  }
+
   async function saveIdentityKind() {
     const name = $('pf-name-input').value.trim(); if (!name) throw new Error('give the profile a name');
     const photoUrl = $('pf-photo-input').value.trim();
@@ -1582,17 +1754,54 @@
   }
   // Developer's choice: addons + plugins + collections, plus only the Playback block
   // on every platform. Everything else — watch progress/history, other settings — off.
+  // A whole working setup, minus the things a second profile wants to keep as
+  // its own: how it looks, and what it has watched.
+  //
+  //   add-ons     stream sources — NOT the metadata ones
+  //   plugins     all
+  //   collections all
+  //   settings    every tab except Appearance
+  //   API keys    on, including overwriting keys the target already has
+  //   watch state never — that is the profile's own history
   function syDevChoice() {
     if (!sySnap) return;
-    sySel.addons = new Set((sySnap.addons || []).map(a => a.url));
+
+    // Keys first: whether they are included decides which settings leaves
+    // count as copyable, so tabStat() below has to be asked after this.
+    // Only possible when the source account was linked with "Read API keys";
+    // when it was not, this stays off and the keys row in the tree says why.
+    const keysLinked = accountKeysIncluded(syA);
+    syCreds.copy = keysLinked;
+    syCreds.replace = keysLinked;      // overwrite keys the target already has
+    sySettingsIncludeKeys = keysLinked;
+    syKeysAnsweredFor = syA + ':' + syI;
+
+    // wzKnownAddon is the hand-checked table in wizard.js and answers without
+    // a fetch, which a click handler needs. An add-on it cannot identify is
+    // KEPT: dropping one nobody recognised would quietly leave a stream source
+    // behind, and the whole point of this button is a setup that works.
+    sySel.addons = new Set((sySnap.addons || [])
+      .filter(a => { const k = wzKnownAddon(a.url); return !k || k.kind !== 'meta'; })
+      .map(a => a.url));
     sySel.plugins = new Set((sySnap.plugins || []).map(p => p.url));
     sySel.collections = new Set((sySnap.collections || []).map(collKey));
+
     sySel.settings = new Set();
-    PLATS.forEach(pl => tabsFor(pl).forEach(tab => { if (tab.key === 'playback' && tabStat(pl, tab).copyable > 0) sySel.settings.add(pl + '::' + tab.key); }));
+    PLATS.forEach(pl => tabsFor(pl).forEach(tab => {
+      if (tab.key !== 'appearance' && tabStat(pl, tab).copyable > 0) sySel.settings.add(pl + '::' + tab.key);
+    }));
+
     // addons / plugins / collections ticks follow their picks via syMirrorCat().
     $('sy-cat-settings').checked = sySel.settings.size > 0;
     $('sy-cat-watchprogress').checked = false; $('sy-cat-watched').checked = false;
     renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
+
+    const dropped = (sySnap.addons || []).length - sySel.addons.size;
+    logAct('Developer\'s choice: ' + sySel.addons.size + ' add-on(s)'
+      + (dropped ? ' (' + dropped + ' metadata add-on(s) left out)' : '')
+      + ', ' + sySel.plugins.size + ' plugin(s), ' + sySel.collections.size + ' collection(s), '
+      + sySel.settings.size + ' settings tab(s), API keys '
+      + (keysLinked ? 'on with overwrite' : 'off — account not linked with keys'), 'info');
   }
 
   // Sync Desk settings are split into TV / Mobile / Desktop / API keys sections so the
@@ -1788,6 +1997,24 @@
     Object.keys(label).forEach(k => { const cb = $('sy-cat-' + k); if (cb && cb.checked) on.push(label[k]); });
     return on;
   }
+  // Write as many of `parts` as the element can actually show, and only then
+  // add a "+N" for what is left. It used to cut at two every time, so
+  // "Add-ons, Collections +1" appeared in a box with room for all three.
+  //
+  // The element is one line with overflow:hidden, so scrollWidth > clientWidth
+  // is the overflow test. A node that has not been laid out yet reports
+  // clientWidth 0 (a hidden pane does this) — the full list is then written
+  // as-is rather than being trimmed against a width of nothing.
+  function fitParts(node, parts) {
+    if (!node) return;
+    node.textContent = parts.join(', ');
+    if (parts.length < 2 || !node.clientWidth) return;
+    let n = parts.length;
+    while (n > 1 && node.scrollWidth > node.clientWidth) {
+      n--;
+      node.textContent = parts.slice(0, n).join(', ') + ' +' + (parts.length - n);
+    }
+  }
   function syncSteps() {
     const srcName = (sySrcLabel || '').trim();
     const nTgt = syTargets.size;
@@ -1795,14 +2022,18 @@
     const state = {
       source: { done: !!srcName, sum: srcName || 'Pick the profile you want to copy from.' },
       targets: { done: nTgt > 0, sum: nTgt ? nTgt + ' profile' + (nTgt === 1 ? '' : 's') + ' selected' : 'Select one or more profiles to receive it.' },
-      carry: { done: carry.length > 0, sum: carry.length ? (carry.length > 2 ? carry.slice(0, 2).join(', ') + ' +' + (carry.length - 2) : carry.join(', ')) : 'Nothing selected yet.' }
+      // The "+N" is decided by what actually fits, not by a fixed count —
+      // see fitParts. carry.parts is the full list; carry.sum is the fallback
+      // for the surfaces that cannot measure.
+      carry: { done: carry.length > 0, parts: carry, sum: carry.length ? carry.join(', ') : 'Nothing selected yet.' }
     };
     document.querySelectorAll('.sy-step[data-systep]').forEach(b => {
       const k = b.dataset.systep, st = state[k];
       b.classList.toggle('on', sySecOpen === k);
       b.classList.toggle('done', st.done && sySecOpen !== k);
       b.setAttribute('aria-selected', sySecOpen === k ? 'true' : 'false');
-      const sum = b.querySelector('.sy-step-sum'); if (sum) sum.textContent = st.sum;
+      const sum = b.querySelector('.sy-step-sum');
+      if (sum) { if (st.parts && st.parts.length) fitParts(sum, st.parts); else sum.textContent = st.sum; }
     });
     sySecs().forEach(sec => {
       const st = state[sec.dataset.systep]; if (!st) return;
@@ -3219,11 +3450,12 @@
       b.appendChild(el('div', 'mk-pn', p.name));
       const meta = el('div', 'mk-pm', 'checking…'); b.appendChild(meta);
       const lang = el('span', 'mk-lang', p.lang.replace(/ language$/i, ''));
-      const open = el('button', 'btn btn-ghost btn-xs', 'View');
+      // One button, because View now opens the dialog that installs as well —
+      // two buttons for one destination was the leftover of the old inline
+      // detail card.
+      const open = el('button', 'btn btn-primary btn-xs', 'View & install');
       open.onclick = () => openProvider(p);
-      const inst = el('button', 'btn btn-primary btn-xs', 'Install');
-      inst.onclick = () => openInstallPlugin(inst, p);
-      row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open); row.appendChild(inst);
+      row.appendChild(ic); row.appendChild(b); row.appendChild(lang); row.appendChild(open);
       grid.appendChild(row);
       // Reachability is a fact worth showing: the community index currently
       // lists several dead manifests as though they were healthy.
@@ -3271,16 +3503,23 @@
   // Layout note: the install controls come FIRST and the scraper list is a
   // collapsed disclosure underneath. It used to be the other way round, which
   // buried the only actionable control under as many as 200 rows.
-  let mkProvSeq = 0;
+  // View on a repo row. One dialog that both CONFIGURES the repo (which of its
+  // providers go in) and writes it to profiles — it used to open an inline card
+  // further down the tab whose own Install button then opened a second dialog,
+  // so choosing providers and choosing profiles were two screens apart with a
+  // scroll between them.
+  //
+  // The write is still openInstallPlugin's: same wzPlugChoice decision, same
+  // mkFillTargets picker, same mkModeSeg and the same mkWrite path everything
+  // else uses. Nothing here writes on its own.
   async function openProvider(p) {
-    const seq = ++mkProvSeq;
-    const stale = () => seq !== mkProvSeq;
-    const card = $('mk-prov-detail-card'), body = $('mk-prov-detail');
-    card.style.display = ''; $('mk-prov-detail-title').textContent = p.name;
-    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const pop = openMkPop(null, p.name, 'Choose what goes in, then where it goes.');
+    const mine = pop;
+    const stale = () => mkPop !== mine;
 
-    const got = await loadInto(body, 'Reading manifest…', () => MK.loadManifest(p.manifestUrl).then(v => ({ m: v })).catch(e => ({ err: e })), { stale });
-    if (!got) return;
+    const got = await loadInto(pop.body, 'Reading manifest…', () => MK.loadManifest(p.manifestUrl).then(v => ({ m: v })).catch(e => ({ err: e })), { stale });
+    if (!got || stale()) return;
+    const body = pop.body;
     const m = got.value.m, previewError = got.value.err;
 
     // ---- summary strip ----
@@ -3306,41 +3545,38 @@
       body.appendChild(note);
     }
 
-    // ---- install, above the fold ----
-    // One button that opens the shared dialog. The profile list, the
-    // merge/overwrite choice and the report used to be rendered inline here,
-    // which put them below however many scrapers this repo has.
-    const inst = el('div', 'mk-install');
-    const go = el('button', 'btn btn-primary', 'Install to profiles…');
-    go.onclick = () => openInstallPlugin(go, p, m && m.name);
-    inst.appendChild(go);
-    inst.appendChild(el('p', 'muted sm', 'Pick the profiles, and merge or overwrite, in the next step.'));
-    body.appendChild(inst);
+    const go = el('button', 'btn btn-primary', 'Install');
+    go.style.width = '100%';
+    // `reset` is created further down by mkBindApply, but the provider picker
+    // built above it has to be able to invalidate a computed plan. Changing
+    // WHICH providers go in changes what would be written just as much as
+    // changing the mode does.
+    let reset = () => {};
 
     // ---- the providers inside it ----
     // A picker when relay/plugins.js is deployed, the read-only list it has
     // always been when it is not. Same rule as the wizard's dialog, and the
     // same single source of truth for what would be written (wzPlugChoice), so
     // the two surfaces cannot drift apart.
+    let pickedN = () => 1;
     if (m) {
       p._m = m;
       const pickable = wzPickReady();
       const total = m.scrapers.length;
+      pickedN = () => (p._sel ? p._sel.size : total);
+      // Where the on/off switches actually live is said in the subtitle now.
+      // It used to be a paragraph-sized note box at the top of this list.
       const d = mkDisclosure(pickable ? 'Choose providers' : 'What you get',
-        total + ' provider' + (total === 1 ? '' : 's') + (pickable ? '' : ' — Nuvio installs the whole repo'));
-      const note = el('div', 'mk-note');
-      note.innerHTML = MK_INFO_SVG + '<div>'
-        + (pickable ? WZ_PLUGIN_PICK : 'Nuvio stores a plugin as the whole repository, so all ' + total + ' of these come with it.')
-        + ' ' + WZ_PLUGIN_ONDEVICE + '</div>';
-      d.body.appendChild(note);
+        total + ' provider' + (total === 1 ? '' : 's')
+        + (pickable ? ' — switch them on in Nuvio' : ' — Nuvio installs the whole repo, switch them on there'));
 
       let count = null;
       const say = () => {
-        if (!count) return;
-        const n = p._sel ? p._sel.size : total;
-        count.textContent = n + ' of ' + total + ' picked';
-        go.disabled = n === 0;
-        go.textContent = n < total ? 'Install ' + n + ' of ' + total + '…' : 'Install to profiles…';
+        if (count) {
+          const n = pickedN();
+          count.textContent = n + ' of ' + total + ' picked';
+        }
+        reset();
       };
       if (pickable) {
         const bar = el('div', 'wz-scr-bar');
@@ -3386,9 +3622,39 @@
       d.body.appendChild(srcW);
       if (total > 200) d.body.appendChild(el('p', 'muted sm', 'Showing the first 200 of ' + total + ' — All and None still cover every one.'));
       body.appendChild(d.node);
-      say();
+      if (count) count.textContent = pickedN() + ' of ' + total + ' picked';
     }
 
+    // ---- where it goes, in the same dialog ----
+    const tbox = el('div', 'mk-tgts'); body.appendChild(tbox);
+    body.appendChild(el('div', 'mk-sec-t', 'How to write it'));
+    const msel = mkModeSeg('plugin');
+    body.appendChild(msel.node);
+
+    const st = el('div', 'inline-status'); st.style.marginTop = '10px'; body.appendChild(st);
+    const res = el('div', 'mk-res'); body.appendChild(res);
+    pop.foot.appendChild(go);
+
+    let targets = [];
+    const chosen = new Set();
+    // Read at click time, not at open time: the picker that decides this is in
+    // the same dialog, so a choice made after it opened has to count.
+    const run = () => {
+      const c = wzPlugChoice(p);
+      mkWrite({
+        kind: 'plugins',
+        master: [{ url: c.url, name: c.name, enabled: true }],
+        targets: targets.filter(t => chosen.has(t.aid + ':' + t.idx)),
+        mode: msel.value(), st, res, btn: go, label: c.name,
+      });
+    };
+    reset = mkBindApply(go, res, st, 'Install', run, () => chosen.size > 0 && pickedN() > 0);
+    msel.onChange(reset);
+    const gotT = await mkFillTargets(tbox, chosen, reset, stale, { label: 'Install to' });
+    if (stale()) return;
+    if (!gotT) { go.disabled = true; return; }
+    targets = gotT;
+    reset();
   }
 
   // ---- collections ----
@@ -3471,28 +3737,35 @@
     // live read that paged short, still says so: that warning is the whole
     // reason the bar exists and it must never be the thing that gets tidied
     // away. "Browse on Nuvio" moved to the panel header so it survives this.
+    // The banner above the grid is gone (Furqan, 2026-09-15). What it said is
+    // NOT gone: showing a stale or half-read catalogue as though it were the
+    // live one is the single thing this surface must never do. It is a tag
+    // beside the count in the header instead — one word, with the whole
+    // explanation on hover and on click. On the normal path (a live read that
+    // came back whole) there is nothing to report and no tag is drawn.
     const quiet = isLive && !mkCollectionsCache.short;
-    // The caveat is real and must stay readable, but it was a four-line wall of
-    // text sitting above every visit. One line now, with the detail a click away.
-    const n = el('div', 'mk-note mk-note-row');
-    n.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="7.8" r=".9" fill="currentColor" stroke="none"/></svg>'
-      + (isLive
-        ? '<span class="mk-note-line"><b>Live from Nuvio</b> — ' + mkCollectionsCache.total + ' collections, read just now.'
-        // A short read is stated, never smoothed over: the API pages, and
-        // a page that failed halfway must not look like the whole catalogue.
-        + (mkCollectionsCache.short ? ' Nuvio lists ' + mkCollectionsCache.short + ' — the rest did not come back, so this is incomplete.' : '') + '</span>'
-        : '<span class="mk-note-line"><b>Snapshot, not live</b> — captured ' + esc(when) + ', ' + mkCollectionsCache.total + ' collections.'
-          + (mkCollectionsFellBack ? ' The live read failed (' + esc(mkCollectionsFellBack) + ').' : '') + '</span>');
-    const why = el('div', 'mk-note-why', MK.COLLECTIONS.why);
-    const more = el('button', 'link', 'Why?');
-    more.onclick = () => { const on = n.classList.toggle('open'); more.textContent = on ? 'Hide' : 'Why?'; };
-    const brw = el('button', 'link', 'Browse on Nuvio');
-    brw.onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
-    const acts = el('span', 'mk-note-acts');
-    if (!isLive) acts.appendChild(more);
-    acts.appendChild(brw);
-    n.appendChild(acts); n.appendChild(why);
-    if (!quiet) box.appendChild(n);
+    const srcTag = $('mk-coll-src');
+    if (srcTag) {
+      clr(srcTag);
+      srcTag.style.display = quiet ? 'none' : '';
+      if (!quiet) {
+        const short = mkCollectionsCache.short;
+        const detail = isLive
+          ? 'Nuvio lists ' + short + ' collections and the rest did not come back, so this list is incomplete.'
+          : 'This is the captured snapshot from ' + when + ' (' + mkCollectionsCache.total + ' collections), not a live read.'
+            + (mkCollectionsFellBack ? ' The live read failed: ' + mkCollectionsFellBack : '');
+        srcTag.textContent = isLive ? 'Incomplete' : 'Snapshot';
+        srcTag.title = detail + '\n\n' + MK.COLLECTIONS.why;
+        // message + details, not one long string: uiModal writes the message
+        // with textContent, so newlines in it collapse to spaces.
+        srcTag.onclick = () => uiModal({
+          title: isLive ? 'This list is incomplete' : 'This is not the live list',
+          message: detail,
+          details: [esc(MK.COLLECTIONS.why)],
+          okLabel: 'OK', noCancel: true,
+        });
+      }
+    }
 
     const grid = el('div', 'mk-coll-grid');
     box.appendChild(grid);
@@ -3606,9 +3879,7 @@
     const acts = el('div'); acts.style.cssText = 'display:flex;gap:6px';
     const install = el('button', 'btn btn-primary btn-xs', 'Install to profile');
     install.onclick = () => openMkCollectionInstall(install, c);
-    const open = el('button', 'btn btn-ghost btn-xs', 'View on Nuvio');
-    open.onclick = () => { openTab(MK.COLLECTIONS.detailUrl(c.public_id)); logAct('Opened community collection ' + c.title, 'info'); };
-    acts.appendChild(install); acts.appendChild(open);
+    acts.appendChild(install);
     foot.appendChild(acts);
     body.appendChild(foot);
     card.appendChild(body);
@@ -3652,6 +3923,29 @@
     const collections = doc.collections.map(x =>
       MK.toInstalledCollection(x, { publicId: c.public_id, version, installedAt: stampedAt }));
 
+    // What you are installing, with its artwork — the dialog used to open on a
+    // wall of grey text and you could not tell one collection from another.
+    const hero = el('div', 'mk-coll-hero');
+    if (c.image_url) {
+      const im = document.createElement('img');
+      im.alt = ''; im.referrerPolicy = 'no-referrer';
+      im.onerror = () => im.remove();
+      im.src = c.image_url;
+      hero.appendChild(im);
+    }
+    const ht = el('div', 'mk-coll-hero-tx');
+    ht.appendChild(el('div', 'mk-coll-hero-n', c.title));
+    const st8 = (c.stats || {});
+    const bits = [];
+    if (collections.length > 1) bits.push('pack of ' + collections.length);
+    if (st8.folderCount) bits.push(st8.folderCount + ' folder' + (st8.folderCount === 1 ? '' : 's'));
+    if (st8.sourceCount) bits.push(st8.sourceCount + ' source' + (st8.sourceCount === 1 ? '' : 's'));
+    if (c.installs_count) bits.push(c.installs_count + ' installs');
+    if (bits.length) ht.appendChild(el('div', 'mk-coll-hero-m', bits.join(' · ')));
+    if (c.description) ht.appendChild(el('div', 'mk-coll-hero-d', c.description));
+    hero.appendChild(ht);
+    pop.body.appendChild(hero);
+
     if (collections.length > 1) {
       pop.body.appendChild(el('p', 'muted sm', 'This is a pack of ' + collections.length + ' collections — all install together.'));
     }
@@ -3684,7 +3978,11 @@
     // mode: the install path plans and applies one profile at a time.
     const chosen = new Set();
     // Any change to the target or the mode invalidates a previous preview.
-    const reset = () => { btn.textContent = 'Preview'; btn.onclick = preview; btn.disabled = !chosen.size; clr(res); status(st, ''); };
+    // Preview is a one-shot: once it has run, renderApplyPlan has drawn the
+    // real Apply button in the body, and leaving a second button in the footer
+    // that only recomputes the same plan is two actions for one step. Changing
+    // the profile or the mode invalidates the plan and brings it back.
+    const reset = () => { btn.style.display = ''; btn.textContent = 'Preview'; btn.onclick = preview; btn.disabled = !chosen.size; clr(res); status(st, ''); };
     msel.onChange(reset);
     const targets = await mkFillTargets(tbox, chosen, reset, stale, { single: true });
     if (stale()) return;
@@ -3720,6 +4018,7 @@
         renderApplyPlan(res, st, plan, aid, 'Collection installed', {
           verify: () => verifyCollections(aid, idx, collections),
         });
+        btn.style.display = 'none';
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
     }
   }
@@ -4014,20 +4313,10 @@
     }
 
     if (killProfile && wz.madeProfile != null) {
+      // Same guarded write the Profile tab's ✕ uses — one copy of the two
+      // independent reads, the "nothing else may go" check and the read-back.
       try {
-        const read = await wzReadProfiles(t.aid);
-        if (!read.crossChecked) throw new Error('could not double-check the profile list against Nuvio, and removing a profile rewrites the whole list — not risking it');
-        if (!read.idx.includes(wz.madeProfile)) throw new Error('that profile is not on the account any more');
-        const keep = read.idx.filter(i => i !== wz.madeProfile);
-        const nextList = read.rows.map(normRow).filter(r => r.profile_index !== wz.madeProfile);
-        const missing = keep.filter(i => !nextList.some(x => x.profile_index === i));
-        if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost too');
-        await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
-        inval(t.aid);
-        const after = await wzReadProfiles(t.aid);
-        const lost = keep.filter(i => !after.idx.includes(i));
-        if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
-        if (after.idx.includes(wz.madeProfile)) throw new Error('Nuvio accepted the write but the profile is still there');
+        await deleteProfileIndex(t.aid, wz.madeProfile, true);
         lines.push('Deleted the profile the wizard created.');
       } catch (e) { problems.push('Profile delete: ' + e.message); }
     } else if (wz.madeProfile != null) {
@@ -4116,22 +4405,42 @@
   // screen. `art` is drawn here rather than borrowed: there is no third party
   // to take a mark from, and the wizard's own step icon is the only other
   // drawn thing in the app. Line weight matches the sidebar icons.
+  // Nuvio's published icon, read off the <link rel="icon"> on nuvio.tv and
+  // checked live (200, image/png). Never a guessed URL — same rule as the
+  // curated add-on list.
+  const NUVIO_MARK = 'https://nuvio.tv/assets/Logo_1080x1080.png';
   const WZ_ENTRY = [
+    // Nuvio's own mark carries both cards — it is what the question is about,
+    // and a real logo reads as the product where a hand-drawn rectangle reads
+    // as a placeholder. The URL is Nuvio's published icon, taken from the
+    // <link rel="icon"> on nuvio.tv itself and checked (200, image/png), not
+    // guessed. An <image> inside inline SVG needs no CORS; if it ever stops
+    // answering, the tile it sits in is already drawn underneath it.
+    //
+    // Both compositions are built symmetric about the centre of their own
+    // viewBox (60,48), so the two cards line up with each other.
     { id: 'have', name: 'I already have a Nuvio account',
       one: 'Pick the account, then the profile you want set up from scratch.',
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<rect x="12" y="20" width="56" height="44" rx="7" opacity=".35"/>'
-         + '<rect x="28" y="29" width="56" height="44" rx="7" opacity=".6"/>'
-         + '<rect x="44" y="38" width="56" height="44" rx="7"/>'
-         + '<circle cx="63" cy="54" r="6.5"/><path d="M53 71a10.5 10.5 0 0 1 20 0"/>'
-         + '<path d="m86 24 4.6 4.6L100 19"/></svg>' },
+      // the account, and the profiles inside it
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<defs><clipPath id="wzLogoHave"><rect x="44" y="16" width="32" height="32" rx="9"/></clipPath></defs>'
+         + '<rect x="44" y="16" width="32" height="32" rx="9" fill="rgba(var(--ink),.06)" stroke="rgba(var(--ink),.16)" stroke-width="1.5"/>'
+         + '<image href="' + NUVIO_MARK + '" x="44" y="16" width="32" height="32" clip-path="url(#wzLogoHave)" preserveAspectRatio="xMidYMid slice"/>'
+         + '<path d="M60 48v10M38 70V60a2 2 0 0 1 2-2h40a2 2 0 0 1 2 2v10" stroke="rgba(var(--ink),.22)" stroke-width="1.5"/>'
+         + '<circle cx="38" cy="70" r="11" fill="rgba(var(--secondary-rgb),.22)" stroke="var(--secondary)" stroke-opacity=".7" stroke-width="1.5"/>'
+         + '<circle cx="60" cy="70" r="11" fill="rgba(var(--accent-rgb),.22)" stroke="var(--accent)" stroke-width="1.5"/>'
+         + '<circle cx="82" cy="70" r="11" fill="rgba(var(--cat-collections-rgb),.22)" stroke="var(--cat-collections)" stroke-opacity=".7" stroke-width="1.5"/>'
+         + '<circle cx="60" cy="67" r="3.4" fill="var(--accent)" stroke="none"/>'
+         + '<path d="M55.6 76a5 5 0 0 1 8.8 0" stroke="var(--accent)" stroke-width="1.6"/></svg>' },
     { id: 'new', name: 'I need to make a Nuvio account',
       one: 'Creates a real Nuvio account, links it here, and signs you straight in.',
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<rect x="27" y="21" width="60" height="54" rx="9" stroke-dasharray="7 7"/>'
-         + '<path d="M57 37v22M46 48h22"/>'
-         + '<path d="m99 22 1.7 4.8 4.8 1.7-4.8 1.7L99 35l-1.7-4.8-4.8-1.7 4.8-1.7Z"/>'
-         + '<path d="m20 60 1.3 3.7 3.7 1.3-3.7 1.3L20 70l-1.3-3.7L15 65l3.7-1.3Z"/></svg>' },
+      // the same mark, not yet yours — an open slot with a plus on it
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<defs><clipPath id="wzLogoNew"><rect x="42" y="20" width="36" height="36" rx="10"/></clipPath></defs>'
+         + '<rect x="36" y="14" width="48" height="48" rx="13" fill="rgba(var(--ink),.04)" stroke="rgba(var(--ink),.22)" stroke-width="1.5" stroke-dasharray="6 6"/>'
+         + '<image href="' + NUVIO_MARK + '" x="42" y="20" width="36" height="36" clip-path="url(#wzLogoNew)" preserveAspectRatio="xMidYMid slice" opacity=".45"/>'
+         + '<circle cx="60" cy="70" r="12" fill="var(--accent)" stroke="none"/>'
+         + '<path d="M60 64v12M54 70h12" stroke="#fff" stroke-width="2.4"/></svg>' },
   ];
   function wzRenderEntry() {
     const box = $('wz-entry'); if (!box) return;
@@ -4607,10 +4916,15 @@
   // choice is explicit and three-way, because "cancel" and "discard" are
   // different answers and a two-button dialog cannot tell them apart.
   //
-  // Shown on the middle steps only: step 1 has nothing behind it, and the Done
-  // step is finished — its button ends the run.
+  // Shown on the middle steps, and on step 1 once a front door has been chosen
+  // — that screen HAS something behind it (the two-door question) and picking
+  // the wrong door left you with no way back to it. Not once the run is locked:
+  // after the first write the profile is a commitment and the only way out is
+  // Exit and undo, which reverses what was written rather than stepping around
+  // it. Never on Done; that step's button ends the run.
   function wzCanGoBack() {
     const i = WZ_STEPS.indexOf(wz.step);
+    if (i === 0) return !wz.locked && (wz.entry === 'have' || wz.entry === 'new');
     return i > 0 && i < WZ_STEPS.length - 1;
   }
   function wzAskLeaveStep() {
@@ -4632,6 +4946,15 @@
   }
   async function wzBack() {
     if (!wzCanGoBack()) return;
+    // On step 1 "back" is not a step at all — it is the front-door question
+    // that the chosen branch is sitting on top of. Clearing the branch also
+    // clears the profile it had selected, or Back would leave the target strip
+    // naming a profile chosen from a question no longer on screen.
+    if (WZ_STEPS.indexOf(wz.step) === 0) {
+      wz.entry = null; wz.idx = null;
+      wzPaintEntry(); wzPaintHead(); wzPaintTarget(); wzRenderPanel(); wzPaintNext();
+      return;
+    }
     if (wzStepDirty(wz.step)) {
       const ans = await wzAskLeaveStep();
       if (ans === 'stay') return;
@@ -7057,6 +7380,9 @@
   function togWire(id, fn) { const b = $(id); b.setAttribute('role', 'switch'); b.onclick = () => { const on = !b.classList.contains('on'); b.classList.toggle('on', on); fn(on); }; }
   function wire() {
     $('btn-google').onclick = () => signIn(enterApp);
+    // Same handler, reached from the wizard's signed-out screen — that panel
+    // named a button the user could no longer get to.
+    if ($('wz-signin-go')) $('wz-signin-go').onclick = () => signIn(enterApp);
     document.querySelectorAll('.navbtn').forEach(b => b.onclick = () => nav(b.dataset.nav));
     $('ac-link-btn').onclick = linkAccount; $('ac-pass').addEventListener('keydown', e => { if (e.key === 'Enter') linkAccount(); });
     $('ac-reload').onclick = reloadAccounts;
@@ -7067,6 +7393,7 @@
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     document.querySelectorAll('.pf-stat').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     $('pf-save-btn').onclick = saveAllDirty;
+    if ($('pf-settings-pop')) $('pf-settings-pop').onclick = openPfSettingsDialog;
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
     // ---- setup wizard ----
     // Guarded as a block: wizard.js is optional in exactly the way market.js is,
@@ -7109,7 +7436,6 @@
     mkFindWire('mk-coll-search', 'mk-coll-clear', renderMkCollGrid);
     // Lives in the panel header now rather than inside the status bar, because
     // that bar is only drawn when the list is a fallback or came back short.
-    if ($('mk-coll-site')) $('mk-coll-site').onclick = () => { openTab(MK.COLLECTIONS.site); logAct('Opened Nuvio community collections', 'info'); };
     if ($('mk-coll-sort')) $('mk-coll-sort').addEventListener('change', renderMkCollGrid);
     $('mk-prov-refresh').onclick = () => renderMkPlugins(true);
     $('mk-prov-close').onclick = () => { $('mk-prov-detail-card').style.display = 'none'; };
@@ -7159,23 +7485,35 @@
     $('sy-preview').onclick = syncPreview; $('sy-apply').onclick = syncApply; $('sy-confirm').onchange = () => { $('sy-apply').disabled = !$('sy-confirm').checked; };
     $('tpl-refresh').onclick = refreshTemplates;
     $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
-    togWire('st-readkeys', setReadKeys);
-    togWire('st-theme', setTheme);
+    // The theme switch lives in the sidebar rail now; the Settings tab is gone.
+    $('sb-theme').onclick = () => setTheme(themeNow() !== 'light');
     paintTheme();
-    $('st-signout').onclick = async () => { if (!(await uiModal({
-      title: 'Sign out of Google?',
-      message: 'Numax will forget this session on this device.',
-      details: [
-        'Affects <b>this device only</b> — nothing is deleted anywhere.',
-        'Linked accounts, templates and backups stay in <b>your Google Drive</b>.',
-        'Any unsaved edits open in the Profile editor will be lost.',
-        '<b>Reversible</b> — sign back in with Google and everything comes back.'
-      ],
-      danger: true, okLabel: 'Sign out'
-    }))) return; gAuth.token = null; gAuth.user = null; store.clear(); invalAll(); $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info'); };
+    // Signing out belongs to the account block it signs out of, at the bottom
+    // of the rail — it used to be a card on a tab that held nothing else.
+    $('sb-user').onclick = async () => {
+      if (!gAuth.token) { signIn(enterApp); return; }
+      if (!(await uiModal({
+        title: 'Sign out of Google?',
+        message: 'Numax will forget this session on this device.',
+        details: [
+          'Affects <b>this device only</b> — nothing is deleted anywhere.',
+          'Linked accounts, templates and backups stay in <b>your Google Drive</b>.',
+          'Any unsaved edits open in the Profile editor will be lost.',
+          '<b>Reversible</b> — sign back in with Google and everything comes back.'
+        ],
+        danger: true, okLabel: 'Sign out'
+      }))) return;
+      gAuth.token = null; gAuth.user = null; store.clear(); invalAll();
+      $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info');
+    };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }
-  window.addEventListener('resize', () => { if (typeof syRemeasure === 'function') syRemeasure(); });
+  // syncSteps re-runs because the step summaries are fitted to their real
+  // width — a narrower window has to recompute how many of them fit.
+  window.addEventListener('resize', () => {
+    if (typeof syRemeasure === 'function') syRemeasure();
+    if (typeof syncSteps === 'function') syncSteps();
+  });
   window.addEventListener('DOMContentLoaded', () => {
     wire(); renderActivity();
     enhanceAllSelects();

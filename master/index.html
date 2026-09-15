@@ -29,40 +29,65 @@
     --p-red:#D7193F;  --p-green:#3DA35D;  --p-magenta:#A5245E;
     --p-yellow:#FFC857; --p-orange:#F28C28; --p-white:#F7F8FA;
 
-    /* what each one means */
-    --primary:#2B6CB0; --primary-rgb:43,108,176; --primary-soft:#8FBFEA;
+    /* what each one means
+       RED is the brand and the main action. BLUE is the second rank: the
+       smaller buttons on a page where the red one is the thing to press.
+       Red therefore does NOT mean danger on its own any more — what marks a
+       destructive action is the crimson --danger below (colder and deeper
+       than --primary), plus the halo on its dialog and the typed-name
+       confirmation. Never style a destructive control with --primary. */
+    --primary:#EE4B4B; --primary-rgb:238,75,75;  --primary-soft:#FFA9A2;
+    --secondary:#2B6CB0; --secondary-rgb:43,108,176; --secondary-soft:#8FBFEA;
     --danger:#D7193F;  --danger-rgb:215,25,63;   --danger-soft:#FF8FA3;
     --ok:#3DA35D;      --ok-rgb:61,163,93;       --ok-soft:#7BD88F;
     --live:#00B8D9;    --live-rgb:0,184,217;
     --warn:#FFC857;    --warn-rgb:255,200,87;    --warn-soft:#FFD98A;
-    --accent:#2B6CB0;  --accent-rgb:43,108,176;  --accent-2:#1E5288;
+    --accent:#EE4B4B;  --accent-rgb:238,75,75;   --accent-2:#C9302F;
 
     /* one colour per KIND of thing, used everywhere that thing appears */
     --cat-addons:#2B6CB0;      --cat-addons-rgb:43,108,176;
     --cat-plugins:#00B8D9;     --cat-plugins-rgb:0,184,217;
     --cat-collections:#C43B75; --cat-collections-rgb:196,59,117;
     --cat-settings:#8B8AD6;    --cat-settings-rgb:139,138,214;
-    --cat-keys:#3DA35D;        --cat-keys-rgb:61,163,93;
+    /* Keys are gold, not green. Green is already "it worked / verified", and a
+       green badge on an account row was being read as a success message rather
+       than as what it is — a statement that this account's keys are held. */
+    --cat-keys:#E0A93B;        --cat-keys-rgb:224,169,59;
 
     /* ground */
     --ink:255,255,255;
-    --bg:#0A1120;
+    /* THE CARD MATERIAL. The page is black and every glass surface — card,
+       sy-card, pf-section, modal, sign-in — is BLACK at low opacity lifted
+       off the page by a white glow, not a coloured pane. The colour on a
+       card comes from what is in it. --card-rgb is only for artwork that
+       wants to echo the brand. */
+    --card-rgb:238,75,75;
+    --bg:#08070A;
     --surface:rgba(var(--ink),.035); --surface-2:rgba(var(--ink),.06); --surface-3:rgba(var(--ink),.09);
     --line:rgba(var(--ink),.10); --line-2:rgba(var(--ink),.06);
     --t:#fff; --t70:rgba(var(--ink),.72); --t55:rgba(var(--ink),.55); --t45:rgba(var(--ink),.45); --t35:rgba(var(--ink),.35);
-    --glass-bg:rgba(10,15,28,.58); --glass-bg-2:rgba(12,18,32,.68); --glass-border:rgba(var(--ink),.08);
-    --glass-glow:0 0 0 1px rgba(var(--ink),.035) inset, 0 1px 0 rgba(var(--ink),.04) inset;
-    --opt-bg:#16203A;
+    --glass-bg:rgba(0,0,0,.42); --glass-bg-2:rgba(0,0,0,.56); --glass-border:rgba(var(--ink),.22);
+    --glass-glow:0 0 0 1px rgba(var(--ink),.05) inset, 0 1px 0 rgba(var(--ink),.07) inset, 0 0 34px -12px rgba(var(--ink),.45);
+    /* The same block without its halo, for a card that sits INSIDE another
+       block — the outer one carries the glow for the pair. */
+    --glass-glow-flat:0 0 0 1px rgba(var(--ink),.05) inset, 0 1px 0 rgba(var(--ink),.07) inset;
+    --opt-bg:#1A0F14;
     /* The rail and the topbar are their own surfaces rather than tints of the
        page, so they need saying in both themes instead of following --ink. */
-    --rail-bg:#070C17; --topbar-bg:rgba(7,12,23,.72);
-    --pop-bg:#101725; --sunken:rgba(0,0,0,.14);
+    --rail-bg:#060509; --topbar-bg:rgba(9,7,11,.74);
+    --pop-bg:#150C11; --sunken:rgba(0,0,0,.22);
     /* "Selected" chips that invert instead of taking a colour — a toggle, a
        platform button, a segmented control. White-on-dark has to become
        dark-on-white, or they vanish into a light card. */
-    --invert-bg:#fff; --invert-fg:#0A1120;
+    --invert-bg:#fff; --invert-fg:#120A0E;
     --r:12px; --r-lg:16px; --r-xl:22px;
     --f:"Inter", system-ui, -apple-system, sans-serif;
+    /* Counts, URLs and metadata used to be set in a typewriter face. They are
+       the interface, not code, so they use the interface font — with tabular
+       figures, which is the only thing the monospace was really buying (a
+       column of counts that does not jitter). The one place still monospaced
+       is the textarea, where JSON is typed by hand. */
+    --f-mono:"Inter", system-ui, -apple-system, sans-serif;
   }
   /* LIGHT. --ink carries most of it: every surface, hairline and dim text in
      the app is built from it, so they invert together. The handful of things
@@ -70,6 +95,10 @@
      which have to darken rather than lighten to stay readable — are restated. */
   :root[data-theme="light"]{
     --ink:17,26,43;
+    /* The red card material is a dark-theme idea: the same wash on a light
+       ground reads as a pink error panel, so light keeps white cards and uses
+       --card-rgb only where a red hairline is wanted. */
+    --card-rgb:176,18,53;
     --bg:#EDF0F6;
     --t:#121A2B;
     --surface:rgba(255,255,255,.75); --surface-2:rgba(255,255,255,.95); --surface-3:rgba(var(--ink),.07);
@@ -77,10 +106,11 @@
     --glass-bg:rgba(255,255,255,.80); --glass-bg-2:rgba(255,255,255,.90);
     --glass-border:rgba(var(--ink),.10);
     --glass-glow:0 0 0 1px rgba(255,255,255,.7) inset, 0 1px 0 rgba(255,255,255,.9) inset;
+    --glass-glow-flat:0 0 0 1px rgba(255,255,255,.7) inset, 0 1px 0 rgba(255,255,255,.9) inset;
     /* The four "soft" colours are soft-ON-DARK. On a light ground the same
        job needs a darker tone, not a paler one, or a link and an error read
        as the same washed-out pastel. */
-    --primary-soft:#1B5488; --danger-soft:#B01235;
+    --primary-soft:#B32B2B; --secondary-soft:#1B5488; --danger-soft:#B01235;
     --ok-soft:#237A41; --warn-soft:#8A6300;
     --opt-bg:#FFFFFF;
     /* Dim text does NOT behave symmetrically between the themes: white at 35%
@@ -109,11 +139,18 @@
   .accounts-layout .card #ac-list{ flex:1; min-height:0; overflow-y:auto; padding-right:4px; }
   .accounts-layout .card #ac-list::-webkit-scrollbar{ width:5px; }
   .accounts-layout .card #ac-list::-webkit-scrollbar-thumb{ background:rgba(var(--ink),.12); border-radius:4px; }
-  .api-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ok-soft); background:rgba(67,160,71,.14); border:1px solid rgba(67,160,71,.25); border-radius:999px; padding:3px 8px; }
+  .api-badge{ display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; border-radius:999px; padding:3px 8px; }
   @media (max-width:900px){ .accounts-layout{ grid-template-columns:1fr; } .panel[data-panel="accounts"]{ flex:1 0 auto; overflow:visible; } }
 
   /* ============ PROFILE TAB (card layout matching target design) ============ */
-  .panel[data-panel="profile"]{ display:flex; flex-direction:column; overflow:hidden; padding:clamp(16px,2vw,24px) clamp(18px,2.5vw,32px); max-width:1800px; gap:14px; }
+  /* ONE block, with sections inside it. The panel carries the outline and the
+     halo; the three cards within keep their own surface so the hierarchy still
+     reads, but give up their halos — three glows stacked inside a fourth was
+     the "glow in the middle". */
+  .panel[data-panel="profile"]{ display:flex; flex-direction:column; overflow:hidden; padding:clamp(16px,2vw,24px) clamp(18px,2.5vw,32px); max-width:1800px; gap:14px;
+    background:var(--glass-bg); backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
+    border:1px solid var(--glass-border); border-radius:18px; box-shadow:var(--glass-glow); }
+  .panel[data-panel="profile"] .sy-card, .panel[data-panel="profile"] .pf-section{ box-shadow:var(--glass-glow-flat); }
   .panel[data-panel="profile"] .pf-head-card,
   .panel[data-panel="profile"] .pf-name-card{ flex:none; margin-bottom:0; }
   .panel[data-panel="profile"] #pf-empty{ flex:none; }
@@ -169,6 +206,11 @@
   .pf-fab svg{ width:16px; height:16px; flex:none; }
   .pf-fab span{ display:inline-block; max-width:0; opacity:0; white-space:nowrap; overflow:hidden; font-size:12.5px; font-weight:600; transition:max-width .25s ease, opacity .2s ease, margin .25s ease; }
   .pf-fab:hover span, .pf-fab:focus-visible span{ max-width:140px; margin-left:8px; opacity:1; }
+  /* The save pill opens itself the moment there is something to save. The
+     button is disabled exactly while nothing is dirty (updateSaveButtonsState
+     in app.js), so :not(:disabled) already means "you have unsaved changes" —
+     no extra class and no JS to keep in step. */
+  .pf-fab-save:not(:disabled) span{ max-width:140px; margin-left:8px; opacity:1; }
   .pf-fab-save{ background:var(--accent); border-color:var(--accent); color:#fff; }
   .pf-fab-save:hover{ background:var(--accent-2); }
   .pf-fab-save:disabled{ opacity:.35; cursor:not-allowed; background:var(--accent); }
@@ -301,7 +343,7 @@
   .sy-carry-ic{ width:24px; height:24px; display:grid; place-items:center; color:var(--t70); flex:none; }
   .sy-carry-ic svg{ width:18px; height:18px; }
   .sy-carry-lbl{ font-size:13.5px; font-weight:600; flex:1; }
-  .sy-carry-cnt{ font-family:ui-monospace,monospace; font-size:11.5px; color:var(--t45); }
+  .sy-carry-cnt{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--t45); }
   .sy-carry-choose{ font-size:12px; color:var(--t55); background:transparent; border:1px solid var(--line); border-radius:8px; padding:5px 10px; cursor:pointer; display:flex; align-items:center; gap:4px; }
   .sy-carry-choose:hover{ border-color:rgba(var(--ink),.28); color:var(--t); }
   .sy-carry-choose:disabled{ opacity:.35; cursor:not-allowed; }
@@ -388,7 +430,7 @@
   .watched-row{ display:flex; align-items:center; gap:12px; padding:9px 0; border-top:1px solid var(--line-2); }
   .watched-row:first-child{ border-top:none; }
   .watched-title{ flex:1; min-width:0; font-size:13.5px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .watched-meta{ font-size:11px; color:var(--t45); font-family:ui-monospace,monospace; white-space:nowrap; }
+  .watched-meta{ font-size:11px; color:var(--t45); font-family:var(--f-mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .watched-se{ font-size:11px; color:var(--t55); font-weight:600; }
   .wp-bar{ height:4px; width:80px; background:var(--surface-3); border-radius:2px; overflow:hidden; }
   .wp-bar-fill{ height:100%; background:var(--accent); border-radius:2px; }
@@ -411,8 +453,11 @@
   .modal-msg{ font-size:14.5px; line-height:1.5; color:var(--t); }
   .modal-input{ margin-top:14px; }
   .modal-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:18px; }
-  .btn.danger-btn{ background:var(--accent); color:#fff; border-color:var(--accent); }
-  .btn.danger-btn:hover{ background:var(--accent-2); }
+  /* The confirm button on a destructive dialog is RED. It was --accent (blue),
+     which is the palette's "go" colour — so Unlink, Remove and Delete all
+     ended in a blue button that looked like every ordinary primary action. */
+  .btn.danger-btn{ background:var(--danger); color:#fff; border-color:var(--danger); }
+  .btn.danger-btn:hover{ background:#B01235; border-color:#B01235; }
   button,input,select,textarea{ font-family:inherit; }
   ::selection{ background:rgba(var(--accent-rgb),.35); }
 
@@ -536,7 +581,31 @@
   .navbtn.on::before{ content:""; position:absolute; left:0; top:8px; bottom:8px; width:3px; border-radius:3px; background:var(--accent); }
   .navbtn .cnt{ margin-left:auto; font-size:11px; color:var(--t35); }
   .sb-spacer{ flex:1; min-height:12px; }
-  .sb-user{ display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px; }
+  /* Theme switch, in the rail where the Settings tab used to be. */
+  .sb-theme{ display:flex; align-items:center; gap:11px; width:100%; padding:9px 11px; margin-bottom:2px;
+    background:transparent; border:none; border-radius:10px; color:var(--t55);
+    font-family:inherit; font-size:13.5px; font-weight:500; text-align:left; cursor:pointer; }
+  .sb-theme:hover{ color:var(--t); background:var(--surface); }
+  .sb-theme-ic{ flex:none; display:grid; place-items:center; width:19px; height:19px; }
+  .sb-theme-ic svg{ grid-area:1/1; width:19px; height:19px; }
+  .sb-theme .sun{ display:none; }
+  .sb-theme.on .sun{ display:block; }
+  .sb-theme.on .moon{ display:none; }
+  .sb-theme-tx{ flex:1; min-width:0; }
+  .sb-theme-sw{ flex:none; width:30px; height:17px; border-radius:999px; background:var(--surface-3);
+    border:1px solid var(--line); display:block; position:relative;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .sb-theme-sw i{ position:absolute; top:1px; left:1px; width:13px; height:13px; border-radius:50%;
+    background:var(--t45); transition:transform var(--mo-micro,.14s) var(--mo-ease,ease), background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .sb-theme.on .sb-theme-sw{ background:rgba(var(--accent-rgb),.3); border-color:rgba(var(--accent-rgb),.55); }
+  .sb-theme.on .sb-theme-sw i{ transform:translateX(13px); background:var(--accent); }
+
+  .sb-user{ display:flex; align-items:center; gap:10px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px; font-family:inherit; text-align:left; color:inherit; cursor:pointer;
+    transition:border-color var(--mo-micro,.14s) var(--mo-ease,ease), background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .sb-user:hover{ background:var(--surface-2); border-color:rgba(var(--ink),.22); }
+  .sb-user-tx{ flex:1; min-width:0; overflow:hidden; }
+  .sb-user-tx b, .sb-user-tx span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sb-user-car{ flex:none; width:15px; height:15px; color:var(--t35); }
   .sb-user .av{ width:32px; height:32px; border-radius:50%; background:var(--accent); display:grid; place-items:center; font-weight:700; font-size:13px; flex:none; overflow:hidden; }
   .sb-user .av img{ width:100%; height:100%; object-fit:cover; }
   .sb-user b{ font-size:13px; display:block; }
@@ -573,7 +642,7 @@
   .card{ background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--glass-border); border-radius:var(--r-lg); padding:20px 22px; margin-bottom:18px; box-shadow:var(--glass-glow); }
   .card > h3{ font-size:17px; font-weight:700; letter-spacing:-.01em; }
   .chead{ display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-  .pill-count{ font-family:ui-monospace,monospace; font-size:11.5px; color:var(--t55); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
+  .pill-count{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--t55); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:3px 10px; }
 
   .field-col{ display:flex; flex-direction:column; gap:12px; max-width:440px; }
   .switch-row{ display:flex; align-items:center; gap:14px; padding:13px 15px; background:var(--surface); border:1px solid var(--line); border-radius:12px; }
@@ -587,8 +656,12 @@
   .av img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:1; }
   .acct{ background:var(--surface); border:1px solid var(--line); border-radius:13px; padding:14px 16px; margin-bottom:10px; }
   .acct-head{ display:flex; align-items:center; gap:12px; }
-  .acct-name{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:14.5px; font-weight:600; }
-  .acct-mail{ font-size:12px; color:var(--t45); margin-top:2px; }
+  .acct-name{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:14.5px; font-weight:600; min-width:0; }
+  /* In a narrow column the Rename/Unlink buttons squeeze this row to almost
+     nothing and a long email ran straight out of it and over them. */
+  .acct-name-text{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .api-badge{ flex:none; }
+  .acct-mail{ font-size:12px; color:var(--t45); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .ac-hint{ margin:-4px 0 14px; line-height:1.5; }
   .acct-profiles{ display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; padding-top:13px; border-top:1px solid var(--line-2); }
   .pmini{ display:inline-flex; align-items:center; gap:7px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 12px 4px 4px; font-size:12.5px; color:var(--t); font-family:inherit; }
@@ -599,6 +672,23 @@
   .pchip:hover{ border-color:rgba(var(--ink),.28); }
   .pchip.on{ border-color:var(--accent); background:rgba(var(--accent-rgb),.08); }
   .pchip .pcn{ font-size:12.5px; font-weight:600; }
+  /* The delete ✕ sits next to the chip, not inside it — .pchip is a <button>.
+     It stays out of the way until the chip is hovered or something in the pair
+     has focus, so a row of profiles is not a row of delete buttons. */
+  .pchip-wrap{ position:relative; display:flex; flex:none; min-width:0; }
+  /* Inside the chip's own box, not overlapping its corner: the profile strip
+     is a horizontal scroller (overflow-x:auto forces overflow-y to clip too),
+     so anything sticking out above the chip gets its top cut off. */
+  .pchip-x{ position:absolute; top:3px; right:3px; width:20px; height:20px; border-radius:50%;
+    display:grid; place-items:center; cursor:pointer; padding:0;
+    background:var(--danger); border:1px solid rgba(0,0,0,.45); color:#fff;
+    opacity:0; transform:scale(.7); pointer-events:none;
+    transition:opacity var(--mo-micro,.14s) var(--mo-ease,ease), transform var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .pchip-x svg{ width:12px; height:12px; }
+  .pchip-wrap:hover .pchip-x, .pchip-wrap:focus-within .pchip-x{ opacity:1; transform:none; pointer-events:auto; }
+  .pchip-x:hover{ background:var(--danger-soft); color:#2a0008; }
+  .pchip-x:focus-visible{ opacity:1; transform:none; pointer-events:auto; outline:2px solid var(--danger-soft); outline-offset:2px; }
+  @media (hover:none){ .pchip-x{ opacity:1; transform:none; pointer-events:auto; } }
   .pchip.multi .chk{ position:absolute; top:7px; right:7px; width:17px; height:17px; border-radius:50%; background:var(--accent); color:#fff; font-size:10px; display:none; place-items:center; }
   .pchip.multi.on .chk{ display:grid; }
   .rename-input{ max-width:220px; }
@@ -607,7 +697,7 @@
   .erow{ display:flex; align-items:center; gap:11px; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:10px 13px; margin-bottom:8px; }
   .erow .eb{ flex:1; min-width:0; }
   .erow .en{ font-size:13.5px; font-weight:600; }
-  .erow .es{ font-size:11px; color:var(--t45); font-family:ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .erow .es{ font-size:11px; color:var(--t45); font-family:var(--f-mono); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .erow.dragging{ opacity:.5; }
   /* drag-reorder insertion line: a growing spacer whose own height/margin
      transition reflows the surrounding rows, giving the "magnetic" push. */
@@ -635,7 +725,7 @@
     border:1px solid var(--line); background:var(--surface); color:var(--t45); font-size:12px; font-weight:600; cursor:pointer; }
   .sy-set-sec:hover{ color:var(--t); }
   .sy-set-sec.on{ background:var(--surface-2); border-color:var(--t45); color:var(--t); }
-  .sy-set-sec-n{ font-family:ui-monospace,monospace; font-size:10px; opacity:.7; }
+  .sy-set-sec-n{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10px; opacity:.7; }
   /* settings copy tree: platform header, then its blocks indented under it */
   .pick.set-plat-head{ margin-top:12px; padding-top:10px; border-top:1px solid var(--line-2); }
   .pick.set-plat-head:first-child{ margin-top:0; padding-top:2px; border-top:0; }
@@ -650,7 +740,7 @@
   .cat-row{ display:flex; align-items:center; gap:12px; padding:11px 0; border-top:1px solid var(--line-2); flex-wrap:wrap; }
   .cat-row:first-child{ border-top:none; }
   .cat-lbl{ display:flex; align-items:center; gap:9px; font-size:14px; font-weight:600; min-width:130px; }
-  .cat-cnt{ font-family:ui-monospace,monospace; font-size:12px; color:var(--t45); }
+  .cat-cnt{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:12px; color:var(--t45); }
 
   /* targets */
   .tgt-acct{ font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--t35); font-weight:700; }
@@ -661,7 +751,7 @@
   /* reports — base badge/tag styles (layout overridden in panel-level block) */
   .rbadge{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; }
   .rbadge.chg{ background:rgba(67,160,71,.18); color:var(--ok-soft); } .rbadge.no{ background:var(--surface-2); color:var(--t45); }
-  .tag{ font-family:ui-monospace,monospace; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; }
+  .tag{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; font-weight:700; padding:1px 8px; border-radius:999px; }
   .tag.add{ background:rgba(67,160,71,.18); color:var(--ok-soft); } .tag.upd{ background:rgba(240,160,32,.16); color:var(--warn-soft); }
   .tag.rem{ background:rgba(var(--danger-rgb),.16); color:var(--danger-soft); } .tag.keep,.tag.held{ background:var(--surface-2); color:var(--t45); }
   .tag.held[title]{ cursor:help; }
@@ -694,7 +784,7 @@
   .sf-secret{ display:flex; align-items:center; gap:8px; width:100%; }
   .sf-secret .lock{ font-size:10.5px; color:var(--warn); font-weight:600; white-space:nowrap; }
   .sf-range-wrap{ display:flex; align-items:center; gap:10px; width:100%; }
-  .sf-range-wrap output{ font-family:ui-monospace,monospace; font-size:12px; color:var(--t70); min-width:44px; text-align:right; }
+  .sf-range-wrap output{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:12px; color:var(--t70); min-width:44px; text-align:right; }
   .set-save-note{ font-size:12px; color:var(--t45); }
   .set-plat-save{ display:flex; gap:10px; align-items:center; margin:8px 0 18px; }
 
@@ -702,7 +792,12 @@
     .land-hero{ grid-template-columns:1fr; }
     #view-app{ grid-template-columns:1fr; height:auto; min-height:100dvh; }
     .sidebar{ flex-direction:row; flex-wrap:wrap; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+    /* The rail is a horizontal strip here. The theme switch keeps its icon and
+       drops its label and track, so it stays reachable without a Settings tab
+       to fall back on; the account block and the spacers go. */
     .sb-sec,.sb-spacer,.sb-user{ display:none; }
+    .sb-theme{ width:auto; margin-bottom:0; }
+    .sb-theme-tx, .sb-theme-sw{ display:none; }
     .navbtn{ width:auto; }
     .set-field{ grid-template-columns:1fr; }
     .set-field .sf-c{ justify-content:flex-start; }
@@ -874,11 +969,14 @@
      is a deliberate fourth use.
      The light wash is deliberate too: --glass-bg is darker than the page, and
      over a near-black background a darker pane reads as a hole, not a block. */
+  /* The same block every other big surface uses — low-opacity black, a thin
+     white outline and a white halo. It used to be a light wash of its own,
+     which made the wizard the one screen whose blocks did not match the app. */
   .wz-main, .wz-panel{
-    background:linear-gradient(rgba(var(--ink),.045), rgba(var(--ink),.018));
+    background:var(--glass-bg);
     backdrop-filter:blur(9px); -webkit-backdrop-filter:blur(9px);
-    border:1px solid rgba(var(--ink),.09); border-radius:18px;
-    box-shadow:inset 0 1px 0 rgba(var(--ink),.05), 0 18px 46px rgba(0,0,0,.42); }
+    border:1px solid var(--glass-border); border-radius:18px;
+    box-shadow:var(--glass-glow); }
   /* Step 1's front door has nothing to read from yet - no profile, no
      account - so the frosted block behind it is just an empty frame with
      two cards in the corner. Drop the glass on THAT screen only (app.js
@@ -888,6 +986,19 @@
     background:none; backdrop-filter:none; -webkit-backdrop-filter:none;
     border-color:transparent; box-shadow:none; }
   .wz-pane[data-wzpane="account"]{ flex:1 1 auto; }
+  /* Signed out. This is the only visible thing in a full-width, full-height
+     column, so it centres in both directions rather than sitting in the top
+     left corner of an empty screen. The art is capped by height as well as
+     width: on a short window it is the first thing that should give up room,
+     and below 420px tall it goes entirely. */
+  .wz-empty{ flex:1 1 auto; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; gap:14px; padding:20px 16px; min-height:0; }
+  .wz-empty .wz-empty-art{ width:min(300px,62%); max-height:38vh; flex:0 1 auto; min-height:0; }
+  .wz-empty .wz-empty-art svg{ width:100%; height:100%; max-height:38vh; display:block; overflow:visible; }
+  .wz-empty h3{ font-size:20px; font-weight:700; }
+  .wz-empty p{ max-width:46ch; line-height:1.6; }
+  .wz-empty .btn{ margin-top:4px; }
+  @media (max-height:420px){ .wz-empty .wz-empty-art{ display:none; } }
   /* A branch fills the block instead of floating in the middle of it: the
      question and its controls start at the top, at a size that owns the
      screen, and the way back to the other front door sits on the bottom
@@ -971,7 +1082,7 @@
      the profile you are looking at, and at 9.5px in --t35 they read as
      disabled text. Accent-coloured and a size up, they do that job. */
   .wz-pnl-h{
-    font-family:ui-monospace,monospace; font-size:11px; letter-spacing:.14em;
+    font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; letter-spacing:.14em;
     text-transform:uppercase; color:var(--accent); margin:18px 0 8px;
     padding-bottom:7px; border-bottom:1px solid var(--line-2); }
   .wz-pnl-body > .wz-pnl-h:first-child{ margin-top:0; }
@@ -983,7 +1094,7 @@
   .wz-pnl-row .as{ font-size:11px; color:var(--t35); min-width:0;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wz-pnl-row .sp{ flex:1 1 auto; min-width:6px; }
-  .wz-pnl-row .st{ flex:none; font-family:ui-monospace,monospace; font-size:10.5px; color:var(--t35); }
+  .wz-pnl-row .st{ flex:none; font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10.5px; color:var(--t35); }
   .wz-pnl-row .st.on{ color:var(--ok-soft); }
   .wz-pnl-none{ font-size:11.5px; color:var(--t35); font-style:italic; padding:3px 0 4px; }
   .wz-pnl-err{ font-size:11.5px; color:var(--danger-soft); line-height:1.5; padding:3px 0; }
@@ -992,7 +1103,7 @@
   .wz-pnl-run .wz-pnl-h{ margin-top:0; }
   .wz-pnl-did{ display:flex; gap:8px; align-items:flex-start; font-size:11.5px;
     color:var(--t55); line-height:1.5; padding:3px 0; }
-  .wz-pnl-did .tk{ flex:none; color:var(--ok-soft); font-family:ui-monospace,monospace; }
+  .wz-pnl-did .tk{ flex:none; color:var(--ok-soft); font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
   .wz-pnl-did span:last-child{ min-width:0; overflow-wrap:anywhere; }
 
   /* ---- step 1 at scale ---- */
@@ -1050,12 +1161,17 @@
   #wz-entry .wz-pick:hover{ background:linear-gradient(155deg, rgba(var(--ink),.1), rgba(var(--ink),.02) 55%, rgba(0,0,0,.08)); }
   #wz-entry .wz-pick-h{ justify-content:center; }
   #wz-entry .wz-pick-n{ font-size:18px; }
-  #wz-entry .wz-pick-one{ font-size:13.5px; max-width:34ch; margin-top:0; }
+  /* flex:none, overriding `.wz-pick > .wz-pick-one{ flex:1 1 auto }`. That rule
+     exists so cards in a ROW line their rules up, but on these two there is
+     nothing below the text — it just let the description swallow every spare
+     pixel, which pinned the art to the top of a card that is supposed to
+     centre its contents. This is what "still not in the middle" was. */
+  #wz-entry .wz-pick-one{ font-size:13.5px; max-width:34ch; margin-top:0; flex:none; }
   /* Drawn, not borrowed. Sized against the card so it fills a tall block
      without becoming the whole of a short one. */
   #wz-entry .wz-entry-art{ width:min(228px,58%); color:var(--t45); flex:none;
     transition:color var(--mo-micro,.16s) var(--mo-ease,ease); }
-  #wz-entry .wz-entry-art svg{ width:100%; height:auto; display:block; }
+  #wz-entry .wz-entry-art svg{ width:100%; height:auto; display:block; overflow:visible; }
   #wz-entry .wz-pick:hover .wz-entry-art, #wz-entry .wz-pick.on .wz-entry-art{ color:var(--t70); }
   @media (max-width:640px){ #wz-entry{ grid-template-columns:1fr; } }
   @media (max-height:700px){ #wz-entry .wz-entry-art{ width:min(150px,38%); } }
@@ -1067,7 +1183,7 @@
     cursor:pointer; font-family:inherit; white-space:nowrap;
     transition:color var(--mo-micro,.16s) var(--mo-ease,ease), border-color var(--mo-micro,.16s) var(--mo-ease,ease), background var(--mo-micro,.16s) var(--mo-ease,ease); }
   .wz-step .n{ width:21px; height:21px; border-radius:50%; display:grid; place-items:center; flex:none;
-    background:var(--surface-2); color:var(--t45); font-family:ui-monospace,monospace; font-size:11px; }
+    background:var(--surface-2); color:var(--t45); font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; }
   .wz-step:hover:not(:disabled){ color:var(--t); border-color:rgba(var(--ink),.24); }
   .wz-step.on{ background:var(--surface-3); color:var(--t); border-color:rgba(var(--ink),.2); }
   .wz-step.on .n{ background:var(--accent); color:#fff; }
@@ -1179,7 +1295,7 @@
   .wz-pick-n{ font-size:15px; font-weight:700; letter-spacing:-.01em; min-width:0; overflow-wrap:anywhere; }
   .wz-pick-h .btn{ flex:none; }
   .wz-pick-one{ font-size:12.5px; color:var(--t70); margin-top:8px; line-height:1.5; overflow-wrap:anywhere; }
-  .wz-pick-price{ font-size:11.5px; color:var(--t45); margin-top:6px; font-family:ui-monospace,monospace; }
+  .wz-pick-price{ font-size:11.5px; color:var(--t45); margin-top:6px; font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
   .wz-tag{ font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap;
     border-radius:999px; padding:2px 9px; background:rgba(66,133,244,.18); color:#8ab4f8; }
   .wz-tag.plain{ background:var(--surface-2); color:var(--t45); }
@@ -1188,7 +1304,7 @@
   .wz-pc{ display:grid; gap:5px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line-2); }
   .wz-pc div{ font-size:12px; line-height:1.5; display:flex; gap:8px; }
   .wz-pc span:last-child{ min-width:0; overflow-wrap:anywhere; }
-  .wz-pc .s{ flex:none; width:11px; font-family:ui-monospace,monospace; font-weight:700; }
+  .wz-pc .s{ flex:none; width:11px; font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-weight:700; }
   .wz-pc .pro .s{ color:var(--ok-soft); } .wz-pc .con .s{ color:var(--warn); }
   .wz-pc .con{ color:var(--t55); }
   /* "What you're getting" behind the simple card's "?" - prose lines between
@@ -1246,7 +1362,7 @@
   .wz-inst > div{ min-width:0; }
   .wz-inst .nm{ font-size:13.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wz-inst .muted{ overflow-wrap:anywhere; }
-  .wz-inst .up{ font-family:ui-monospace,monospace; font-size:11.5px; color:var(--ok-soft); flex:none; }
+  .wz-inst .up{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11.5px; color:var(--ok-soft); flex:none; }
   .wz-inst .up.low{ color:var(--warn-soft); }
   .wz-inst .spacer{ flex:1 1 auto; min-width:0; }
   .wz-inst .btn{ flex:none; }
@@ -1277,7 +1393,7 @@
   .wz-inst-sq:hover{ border-color:rgba(var(--ink),.26); }
   .wz-inst-sq .nm{ font-size:13px; font-weight:600; line-height:1.35; min-width:0; overflow-wrap:anywhere;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
-  .wz-inst-sq .up{ font-family:ui-monospace,monospace; font-size:11px; color:var(--ok-soft); }
+  .wz-inst-sq .up{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--ok-soft); }
   .wz-inst-sq .up.low{ color:var(--warn-soft); }
   .wz-inst-sq .sp{ flex:1 1 auto; min-height:0; }
   .wz-inst-sq .btn{ flex:none; align-self:flex-start; }
@@ -1294,7 +1410,7 @@
     border-radius:11px; padding:10px 12px; }
   .wz-out-row > div{ min-width:0; flex:1 1 auto; }
   .wz-out-row .k{ font-size:10.5px; letter-spacing:.07em; text-transform:uppercase; color:var(--t45); }
-  .wz-out-row .v{ font-family:ui-monospace,monospace; font-size:12px; margin-top:3px; overflow-wrap:anywhere;
+  .wz-out-row .v{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:12px; margin-top:3px; overflow-wrap:anywhere;
     user-select:all; line-height:1.45; }
   .wz-out-row .btn{ flex:none; }
   /* Carries a hostname, which has no break opportunity in it - without this it
@@ -1310,7 +1426,7 @@
      rather than as "3 · " typed into the heading, so the sequence is visible
      at a glance and renumbering is a one-token edit. */
   .wz-n{ display:inline-grid; place-items:center; flex:none; width:22px; height:22px; border-radius:50%;
-    margin-right:9px; background:var(--accent); color:#fff; font-family:ui-monospace,monospace;
+    margin-right:9px; background:var(--accent); color:#fff; font-family:var(--f-mono); font-variant-numeric:tabular-nums;
     font-size:11.5px; font-weight:700; box-shadow:0 0 16px rgba(var(--accent-rgb),.45); }
   .chead h3{ display:flex; align-items:center; min-width:0; }
 
@@ -1523,7 +1639,7 @@
     transition:background var(--mo-micro,.14s) var(--mo-ease,ease); }
   .mk-sec-h:hover{ background:rgba(var(--ink),.03); }
   .mk-sec-h .spacer{ flex:1; }
-  .mk-sec-cnt{ font-family:ui-monospace,monospace; font-size:11px; color:var(--t35); }
+  .mk-sec-cnt{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--t35); }
   .mk-sec-car{ flex:none; color:var(--t45); display:grid; place-items:center; transition:transform var(--mo-expand,.26s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
   .mk-sec-car svg{ width:14px; height:14px; }
   .mk-sec.open .mk-sec-car{ transform:rotate(180deg); }
@@ -1560,7 +1676,7 @@
     background:var(--surface-2); border:1px solid var(--line); border-radius:999px;
     padding:3px 9px 3px 7px; color:var(--t35); font-family:inherit; }
   .mk-dead-btn svg{ width:14px; height:14px; }
-  .mk-dead-btn .mk-dead-n{ font-family:ui-monospace,monospace; font-size:10.5px; }
+  .mk-dead-btn .mk-dead-n{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10.5px; }
   .mk-dead-btn:hover{ color:var(--danger-soft); border-color:rgba(var(--danger-rgb),.38); }
   .mk-dead-btn.on{ color:var(--danger-soft); background:rgba(var(--danger-rgb),.1); border-color:rgba(var(--danger-rgb),.38); }
   .mk-dead-wrap{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line-2); }
@@ -1569,7 +1685,7 @@
      drag has something to read against. */
   .pf-coll-folders{ display:flex; flex-direction:column; gap:6px; }
   .pf-coll-folders .pf-coll-n{ flex:none; width:22px; text-align:center;
-    font-family:ui-monospace,monospace; font-size:11px; color:var(--t35); }
+    font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--t35); }
   .mk-nm{ font-size:13.5px; font-weight:700; }
   .mk-sub{ font-size:11px; color:var(--t35); margin-top:2px; }
   .mk-acts{ display:flex; gap:7px; margin-top:auto; }
@@ -1579,7 +1695,7 @@
   .mk-row:hover{ border-color:rgba(var(--ink),.17); }
   .mk-row .mk-rb{ flex:1; min-width:0; }
   .mk-row .mk-rn{ font-size:13px; font-weight:600; }
-  .mk-row .mk-ru{ font-size:11px; color:var(--t35); font-family:ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mk-row .mk-ru{ font-size:11px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* provider (plugin) list — a grid, not a single column with half the card empty */
   .mk-prov-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:8px; }
@@ -1588,8 +1704,8 @@
   .mk-prov.dead{ opacity:.6; }
   .mk-prov .mk-pb{ flex:1; min-width:0; }
   .mk-prov .mk-pn{ font-size:13.5px; font-weight:600; }
-  .mk-prov .mk-pm{ font-size:11px; color:var(--t35); font-family:ui-monospace,monospace; margin-top:2px; }
-  .mk-lang{ font-family:ui-monospace,monospace; font-size:10.5px; color:var(--t45); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:2px 9px; flex:none; }
+  .mk-prov .mk-pm{ font-size:11px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; margin-top:2px; }
+  .mk-lang{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10.5px; color:var(--t45); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:2px 9px; flex:none; }
 
   /* scraper picker */
   .mk-scr{ display:flex; align-items:center; gap:10px; padding:8px 11px; border-radius:10px; border:1px solid var(--line-2); background:rgba(var(--ink),.02); }
@@ -1684,6 +1800,10 @@
      a repository row carries a mark, a name, a provider count and two buttons,
      and a collection grid wants three or four across. Same dialog, more room. */
   .mk-dlg-wide .mk-dlg{ width:min(1020px,96vw); height:min(86dvh, 100% - 32px); }
+  /* The settings pop-out is the biggest surface in the app on purpose: it is
+     there to stop you scrolling a long tree through a third of a panel. */
+  .pf-set-dlg .mk-dlg{ width:min(1320px,97vw); height:min(94dvh, 100% - 16px); }
+  .pf-set-dlg .mk-dlg-b{ padding-top:4px; }
   .mk-dlg-b{ padding:16px 18px; overflow-y:auto; flex:1 1 auto; min-height:0; }
   .mk-dlg-b::-webkit-scrollbar{ width:5px; }
   .mk-dlg-b::-webkit-scrollbar-thumb{ background:rgba(var(--ink),.14); border-radius:4px; }
@@ -1699,7 +1819,7 @@
   .mk-chk{ font-size:12px; line-height:1.5; margin:-6px 0 12px; padding:0; }
   .mk-chk:empty{ display:none; }
   .mk-chk-l{ font-weight:600; }
-  .mk-chk-s{ color:var(--t35); font-family:ui-monospace,monospace; font-size:10.5px; margin-top:3px;
+  .mk-chk-s{ color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10.5px; margin-top:3px;
     overflow-wrap:anywhere; }
   .mk-chk.ok .mk-chk-l{ color:var(--ok-soft); }
   .mk-chk.warn .mk-chk-l{ color:var(--warn-soft); }
@@ -1725,7 +1845,7 @@
   .mk-pick-top{ display:flex; align-items:center; gap:12px; padding:2px 2px 8px; }
   .mk-pick-top-tx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .mk-pick-top-t{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--t55); }
-  .mk-pick-top-c{ font-size:11.5px; color:var(--t35); font-family:ui-monospace,monospace; }
+  .mk-pick-top-c{ font-size:11.5px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
   .mk-pick-top-c.on{ color:var(--primary-soft); }
   .mk-pick-topall{ flex:none; font-size:11.5px; font-weight:600; font-family:inherit; cursor:pointer;
     color:var(--t70); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:6px 14px;
@@ -1751,7 +1871,7 @@
     background:var(--surface-3); color:var(--t70); font-weight:800; font-size:11.5px; }
   .mk-pick-htx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
   .mk-pick-hn{ font-size:13px; font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .mk-pick-hc{ font-size:10.5px; color:var(--t35); font-family:ui-monospace,monospace; }
+  .mk-pick-hc{ font-size:10.5px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; }
   .mk-pick-hc.on{ color:var(--primary-soft); }
   .mk-pick-car{ flex:none; color:var(--t45); display:grid; place-items:center;
     transition:transform var(--mo-expand,.26s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
@@ -1765,8 +1885,13 @@
   .mk-pick-all:hover{ text-decoration:underline; color:var(--primary-soft); }
   /* A grid, not a wrapping flex row: chips used to be as wide as their own
      name, so one account's profiles were five different sizes. Equal tracks
-     give one size; fitChipName() in app.js steps the name down to fit it. */
-  .mk-pick-chips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:7px; }
+     give one size; fitChipName() in app.js steps the name down to fit it.
+     auto-FIT, not auto-fill: auto-fill keeps the tracks it could fit even when
+     nothing is in them, so an account with two profiles in a card wide enough
+     for three ended with a third of the row reserved and empty. auto-fit
+     collapses the empty tracks and the 1fr max hands that width back to the
+     chips that exist, so a row is always full whatever the count. */
+  .mk-pick-chips{ display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:7px; }
   .mk-pick-chip{ flex-direction:row; gap:8px; min-width:0; padding:7px 13px 7px 8px; border-radius:11px; border-width:1.5px; justify-content:flex-start; }
   .mk-pick-chip .av{ flex:none; }
   .mk-pick-chip .pcn{ font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -1775,11 +1900,27 @@
   .mk-inst:hover{ background:var(--surface-2); }
   .mk-inst .mk-ib{ flex:1; min-width:0; }
   .mk-inst .mk-in{ font-size:12.5px; font-weight:600; }
-  .mk-inst .mk-iu{ font-size:10.5px; color:var(--t35); font-family:ui-monospace,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .mk-up{ font-family:ui-monospace,monospace; font-size:10.5px; flex:none; color:var(--ok-soft); }
+  .mk-inst .mk-iu{ font-size:10.5px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mk-up{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:10.5px; flex:none; color:var(--ok-soft); }
   .mk-up.mid{ color:var(--warn-soft); } .mk-up.low{ color:var(--danger-soft); }
   .mk-inst-note{ font-size:11px; color:var(--t35); }
 
+  /* Says the list on screen is not the live catalogue. Only drawn when that is
+     actually true — see renderMkCollections. */
+  .mk-src-tag{ flex:none; font-family:inherit; font-size:10.5px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; cursor:pointer; padding:3px 9px; border-radius:999px;
+    color:var(--warn); background:rgba(var(--warn-rgb),.14); border:1px solid rgba(var(--warn-rgb),.35); }
+  .mk-src-tag:hover{ background:rgba(var(--warn-rgb),.24); }
+  /* What you are about to install, with its artwork, at the top of the dialog. */
+  .mk-coll-hero{ display:flex; gap:14px; align-items:flex-start; margin-bottom:14px; }
+  .mk-coll-hero img{ width:96px; height:140px; flex:none; object-fit:cover; border-radius:10px;
+    border:1px solid var(--line); background:var(--surface); }
+  .mk-coll-hero-tx{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .mk-coll-hero-n{ font-size:17px; font-weight:700; line-height:1.25; }
+  .mk-coll-hero-m{ font-size:11.5px; color:var(--t45); font-variant-numeric:tabular-nums; }
+  .mk-coll-hero-d{ font-size:12.5px; color:var(--t55); line-height:1.5;
+    display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  @media (max-width:520px){ .mk-coll-hero img{ width:70px; height:102px; } }
   .mk-note{ display:flex; gap:10px; align-items:flex-start; font-size:12.5px; color:var(--t45); background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:12px 14px; line-height:1.5; margin-bottom:14px; }
   .mk-note svg{ width:16px; height:16px; flex:none; margin-top:1px; color:var(--t35); }
   .mk-note-row{ flex-wrap:wrap; align-items:center; padding:9px 14px; margin-bottom:12px; }
@@ -1811,7 +1952,7 @@
   .wz-plug-tx{ flex:1 1 auto; min-width:0; }
   .wz-plug-n{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13.5px; font-weight:600;
     min-width:0; overflow-wrap:anywhere; }
-  .wz-plug-m{ font-size:11px; color:var(--t35); font-family:ui-monospace,monospace; margin-top:2px;
+  .wz-plug-m{ font-size:11px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; margin-top:2px;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wz-plug-m.bad{ color:var(--danger-soft); }
   .wz-plug-h .btn, .wz-plug-h .mk-lang{ flex:none; }
@@ -1929,8 +2070,13 @@
   .sidebar .navbtn.on:hover{ background:transparent; }
   .pf-tabs-bar .pf-editor-tab.on{ border-bottom-color:transparent; }
   .set-tabs .set-tab.on{ background:transparent; }
-  .set-platbar button.on{ background:transparent; }
-  .sy-set-sections .sy-set-sec.on{ background:transparent; }
+  /* Clearing the background is not enough on the two bars whose buttons carry
+     a BORDER of their own: the shared indicator draws a pill, the button's own
+     outline draws a second one inside it, and the selected item ends up ringed
+     twice. Only .mk-tab was zeroing both. Reported on the settings sections in
+     light mode, where the 0.66-alpha outline is plainly visible. */
+  .set-platbar button.on{ background:transparent; border-color:transparent; }
+  .sy-set-sections .sy-set-sec.on{ background:transparent; border-color:transparent; }
   @media (max-width:900px){
     /* sidebar is a horizontal strip here — the rail travels along the bottom */
     .sidebar .mo-ind-rail::before{ left:9px; right:9px; top:auto; bottom:2px; width:auto; height:2px; }
@@ -2067,7 +2213,9 @@
   .modal-details li + li{ margin-top:5px; }
   .modal-details li::before{ content:""; position:absolute; left:2px; top:7px; width:4px; height:4px; border-radius:50%; background:var(--t35); }
   .modal-details li b{ color:var(--t70); font-weight:600; }
-  .modal-card.danger-card{ border-color:rgba(var(--danger-rgb),.4); box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(var(--danger-rgb),.12); }
+  /* Every card is a red pane now, so a danger card has to say it louder than a
+     tinted border did — a brighter edge and a red halo, not the same wash. */
+  .modal-card.danger-card{ border-color:rgba(var(--danger-rgb),.65); box-shadow:0 24px 70px rgba(0,0,0,.6), 0 0 0 1px rgba(var(--danger-rgb),.3), 0 0 44px -10px rgba(var(--danger-rgb),.55); }
 
   /* ---- morphing popover ---- */
   .mo-pop-layer{ position:fixed; inset:0; z-index:90; }
@@ -2160,7 +2308,7 @@
   .mo-empty p{ font-size:13px; color:var(--t45); max-width:38ch; line-height:1.55; }
   .mo-act-row{ display:flex; align-items:flex-start; gap:10px; padding:9px 0; border-top:1px solid var(--line-2); }
   .mo-act-row:first-child{ border-top:none; }
-  .mo-act-t{ font-family:ui-monospace,monospace; font-size:11px; color:var(--t35); width:54px; flex:none; padding-top:1px; }
+  .mo-act-t{ font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--t35); width:54px; flex:none; padding-top:1px; }
   .mo-act-dot{ width:6px; height:6px; border-radius:50%; flex:none; margin-top:6px; background:var(--t35); }
   .mo-act-row.ok .mo-act-dot{ background:var(--ok-soft); }
   .mo-act-row.err .mo-act-dot{ background:var(--danger-soft); }
@@ -2200,16 +2348,26 @@
   .sy-carry-row:has(#sy-cat-settings) .sy-carry-ic{ color:var(--cat-settings); }
   .mk-coll-card{ border-top:2px solid rgba(var(--cat-collections-rgb),.5); }
   .mk-prov{ border-left:2px solid rgba(var(--cat-plugins-rgb),.42); }
-  .api-badge{ color:var(--cat-keys); background:rgba(var(--cat-keys-rgb),.14); border-color:rgba(var(--cat-keys-rgb),.3); }
+  .api-badge{ color:var(--cat-keys); background:rgba(var(--cat-keys-rgb),.14); border:1px solid rgba(var(--cat-keys-rgb),.3); }
 
-  /* Primary actions carry a little light. Solid fill, gradient lift, soft
-     glow underneath — enough to be the obvious thing to press, not enough to
-     shout on a page with several of them. */
-  .btn-primary{ background:linear-gradient(180deg, #3479BE, var(--primary)); color:#fff;
+  /* TWO RANKS OF BUTTON.
+     Red is rank one: the thing this screen is for. Blue is rank two: every
+     other, smaller button around it. That is the whole rule — a page should
+     have at most one red button, and the ghost buttons beside it go blue.
+     Destructive buttons are neither; they take --danger, which is a colder,
+     deeper crimson, and they only ever appear inside a confirmation. */
+  .btn-primary{ background:linear-gradient(180deg, #F4665F, var(--primary)); color:#fff;
     border-color:transparent; box-shadow:0 6px 18px -9px rgba(var(--primary-rgb),.85); }
-  .btn-primary:hover{ background:linear-gradient(180deg, #3D85CC, #2A66A6); }
+  .btn-primary:hover{ background:linear-gradient(180deg, #FF7A72, var(--accent-2)); }
   .btn-primary:disabled{ box-shadow:none; }
-  .btn.danger-btn, .danger-btn{ box-shadow:0 6px 18px -9px rgba(var(--danger-rgb),.75); }
+  /* Rank two. .btn-ghost is what nearly every small button in the app uses,
+     so tinting it here turns them all blue without touching a single call
+     site — except the destructive ones, which keep their own colour. */
+  .btn-ghost:not(.danger){ border-color:rgba(var(--secondary-rgb),.42); color:var(--secondary-soft); }
+  .btn-ghost:not(.danger):hover{ border-color:rgba(var(--secondary-rgb),.75); background:rgba(var(--secondary-rgb),.12); color:var(--secondary-soft); }
+  .btn-ghost:not(.danger).on{ border-color:var(--secondary); background:rgba(var(--secondary-rgb),.18); }
+  .btn.danger-btn, .danger-btn{ background:var(--danger); border-color:var(--danger); color:#fff;
+    box-shadow:0 6px 18px -9px rgba(var(--danger-rgb),.75); }
 
   /* Live, in progress. The shimmer already marks these; cyan names them. */
   .inline-status.shimmer, .shimmer{ color:var(--live); }
@@ -2253,7 +2411,7 @@
 </script>
 </head>
 <body>
-<div class="mo-app-bg" data-bg="stars" aria-hidden="true"></div>
+<div class="mo-app-bg" data-bg="stars" data-bg-color="245,197,90" aria-hidden="true"></div>
 <div class="land-glow" aria-hidden="true"></div>
 
 <!-- ============ LANDING ============ -->
@@ -2308,8 +2466,22 @@
     <button class="navbtn" data-nav="market"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 9h18l-1.4 9.2a2 2 0 0 1-2 1.8H6.4a2 2 0 0 1-2-1.8Z"/><path d="M8 9V6.5a4 4 0 0 1 8 0V9"/></svg>Marketplace</button>
     <button class="navbtn" data-nav="activity"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Activity</button>
     <div class="sb-spacer"></div>
-    <button class="navbtn" data-nav="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg>Settings</button>
-    <div class="sb-user"><div class="av" id="sb-avatar">N</div><div><b id="sb-name">Signed out</b><span id="sb-sub">No accounts</span></div></div>
+    <!-- The Settings tab held exactly three things and none of them needed a
+         tab: reading API keys is decided where you link an account, the theme
+         is a switch, and signing out belongs to the account it signs out of. -->
+    <button class="sb-theme" id="sb-theme" type="button" role="switch" aria-checked="false" aria-label="Light mode">
+      <span class="sb-theme-ic" aria-hidden="true">
+        <svg class="moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z"/></svg>
+        <svg class="sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.2 5.2l1.4 1.4M17.4 17.4l1.4 1.4M18.8 5.2l-1.4 1.4M6.6 17.4l-1.4 1.4"/></svg>
+      </span>
+      <span class="sb-theme-tx">Light mode</span>
+      <span class="sb-theme-sw" aria-hidden="true"><i></i></span>
+    </button>
+    <button class="sb-user" id="sb-user" type="button" aria-haspopup="dialog">
+      <div class="av" id="sb-avatar">N</div>
+      <div class="sb-user-tx"><b id="sb-name">Signed out</b><span id="sb-sub">No accounts</span></div>
+      <svg class="sb-user-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 15 5-5 5 5"/></svg>
+    </button>
   </aside>
 
   <main class="main">
@@ -2358,9 +2530,59 @@
            picker, the profile picker and the sign-up form are all still here;
            they just wait behind whichever of the two answers applies. -->
       <div class="wz-pane on" data-wzpane="account">
-        <div class="wz-sec" id="wz-signin-card" style="display:none">
-          <div class="chead"><h3>Sign in with Google first</h3></div>
-          <p class="muted sm">Numax keeps your linked Nuvio accounts in your own Google Drive, so the wizard needs that connection before it can do anything.</p>
+        <!-- Signed out, the four steps below are all hidden and this is the
+             only thing in a full-width column. It is centred and carries its
+             own artwork for that reason, and it ends in a real button: the
+             panel used to be a dead end that named a control living on a
+             screen you could no longer see. -->
+        <div class="wz-sec wz-empty" id="wz-signin-card" style="display:none">
+          <div class="wz-empty-art" aria-hidden="true">
+            <svg viewBox="0 0 300 196" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <radialGradient id="wzGlow" cx="50%" cy="52%" r="50%">
+                  <stop offset="0" stop-color="rgb(var(--card-rgb))" stop-opacity=".34"/>
+                  <stop offset="1" stop-color="rgb(var(--card-rgb))" stop-opacity="0"/>
+                </radialGradient>
+                <linearGradient id="wzCard" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stop-color="rgb(var(--card-rgb))" stop-opacity=".30"/>
+                  <stop offset="1" stop-color="rgb(var(--card-rgb))" stop-opacity=".10"/>
+                </linearGradient>
+              </defs>
+              <ellipse cx="150" cy="102" rx="140" ry="86" fill="url(#wzGlow)"/>
+              <!-- the two profiles it copies TO, behind and dimmer -->
+              <g opacity=".72">
+                <rect x="14" y="58" width="74" height="86" rx="14" fill="url(#wzCard)" stroke="var(--cat-addons)" stroke-opacity=".5"/>
+                <circle cx="51" cy="86" r="13" fill="var(--cat-addons)" fill-opacity=".55"/>
+                <rect x="30" y="108" width="42" height="6" rx="3" fill="var(--cat-addons)" fill-opacity=".38"/>
+                <rect x="36" y="122" width="30" height="6" rx="3" fill="var(--cat-addons)" fill-opacity=".22"/>
+              </g>
+              <g opacity=".72">
+                <rect x="212" y="58" width="74" height="86" rx="14" fill="url(#wzCard)" stroke="var(--cat-collections)" stroke-opacity=".5"/>
+                <circle cx="249" cy="86" r="13" fill="var(--cat-collections)" fill-opacity=".55"/>
+                <rect x="228" y="108" width="42" height="6" rx="3" fill="var(--cat-collections)" fill-opacity=".38"/>
+                <rect x="234" y="122" width="30" height="6" rx="3" fill="var(--cat-collections)" fill-opacity=".22"/>
+              </g>
+              <!-- the arcs that carry a setup across -->
+              <path d="M92 101h24" stroke="var(--cat-plugins)" stroke-opacity=".55" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 6"/>
+              <path d="M184 101h24" stroke="var(--cat-plugins)" stroke-opacity=".55" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 6"/>
+              <!-- the profile it copies FROM -->
+              <rect x="112" y="40" width="76" height="122" rx="17" fill="url(#wzCard)" stroke="rgb(var(--card-rgb))" stroke-opacity=".85"/>
+              <circle cx="150" cy="78" r="17" fill="var(--cat-keys)" fill-opacity=".9"/>
+              <path d="M143 78.5l5 5 9-10" stroke="#1a0b10" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect x="126" y="110" width="48" height="7" rx="3.5" fill="#fff" fill-opacity=".5"/>
+              <rect x="133" y="126" width="34" height="7" rx="3.5" fill="#fff" fill-opacity=".26"/>
+              <rect x="138" y="142" width="24" height="7" rx="3.5" fill="#fff" fill-opacity=".14"/>
+              <!-- gold, same as the stars behind the page -->
+              <path d="M258 26l2.6 6.4 6.4 2.6-6.4 2.6-2.6 6.4-2.6-6.4-6.4-2.6 6.4-2.6z" fill="var(--cat-keys)" fill-opacity=".85"/>
+              <path d="M40 24l1.9 4.6 4.6 1.9-4.6 1.9L40 37l-1.9-4.6-4.6-1.9 4.6-1.9z" fill="var(--cat-keys)" fill-opacity=".55"/>
+              <circle cx="284" cy="120" r="2.6" fill="var(--cat-keys)" fill-opacity=".5"/>
+              <circle cx="20" cy="150" r="2.2" fill="var(--cat-keys)" fill-opacity=".4"/>
+              <circle cx="150" cy="182" r="2.4" fill="var(--cat-keys)" fill-opacity=".35"/>
+            </svg>
+          </div>
+          <h3>Sign in with Google first</h3>
+          <p class="muted sm">Numax keeps your linked Nuvio accounts in your own Google Drive, so the wizard needs that connection before it can do anything. Nothing is stored anywhere else.</p>
+          <button class="btn btn-primary" id="wz-signin-go">Continue with Google</button>
         </div>
 
         <div id="wz-account-body">
@@ -2575,7 +2797,7 @@
         <div class="field-col">
           <label class="fld"><span>Nuvio email</span><input id="ac-email" type="email" autocomplete="off" placeholder="name@example.com"></label>
           <label class="fld"><span>Password</span><input id="ac-pass" type="password" autocomplete="off" placeholder="Nuvio password"></label>
-          <label class="fld"><span>Label (optional)</span><input id="ac-label" type="text" placeholder="e.g. Mum's TV"></label>
+          <label class="fld"><span>Label (optional)</span><input id="ac-label" type="text" placeholder="e.g. Hiro"></label>
           <button class="btn btn-primary" id="ac-link-btn" style="align-self:flex-start">Link account</button>
           <div class="inline-status" id="ac-log"></div>
         </div>
@@ -2599,8 +2821,8 @@
         </div>
         <div class="pf-head-r">
           <span class="eyebrow">Choose a profile</span>
-          <label class="fld"><span>1&nbsp;&nbsp;Account</span><select class="sel" id="pf-account"></select></label>
-          <span class="fld-label">2&nbsp;&nbsp;Profile</span>
+          <label class="fld"><span>Account</span><select class="sel" id="pf-account"></select></label>
+          <span class="fld-label">Profile</span>
           <div class="pf-picker-wrap"><div class="pf-picker-scroll"><div class="chip-grid" id="pf-profiles"></div></div></div>
         </div>
         <div class="pf-head-stats">
@@ -2640,6 +2862,7 @@
             <h3 id="pf-editor-pane-title">Add-ons</h3>
             <span class="spacer"></span>
             <button class="btn btn-ghost btn-xs" id="pf-browse" style="display:none">Browse</button>
+            <button class="iconbtn" id="pf-settings-pop" style="display:none" title="Open settings in a bigger window" aria-label="Open settings in a bigger window"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M14 4h6v6M20 4l-7.5 7.5M10 20H4v-6M4 20l7.5-7.5"/></svg></button>
           </div>
           <div class="pf-panes-wrap">
             <div id="pf-pane-addons" class="pf-pane"><div id="pf-addons"></div></div>
@@ -2750,6 +2973,13 @@
                 </div>
                 <div class="sy-carry-chooser" id="sy-items-collections"></div>
                 <div class="sy-carry-row">
+                  <input type="checkbox" id="sy-cat-settings">
+                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg></span>
+                  <span class="sy-carry-lbl">Settings</span>
+                  <span class="sy-carry-cnt" id="sy-cnt-settings">0 selected</span>
+                  <button class="sy-carry-choose sy-tgl" data-target="sy-settings-tree">Choose <span>›</span></button>
+                </div>
+                <div class="sy-carry-row">
                   <input type="checkbox" id="sy-cat-watchprogress">
                   <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
                   <span class="sy-carry-lbl">Watch Progress</span>
@@ -2762,13 +2992,6 @@
                   <span class="sy-carry-lbl">Watched History</span>
                   <span class="sy-carry-cnt" id="sy-cnt-watched">0 items</span>
                   <button class="sy-carry-choose" disabled>All items</button>
-                </div>
-                <div class="sy-carry-row">
-                  <input type="checkbox" id="sy-cat-settings">
-                  <span class="sy-carry-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 13a7.5 7.5 0 0 0 0-2l2-1.5-2-3.4-2.3 1a7.5 7.5 0 0 0-1.7-1L14 3.4h-4l-.7 2.7a7.5 7.5 0 0 0-1.7 1l-2.3-1-2 3.4L5.6 11a7.5 7.5 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7.5 7.5 0 0 0 1.7 1l.7 2.7h4l.7-2.7a7.5 7.5 0 0 0 1.7-1l2.3 1 2-3.4Z"/></svg></span>
-                  <span class="sy-carry-lbl">Settings</span>
-                  <span class="sy-carry-cnt" id="sy-cnt-settings">0 selected</span>
-                  <button class="sy-carry-choose sy-tgl" data-target="sy-settings-tree">Choose <span>›</span></button>
                 </div>
                 <div class="sy-carry-chooser" id="sy-settings-tree"></div>
                 </div>
@@ -2922,7 +3145,7 @@
         <div class="card">
           <div class="chead"><h3>Community collections</h3><span class="spacer"></span>
             <span class="pill-count" id="mk-coll-count"></span>
-            <button class="btn btn-ghost btn-xs" id="mk-coll-site">Browse on Nuvio</button></div>
+            <button type="button" class="mk-src-tag" id="mk-coll-src" style="display:none"></button></div>
           <div class="mk-find">
             <span class="mk-find-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg></span>
             <input type="search" id="mk-coll-search" placeholder="Search collections by name, tag or add-on…" autocomplete="off">
@@ -2946,18 +3169,6 @@
     </section>
 
     <!-- settings (prefs) -->
-    <section class="panel" data-panel="settings" style="display:none">
-      <div class="phead"><span class="eyebrow">Settings</span><h1>Preferences.</h1><p>These apply to Numax on this device.</p></div>
-      <div class="panel-cols">
-      <div class="card"><div class="chead"><h3>Reading profiles</h3></div>
-        <div class="switch-row"><div class="tx"><b>Read API keys</b><span>Applies to the next account you link, from either tab — doesn't change accounts already linked. Still never copied between profiles.</span></div><button class="tog" id="st-readkeys" role="switch"></button></div></div>
-      <div class="card"><div class="chead"><h3>Appearance</h3></div>
-        <div class="switch-row"><div class="tx"><b>Light mode</b><span>Same colours, lighter ground. Saved on this device only — it isn't part of your account and doesn't follow you to another browser.</span></div><button class="tog" id="st-theme" role="switch"></button></div></div>
-      <div class="card"><div class="chead"><h3>Sign out</h3></div>
-        <p class="muted sm" style="margin-bottom:12px">Signs out of Google on this device. Your accounts and templates stay safe in your Drive.</p>
-        <button class="btn btn-ghost danger" id="st-signout">Sign out</button></div>
-      </div>
-    </section>
   </main>
 </div>
 

@@ -482,6 +482,7 @@
     var ctx = c.getContext('2d');
     if (!ctx) return;
     var holeCol = (kind === 'hole') ? (host.getAttribute('data-bg-color') || '229,57,53') : '';
+    var starCol = (kind === 'stars') ? (host.getAttribute('data-bg-color') || '255,255,255') : '';
     var w = 0, h = 0, dpr = 1, t = 0, id = 0, live = false, seen = true, parts = null, last = 0;
 
     function size() {
@@ -537,8 +538,8 @@
         for (i = 0; i < parts.length; i++) {
           p = parts[i];
           p.y -= 1.6 * dt; if (p.y < -2) { p.y = h + 2; p.x = Math.random() * w; }
-          ctx.globalAlpha = 0.16 + 0.20 * Math.abs(Math.sin(t * p.sp + p.ph));
-          ctx.fillStyle = '#fff';
+          ctx.globalAlpha = 0.22 + 0.26 * Math.abs(Math.sin(t * p.sp + p.ph));
+          ctx.fillStyle = 'rgb(' + starCol + ')';
           ctx.beginPath(); ctx.arc(p.x, p.y, p.z * 0.7, 0, TAU); ctx.fill();
         }
         ctx.globalAlpha = 1;
