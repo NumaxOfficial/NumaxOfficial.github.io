@@ -1722,8 +1722,126 @@
   /* Folder list inside the collection editor. The position number leads, so a
      drag has something to read against. */
   .pf-coll-folders{ display:flex; flex-direction:column; gap:6px; }
-  .pf-coll-folders .pf-coll-n{ flex:none; width:22px; text-align:center;
+  .pf-coll-folders .pf-coll-n, .cf-outline .pf-coll-n, .cf-rev .pf-coll-n{ flex:none; width:22px; text-align:center;
     font-family:var(--f-mono); font-variant-numeric:tabular-nums; font-size:11px; color:var(--t35); }
+
+  /* ============ THE COLLECTION BUILDER ============
+     A port of Nuvio's own five-step builder, so the shape of the screen is
+     Nuvio's: a step rail, one pane per step, and a footer that always says how
+     many things still block a save. Everything here is scoped under .cf-dlg so
+     none of it can reach the other dialogs that share .mk-dlg. */
+  .cf-dlg .mk-dlg-b{ display:flex; flex-direction:column; gap:14px; padding:14px 18px; }
+  .cf-rail{ display:flex; gap:6px; flex:none; overflow-x:auto; padding-bottom:2px; }
+  .cf-rail::-webkit-scrollbar{ height:0; }
+  .cf-step{ display:flex; align-items:center; gap:8px; flex:none; padding:7px 12px 7px 8px;
+    border-radius:999px; border:1px solid var(--line); background:var(--surface);
+    color:var(--t45); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease), color var(--mo-micro,.14s) var(--mo-ease,ease),
+               border-color var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .cf-step:disabled{ cursor:default; opacity:.55; }
+  .cf-step:not(:disabled):hover{ background:var(--surface-2); color:var(--t70); }
+  .cf-step.on{ background:rgba(var(--accent-rgb),.16); border-color:rgba(var(--accent-rgb),.5); color:var(--t); }
+  .cf-step.did{ color:var(--t70); }
+  .cf-step.did .cf-step-n{ background:rgba(67,160,71,.22); color:#8FD694; border-color:rgba(67,160,71,.45); }
+  .cf-step-n{ flex:none; width:19px; height:19px; border-radius:50%; display:grid; place-items:center;
+    background:var(--surface-3); border:1px solid var(--line); font-size:10.5px;
+    font-variant-numeric:tabular-nums; }
+  .cf-step.on .cf-step-n{ background:var(--accent); border-color:transparent; color:#fff; }
+  .cf-pane{ flex:1 1 auto; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:14px;
+    padding-right:4px; }
+  .cf-pane::-webkit-scrollbar{ width:5px; }
+  .cf-pane::-webkit-scrollbar-thumb{ background:rgba(var(--ink),.14); border-radius:4px; }
+
+  .cf-head{ display:flex; flex-direction:column; gap:3px; }
+  .cf-head > b{ font-size:14.5px; font-weight:700; }
+  .cf-head > span{ font-size:12px; color:var(--t45); line-height:1.5; }
+  .cf-head-row{ flex-direction:row; align-items:flex-start; gap:12px; }
+  .cf-head-row > div{ min-width:0; display:flex; flex-direction:column; gap:3px; }
+  .cf-head-row > .btn{ flex:none; margin-left:auto; }
+
+  /* Templates. Explicitly three columns rather than auto-fit: with fourteen
+     cards auto-fit strands the last one on a row of its own at this width —
+     the same trap #wz-routes and the metadata tiles already document. */
+  .cf-tpl-grid{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; }
+  .cf-tpl{ display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left;
+    padding:12px 13px; border-radius:12px; border:1px solid var(--line); background:rgba(0,0,0,.22);
+    color:inherit; font-family:inherit; cursor:pointer;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease), border-color var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .cf-tpl:hover:not(:disabled){ background:var(--surface-2); border-color:rgba(var(--ink),.3); }
+  .cf-tpl:disabled{ cursor:default; opacity:.5; }
+  .cf-tpl-k{ font-size:9.5px; font-weight:700; letter-spacing:.1em; color:var(--accent); }
+  .cf-tpl > b{ font-size:13px; font-weight:700; }
+  .cf-tpl-s{ font-size:11px; color:var(--t35); line-height:1.45; }
+
+  .cf-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px 13px; }
+  .cf-grid-3{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .cf-field{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .cf-lab{ font-size:9.5px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--t35); }
+  .cf-ctl input, .cf-ctl select{ width:100%; }
+  .cf-hint{ font-size:10.5px; color:var(--t35); line-height:1.4; }
+  .cf-checks{ display:flex; flex-direction:column; gap:2px; }
+  .cf-check{ display:flex; align-items:flex-start; gap:10px; padding:9px 11px; border-radius:10px;
+    border:1px solid transparent; cursor:pointer;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .cf-check:hover{ background:var(--surface); }
+  .cf-check input{ margin-top:2px; flex:none; }
+  .cf-check-tx{ min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .cf-check-tx b{ font-size:12.5px; font-weight:600; }
+  .cf-check-tx span{ font-size:11px; color:var(--t35); }
+
+  /* Folders and Artwork are the same two columns: the outline on the left,
+     which is also where the folder REORDER lives, and the selected folder on
+     the right. */
+  .cf-cols{ display:grid; grid-template-columns:minmax(0,260px) minmax(0,1fr); gap:16px; align-items:start; }
+  .cf-outline{ display:flex; flex-direction:column; gap:8px; position:sticky; top:0; }
+  .cf-outline-h{ display:flex; align-items:center; gap:8px; }
+  .cf-outline-h .btn{ margin-left:auto; }
+  .cf-outline-l{ display:flex; flex-direction:column; gap:5px; }
+  .cf-outline .erow{ cursor:pointer; }
+  .cf-outline .erow.on{ border-color:rgba(var(--accent-rgb),.55); background:rgba(var(--accent-rgb),.1); }
+  .cf-col-r{ display:flex; flex-direction:column; gap:13px; min-width:0; }
+  .cf-srcbar{ display:flex; gap:7px; flex-wrap:wrap; }
+
+  .cf-src{ border:1px solid var(--line); border-radius:12px; background:rgba(0,0,0,.22);
+    padding:11px 12px; display:flex; flex-direction:column; gap:11px; }
+  .cf-src-h{ display:flex; align-items:center; gap:10px; }
+  .cf-src-k{ flex:none; font-size:9px; font-weight:700; letter-spacing:.1em; padding:3px 7px;
+    border-radius:999px; background:var(--surface-3); color:var(--t45); }
+  .cf-src-t{ min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .cf-src-t b{ font-size:12.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cf-src-t span{ font-size:10.5px; color:var(--t35); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cf-src-h .iconbtn{ margin-left:auto; flex:none; }
+  .cf-disc summary{ cursor:pointer; font-size:11.5px; font-weight:600; color:var(--t55); padding:4px 0; }
+  .cf-disc[open] summary{ margin-bottom:9px; }
+  .cf-warn{ color:var(--warn-soft); }
+  .cf-quick{ display:flex; flex-direction:column; gap:7px; }
+  .cf-quick-r{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  .cf-prev{ border:1px dashed var(--line); border-radius:12px; padding:14px; text-align:center;
+    font-size:11.5px; color:var(--t35); min-height:74px; display:grid; place-items:center; overflow:hidden; }
+  .cf-prev img{ max-width:100%; max-height:150px; border-radius:8px; display:block; }
+
+  .cf-stats{ display:flex; gap:9px; }
+  .cf-stat{ flex:1; border:1px solid var(--line); border-radius:12px; padding:11px 13px;
+    background:rgba(0,0,0,.22); display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .cf-stat b{ font-size:19px; font-weight:800; letter-spacing:-.02em; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .cf-stat span{ font-size:10.5px; color:var(--t35); }
+  .cf-rev{ display:flex; flex-direction:column; gap:5px; }
+  .cf-rev-src{ margin-left:26px; opacity:.82; }
+  .cf-valid{ display:flex; flex-direction:column; gap:5px; border-top:1px solid var(--line-2); padding-top:12px; }
+
+  .cf-dlg .mk-dlg-f{ display:flex; align-items:center; gap:9px; }
+  .cf-note{ min-width:0; flex:1; font-size:11.5px; color:var(--t35); overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; }
+  .cf-note-bad{ color:var(--danger-soft); }
+  .cf-newbar{ display:flex; justify-content:flex-end; margin-bottom:9px; }
+
+  @media (max-width:900px){
+    .cf-cols{ grid-template-columns:1fr; }
+    .cf-outline{ position:static; }
+    .cf-grid, .cf-grid-3, .cf-tpl-grid{ grid-template-columns:1fr; }
+  }
   .mk-nm{ font-size:13.5px; font-weight:700; }
   .mk-sub{ font-size:11px; color:var(--t35); margin-top:2px; }
   .mk-acts{ display:flex; gap:7px; margin-top:auto; }
@@ -3275,8 +3393,9 @@
 <script src="./meta.js?v=2fac004b"></script>
 <script src="./nuvio-settings-schema.js?v=8fdac466"></script>
 <script src="./ui-motion.js?v=5f014671"></script>
-<script src="./market.js?v=e706379e"></script>
+<script src="./market.js?v=d723c06a"></script>
+<script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
-<script src="./app.js?v=fcfcc8ad"></script>
+<script src="./app.js?v=445cbd51"></script>
 </body>
 </html>

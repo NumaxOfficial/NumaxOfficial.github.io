@@ -645,6 +645,22 @@
   // Cinemeta and OpenSubtitles v3 (no flag) get no button; TvVoo (flag true)
   // does. Manifests we cannot read cross-origin resolve to false, so Numax
   // never offers a button it cannot honour.
+  // The WHOLE addon manifest, unprojected. `loadManifest` above is the PLUGIN
+  // repo loader and deliberately keeps only { name, version, scrapers } — an
+  // addon's `id` and `catalogs` do not survive it, which is exactly what the
+  // collection builder needs when it offers "which catalog feeds this folder".
+  // Two loaders rather than one because the two shapes have nothing in common
+  // beyond the word manifest.
+  const _addonCache = new Map();
+  function loadAddonManifest(url, force) {
+    const u = String(url || '');
+    if (!u) return Promise.resolve(null);
+    if (!force && _addonCache.has(u)) return _addonCache.get(u);
+    const p = fetchJson(u, 9000).then(j => (j && typeof j === 'object') ? j : null);
+    _addonCache.set(u, p);
+    return p;
+  }
+
   const _cfgCache = new Map();
   function isConfigurable(url) {
     const u = String(url || '');
@@ -751,7 +767,7 @@
   window.NumaxMarket = {
     STAPLES, ADDON_GROUPS, COLLECTIONS,
     PLUGIN_INDEX_SITE, UPTIME_SITE: 'https://uptime.ibbylabs.dev/',
-    loadPluginIndex, loadManifest, loadInstances, isConfigurable,
+    loadPluginIndex, loadManifest, loadAddonManifest, loadInstances, isConfigurable,
     configureUrl, normalizeManifestUrl, loadCollectionsSnapshot, loadCollectionInstall,
     loadCollectionsLive, loadCollectionInstallLive,
     toInstalledCollection, installedCollectionId, isInstalledForm,

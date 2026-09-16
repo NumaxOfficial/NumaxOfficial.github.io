@@ -984,6 +984,16 @@
   }
   function renderPfCollections() {
     const box = $('pf-collections'); clr(box); const list = pfEdit.collections;
+    // Building one from scratch is the other half of the builder, and it has to
+    // start somewhere. Guarded on collections.js in the same way every
+    // marketplace control is guarded on market.js.
+    if (window.NumaxCollections) {
+      const bar = el('div', 'cf-newbar');
+      const mk = el('button', 'btn btn-ghost btn-xs', '+ New collection');
+      mk.onclick = () => openCollectionEditor(null, { isNew: true });
+      bar.appendChild(mk);
+      box.appendChild(bar);
+    }
     if (!Array.isArray(list) || !list.length) { box.appendChild(el('p', 'empty sm', 'No collections.')); }
     (list || []).forEach((c, i) => {
       const row = el('div', 'erow'); row.appendChild(dragHandle());
@@ -992,7 +1002,7 @@
       const folders = (c && Array.isArray(c.folders)) ? c.folders : [];
       b.appendChild(el('div', 'es', folders.length ? folders.length + ' folder' + (folders.length === 1 ? '' : 's') : 'No folders')); row.appendChild(b);
       const ed = el('button', 'btn btn-ghost btn-xs', 'Edit');
-      ed.title = 'Open this collection and reorder its folders';
+      ed.title = 'Open the full builder — folders, sources, artwork, and the folder order';
       ed.onclick = () => openCollectionEditor(c); row.appendChild(ed);
       const del = el('button', 'iconbtn', '✕'); del.onclick = () => { list.splice(i, 1); dirty('collections'); renderPfCollections(); }; row.appendChild(del);
       box.appendChild(row);
@@ -1001,44 +1011,573 @@
     if (list && list.length) wireListDropzone(box, list, () => { dirty('collections'); renderPfCollections(); });
     updateHeadStats();
   }
-  // The collection editor.
+  // ======================================================================
+  // THE COLLECTION BUILDER
+  // ======================================================================
+  // A full port of Nuvio's own builder (nuvio.tv/account -> Collections ->
+  // Create/Edit Collection), on Furqan's instruction (2026-09-15) after the
+  // earlier folder-reorder-only dialog was judged too narrow. Every field
+  // Nuvio offers is here, in its steps and its order, with its wording.
   //
-  // Scope is deliberate and it is narrower than Nuvio's own screen: Nuvio edits
-  // a collection on the device, and the only part of it that reaches an account
-  // is the stored collections_json. Folder ORDER is inside that blob and is
-  // therefore something Numax can genuinely change; the sources inside a folder
-  // are listed for context and are not editable, because nothing in this app has
-  // ever written one and a control that silently does nothing is worse than no
-  // control. Nothing here writes — it edits pfEdit in place, exactly as the
-  // inline reorder did, and "Save to profile" is still what commits it.
-  function openCollectionEditor(coll) {
-    const pop = openMkPop(null, collLabel(coll),
-      'Drag to reorder the folders. Saved to Nuvio when you press “Save to profile”.');
-    const draw = () => {
-      clr(pop.body);
-      const folders = (coll && Array.isArray(coll.folders)) ? coll.folders : [];
-      if (!folders.length) { pop.body.appendChild(el('p', 'empty sm', 'This collection has no folders.')); return; }
-      const list = el('div', 'pf-coll-folders');
-      folders.forEach((f, j) => {
-        const r = el('div', 'erow');
-        r.appendChild(el('span', 'pf-coll-n', String(j + 1)));
+  // The MODEL is collections.js, and it is a measured port rather than a
+  // reading of the field names: 800 generated collections were pushed through
+  // Nuvio's own shipped functions and through ours side by side, and every
+  // serialized output and every validation message came back identical. See
+  // that file's header.
+  //
+  // The one thing Nuvio does NOT have is reordering a collection's folders,
+  // which is the whole reason this dialog existed before. It is kept, as drag
+  // handles on the outline in the Folders step.
+  //
+  // Nothing here writes to Nuvio. It edits a working copy, and committing means
+  // putting the serialized result back into pfEdit — exactly where the old
+  // dialog put its reorder. "Save to profile" is still the only thing that
+  // pushes, through the one existing write path.
+  const CF_STEP_LABEL = { template: 'Template', basics: 'Basics', folders: 'Folders', artwork: 'Artwork', review: 'Review' };
+
+  // The profile's own add-ons, and the catalogs inside them. Nuvio offers
+  // exactly this for a catalog source, and it can only come from the add-on's
+  // manifest — the stored row carries the URL and nothing else. An add-on whose
+  // manifest cannot be read is listed with the reason rather than dropped, so
+  // an empty picker is never mistaken for "this profile has no add-ons".
+  async function cfAddonCatalogs() {
+    const rows = (pfEdit && pfEdit.addons) || [];
+    if (!window.NumaxMarket) return [];
+    const out = [];
+    for (const a of rows) {
+      const entry = { url: a.url, name: a.name || host(a.url), addonId: '', catalogs: [], error: '' };
+      try {
+        // loadAddonManifest, NOT loadManifest — the latter is the plugin-repo
+        // loader and projects the JSON down to { name, version, scrapers },
+        // which throws away the two fields this needs.
+        const m = await window.NumaxMarket.loadAddonManifest(a.url);
+        if (m) {
+          entry.addonId = String(m.id || '');
+          entry.name = m.name || entry.name;
+          entry.catalogs = (Array.isArray(m.catalogs) ? m.catalogs : [])
+            .filter(c => c && c.type && c.id)
+            .map(c => ({ type: String(c.type), id: String(c.id), name: String(c.name || c.id) }));
+        } else entry.error = 'no manifest';
+      } catch (e) { entry.error = e.message || 'could not read'; }
+      out.push(entry);
+    }
+    return out;
+  }
+
+  // ---- small field builders, so every control on five steps looks the same --
+  function cfField(label, hint, control) {
+    const w = el('label', 'cf-field');
+    w.appendChild(el('span', 'cf-lab', label));
+    const slot = el('div', 'cf-ctl'); slot.appendChild(control); w.appendChild(slot);
+    if (hint) w.appendChild(el('span', 'cf-hint', hint));
+    return w;
+  }
+  function cfText(obj, key, ph, after) {
+    const i = el('input'); i.type = 'text'; i.autocomplete = 'off';
+    if (ph) i.placeholder = ph;
+    i.value = obj[key] == null ? '' : String(obj[key]);
+    i.oninput = () => { obj[key] = i.value; if (after) after(); };
+    return i;
+  }
+  function cfSelect(obj, key, values, names, after) {
+    const s = el('select');
+    values.forEach(v => { const o = el('option', '', (names && names[v]) || v); o.value = v; s.appendChild(o); });
+    s.value = values.indexOf(obj[key]) >= 0 ? obj[key] : values[0];
+    obj[key] = s.value;
+    s.onchange = () => { obj[key] = s.value; if (after) after(); };
+    return s;
+  }
+  function cfCheck(title, desc, obj, key, after) {
+    const w = el('label', 'cf-check');
+    const i = el('input'); i.type = 'checkbox'; i.checked = !!obj[key];
+    i.onchange = () => { obj[key] = i.checked; if (after) after(); };
+    w.appendChild(i);
+    const t = el('span', 'cf-check-tx');
+    t.appendChild(el('b', '', title)); t.appendChild(el('span', '', desc));
+    w.appendChild(t);
+    return w;
+  }
+
+  function openCollectionEditor(coll, opts) {
+    const C = window.NumaxCollections;
+    if (!C) {
+      uiModal({ title: 'The collection editor is not loaded',
+        message: 'collections.js did not load, so the builder is unavailable. Reload the page and try again.',
+        okLabel: 'OK', noCancel: true });
+      return;
+    }
+    const isNew = !!(opts && opts.isNew);
+    const steps = isNew ? ['template', 'basics', 'folders', 'artwork', 'review']
+                        : ['basics', 'folders', 'artwork', 'review'];
+    // A template REPLACES the draft, so a new collection starts with nothing
+    // until step 1 is answered. An existing one is normalised into the editor's
+    // working shape, which is a copy — cancelling has to change nothing.
+    let draft = isNew ? null : C.normalizeCollection(coll);
+    let step = steps[0];
+    let sel = 0;            // which folder the Folders and Artwork steps are on
+    let catalogs = null;    // the add-on catalog list, read once and kept
+
+    const pop = openMkPop(null, isNew ? 'Create collection' : ('Edit ' + collLabel(coll)),
+      'Every field Nuvio offers. Nothing reaches your account until you press “Save to profile”.');
+    pop.root.classList.add('mk-dlg-wide', 'cf-dlg');
+
+    const rail = el('div', 'cf-rail');
+    const pane = el('div', 'cf-pane');
+    pop.body.appendChild(rail); pop.body.appendChild(pane);
+
+    const note = el('span', 'cf-note');
+    const bCancel = el('button', 'btn btn-ghost', 'Cancel');
+    const bBack = el('button', 'btn btn-ghost', 'Back');
+    const bNext = el('button', 'btn btn-primary', 'Continue');
+    pop.foot.appendChild(note);
+    pop.foot.appendChild(bCancel); pop.foot.appendChild(bBack); pop.foot.appendChild(bNext);
+    bCancel.onclick = closeMkPop;
+
+    const folders = () => (draft && Array.isArray(draft.folders)) ? draft.folders : [];
+    const folderAt = () => folders()[Math.min(sel, Math.max(folders().length - 1, 0))] || null;
+
+    // ---- the rail, the footer note and the button, all from one state ------
+    function paint() {
+      clr(rail);
+      steps.forEach((k, i) => {
+        const b = el('button', 'cf-step' + (k === step ? ' on' : '') + (steps.indexOf(step) > i ? ' did' : ''));
+        b.type = 'button';
+        b.appendChild(el('span', 'cf-step-n', String(i + 1)));
+        b.appendChild(el('span', 'cf-step-t', CF_STEP_LABEL[k]));
+        // Unlike the setup wizard's rail these ARE navigation: nothing here is
+        // written anywhere until Save, so stepping about cannot half-apply a
+        // run. The template step is the exception — going back to it would
+        // throw away everything typed since.
+        b.disabled = !draft || k === 'template';
+        b.onclick = () => { step = k; draw(); };
+        rail.appendChild(b);
+      });
+      const bad = draft ? C.blockingCount(draft) : 0;
+      const last = step === 'review';
+      bBack.style.display = steps.indexOf(step) > 0 ? '' : 'none';
+      bNext.textContent = last ? 'Save collection' : 'Continue';
+      bNext.disabled = !draft || (last && bad > 0);
+      note.textContent = !draft ? 'Pick a starting point.'
+        : bad ? (bad + (bad === 1 ? ' item' : ' items') + ' must be fixed before saving.')
+        : (folders().length + (folders().length === 1 ? ' folder, ' : ' folders, ')
+           + folders().reduce((n, f) => n + C.sourcesOf(f).length, 0) + ' sources.');
+      note.className = 'cf-note' + (bad ? ' cf-note-bad' : '');
+    }
+    function draw() {
+      clr(pane);
+      if (step === 'template') drawTemplate();
+      else if (step === 'basics') drawBasics();
+      else if (step === 'folders') drawFolders();
+      else if (step === 'artwork') drawArtwork();
+      else drawReview();
+      paint();
+    }
+
+    // ---- 1 template -------------------------------------------------------
+    function drawTemplate() {
+      pane.appendChild(cfHead('Start from something recognizable.',
+        'Templates create the collection, the first folder and the first source for you. Every field stays editable afterwards.'));
+      const grid = el('div', 'cf-tpl-grid');
+      C.PRESETS.forEach(p => {
+        const c = el('button', 'cf-tpl'); c.type = 'button';
+        c.appendChild(el('span', 'cf-tpl-k', 'TMDB PRESET'));
+        c.appendChild(el('b', '', p.title));
+        c.appendChild(el('span', 'cf-tpl-s', C.sourceDetail(C.presetSource(p))));
+        c.onclick = () => { draft = C.fromPreset(p); sel = 0; step = 'basics'; draw(); };
+        grid.appendChild(c);
+      });
+      // The first catalog on the profile is what the Addon template starts
+      // from, so that card cannot be offered until the manifests have been
+      // read — and it says which of the three states it is in rather than
+      // sitting there dead. Same as Nuvio's own card.
+      const firstCat = () => {
+        const a = (catalogs || []).find(x => x.catalogs && x.catalogs.length);
+        if (!a) return null;
+        const c0 = a.catalogs[0];
+        return { addonId: a.addonId, addonName: a.name, type: c0.type, catalogId: c0.id, catalogName: c0.name };
+      };
+      const withCats = (catalogs || []).filter(x => x.catalogs && x.catalogs.length).length;
+      [['trakt', 'TRAKT', 'Trakt public list', 'Build from a public Trakt list ID or URL.', false],
+       ['addon', 'ADDON', 'Installed addon catalog',
+        !catalogs ? 'Catalogs are still loading…'
+          : withCats ? withCats + ' add-on' + (withCats === 1 ? '' : 's') + ' with catalog data available.'
+          : 'Install or enable add-ons to use this template.',
+        !catalogs || !withCats],
+       ['blank', 'MANUAL', 'Blank collection', 'Start empty and configure folders, artwork and sources yourself.', false]
+      ].forEach(([kind, kicker, title, sub, off]) => {
+        const c = el('button', 'cf-tpl'); c.type = 'button';
+        c.appendChild(el('span', 'cf-tpl-k', kicker));
+        c.appendChild(el('b', '', title));
+        c.appendChild(el('span', 'cf-tpl-s', sub));
+        c.disabled = !!off;
+        c.onclick = () => { draft = C.fromKind(kind, kind === 'addon' ? firstCat() : null); sel = 0; step = 'basics'; draw(); };
+        grid.appendChild(c);
+      });
+      pane.appendChild(grid);
+      if (!catalogs) cfAddonCatalogs().then(list => { catalogs = list; if (pop.root.isConnected && step === 'template') draw(); });
+    }
+    function cfHead(title, sub) {
+      const h = el('div', 'cf-head');
+      h.appendChild(el('b', '', title));
+      if (sub) h.appendChild(el('span', '', sub));
+      return h;
+    }
+
+    // ---- 2 basics ---------------------------------------------------------
+    function drawBasics() {
+      pane.appendChild(cfHead('Collection identity',
+        'Name the collection and choose the top-level behaviour users see in the app.'));
+      const grid = el('div', 'cf-grid');
+      // The id is the permanent internal key. Nuvio locks it once a collection
+      // exists, and so does this: changing it on an installed collection would
+      // read as a rename and actually be a different collection.
+      const idIn = cfText(draft, 'id', 'weekend-picks', paint);
+      if (!isNew) { idIn.disabled = true; idIn.title = 'Collection IDs cannot be changed after creation.'; }
+      grid.appendChild(cfField('COLLECTION ID', isNew ? 'Used as the permanent internal key.'
+        : 'Locked — collection IDs cannot be changed after creation.', idIn));
+      grid.appendChild(cfField('TITLE', 'This is what users will see in the app.',
+        cfText(draft, 'title', 'Weekend Picks', paint)));
+      grid.appendChild(cfField('VIEW MODE', 'Controls how folders are presented.',
+        cfSelect(draft, 'viewMode', C.VIEW_MODES, null, paint)));
+      grid.appendChild(cfField('BACKDROP IMAGE OR GIF URL', 'Optional wide artwork for the collection.',
+        cfText(draft, 'backdropImageUrl', 'https://cdn.example.com/backdrops/weekend.jpg', paint)));
+      pane.appendChild(grid);
+      const checks = el('div', 'cf-checks');
+      checks.appendChild(cfCheck('Pin to top', 'Moves this collection ahead of the rest.', draft, 'pinToTop'));
+      checks.appendChild(cfCheck('Show All tab', 'Adds an aggregate tab for every folder.', draft, 'showAllTab'));
+      checks.appendChild(cfCheck('Enable focus glow', 'Turns on the focused item highlight effect.', draft, 'focusGlowEnabled'));
+      pane.appendChild(checks);
+    }
+
+    // ---- the folder outline, shared by Folders and Artwork -----------------
+    // This is where the folder REORDER lives — the one thing Nuvio's own
+    // builder cannot do. Same drag helpers as every other list in the app.
+    function cfOutline() {
+      const box = el('div', 'cf-outline');
+      const head = el('div', 'cf-outline-h');
+      head.appendChild(el('span', 'cf-lab', 'OUTLINE'));
+      head.appendChild(el('span', 'pill-count', folders().length + (folders().length === 1 ? ' folder' : ' folders')));
+      const add = el('button', 'btn btn-ghost btn-xs', 'Add'); add.type = 'button';
+      add.onclick = () => { folders().push(C.newFolder()); sel = folders().length - 1; draw(); };
+      head.appendChild(add);
+      box.appendChild(head);
+      const list = el('div', 'cf-outline-l');
+      folders().forEach((f, i) => {
+        const r = el('div', 'erow' + (i === sel ? ' on' : ''));
+        r.appendChild(el('span', 'pf-coll-n', String(i + 1)));
         r.appendChild(dragHandle());
-        wireRowDrag(r, folders, j, () => { dirty('collections'); draw(); renderPfCollections(); });
+        wireRowDrag(r, folders(), i, () => { sel = 0; draw(); });
         const b = el('div', 'eb');
-        b.appendChild(el('div', 'en', (f && (f.title || f.name)) || 'Folder ' + (j + 1)));
-        const n = (f && Array.isArray(f.sources)) ? f.sources.length : null;
-        b.appendChild(el('div', 'es', n == null ? 'no source list' : n + ' source' + (n === 1 ? '' : 's')));
+        b.appendChild(el('div', 'en', f.title || 'Folder ' + (i + 1)));
+        b.appendChild(el('div', 'es', C.sourcesOf(f).length + ' sources · ' + (f.tileShape || 'LANDSCAPE')));
         r.appendChild(b);
+        b.onclick = () => { sel = i; draw(); };
         list.appendChild(r);
       });
-      wireListDropzone(list, folders, () => { dirty('collections'); draw(); renderPfCollections(); });
-      pop.body.appendChild(list);
-      if (folders.length < 2) pop.body.appendChild(el('p', 'muted sm', 'One folder, so there is nothing to reorder.'));
+      wireListDropzone(list, folders(), () => { sel = 0; draw(); });
+      box.appendChild(list);
+      if (!folders().length) box.appendChild(el('p', 'empty sm', 'No folders yet — press Add.'));
+      return box;
+    }
+
+    // ---- 3 folders --------------------------------------------------------
+    function drawFolders() {
+      const cols = el('div', 'cf-cols');
+      cols.appendChild(cfOutline());
+      const right = el('div', 'cf-col-r');
+      const f = folderAt();
+      if (!f) { right.appendChild(el('p', 'empty sm', 'Add a folder to start defining what users can browse.')); cols.appendChild(right); pane.appendChild(cols); return; }
+
+      const h = el('div', 'cf-head cf-head-row');
+      const ht = el('div');
+      ht.appendChild(el('b', '', 'Selected folder'));
+      ht.appendChild(el('span', '', 'Keep the folder name short, then attach one or more sources.'));
+      h.appendChild(ht);
+      const rm = el('button', 'btn btn-ghost btn-xs', 'Remove folder'); rm.type = 'button';
+      rm.onclick = () => { folders().splice(sel, 1); sel = Math.max(0, sel - 1); draw(); };
+      h.appendChild(rm);
+      right.appendChild(h);
+
+      const grid = el('div', 'cf-grid');
+      const fid = cfText(f, 'id', 'action', () => { paint(); });
+      if (!f.isNew) { fid.disabled = true; fid.title = 'Existing folder IDs are locked.'; }
+      grid.appendChild(cfField('FOLDER ID', f.isNew ? 'Internal key for this folder.' : 'Locked — existing folder IDs cannot change.', fid));
+      grid.appendChild(cfField('FOLDER TITLE', 'Visible label for this row or tab.',
+        cfText(f, 'title', 'Action', () => { paint(); redrawOutline(); })));
+      grid.appendChild(cfField('TILE SHAPE', 'Card format users browse.',
+        cfSelect(f, 'tileShape', C.TILE_SHAPES, null, () => { paint(); redrawOutline(); })));
+      right.appendChild(grid);
+
+      right.appendChild(cfHead('Sources', 'Choose what content feeds this folder.'));
+      const bar = el('div', 'cf-srcbar');
+      const addCat = el('button', 'btn btn-ghost btn-xs', 'Add catalog'); addCat.type = 'button';
+      addCat.onclick = () => { C.sourcesOf(f).length; (f.sources = C.sourcesOf(f)).push(C.newSource('addon')); draw(); };
+      const addT = el('button', 'btn btn-ghost btn-xs', 'Add TMDB'); addT.type = 'button';
+      addT.onclick = () => { (f.sources = C.sourcesOf(f)).push(C.newSource('tmdb')); draw(); };
+      const addK = el('button', 'btn btn-ghost btn-xs', 'Add Trakt'); addK.type = 'button';
+      addK.onclick = () => { (f.sources = C.sourcesOf(f)).push(C.newSource('trakt')); draw(); };
+      bar.appendChild(addCat); bar.appendChild(addT); bar.appendChild(addK);
+      right.appendChild(bar);
+
+      const list = C.sourcesOf(f);
+      if (!list.length) right.appendChild(el('p', 'empty sm', 'No sources attached. Add one, or pick a preset, so this folder has something to show.'));
+      list.forEach((src, i) => right.appendChild(cfSourceCard(f, src, i)));
+
+      if (!list.length) {
+        const quick = el('div', 'cf-quick');
+        quick.appendChild(el('span', 'cf-lab', 'QUICK PRESETS'));
+        const row = el('div', 'cf-quick-r');
+        C.PRESETS.slice(0, 6).forEach(p => {
+          const b = el('button', 'btn btn-ghost btn-xs', p.title); b.type = 'button';
+          b.onclick = () => { (f.sources = C.sourcesOf(f)).push(C.presetSource(p)); draw(); };
+          row.appendChild(b);
+        });
+        quick.appendChild(row); right.appendChild(quick);
+      }
+      cols.appendChild(right);
+      pane.appendChild(cols);
+    }
+    // Repaint only the outline, so typing a folder title does not rebuild the
+    // form underneath the cursor and lose the caret.
+    function redrawOutline() {
+      const old = pane.querySelector('.cf-outline');
+      if (old && old.parentNode) old.parentNode.replaceChild(cfOutline(), old);
+    }
+
+    // ---- one source, of whichever of the three kinds it is -----------------
+    function cfSourceCard(folder, src, i) {
+      const kind = C.providerOf(src);
+      const card = el('div', 'cf-src');
+      const h = el('div', 'cf-src-h');
+      h.appendChild(el('span', 'cf-src-k', kind.toUpperCase()));
+      const t = el('div', 'cf-src-t');
+      t.appendChild(el('b', '', C.sourceTitle(src)));
+      t.appendChild(el('span', '', C.sourceDetail(src)));
+      h.appendChild(t);
+      const del = el('button', 'iconbtn', '✕'); del.type = 'button';
+      del.onclick = () => { C.sourcesOf(folder).splice(i, 1); folder.sources = C.sourcesOf(folder); draw(); };
+      h.appendChild(del);
+      card.appendChild(h);
+
+      const grid = el('div', 'cf-grid');
+      const refresh = () => { paint(); redrawSrcHead(); };
+      const redrawSrcHead = () => {
+        clr(t); t.appendChild(el('b', '', C.sourceTitle(src))); t.appendChild(el('span', '', C.sourceDetail(src)));
+      };
+
+      if (kind === 'tmdb') {
+        grid.appendChild(cfField('SOURCE TYPE', 'What kind of TMDB feed this is.',
+          cfSelect(src, 'tmdbSourceType', C.TMDB_TYPE_ORDER, C.TMDB_TYPE_CHOICE, () => { draw(); })));
+        grid.appendChild(cfField('DISPLAY TITLE', 'Shown as the source or feed name.',
+          cfText(src, 'title', 'TMDB Discover', refresh)));
+        const type = C.tmdbType(src.tmdbSourceType);
+        if (type !== 'DISCOVER') {
+          grid.appendChild(cfField('TMDB ID', type === 'COLLECTION' ? 'TMDB movie collection ID — 10 for Star Wars Collection.' : 'The numeric TMDB id.',
+            cfText(src, 'tmdbId', type === 'COLLECTION' ? '10 for Star Wars Collection' : '420', refresh)));
+        }
+        // Two of the seven can only mean one medium, and the model forces it —
+        // so the control is not offered where it would be a lie.
+        const forced = (type === 'NETWORK' || type === 'LIST' || type === 'COLLECTION');
+        if (!forced) {
+          grid.appendChild(cfField('TYPE', 'Movies or series.',
+            cfSelect(src, 'mediaType', C.MEDIA_TYPES, { MOVIE: 'Movies', TV: 'Series' }, () => { draw(); })));
+        } else {
+          const lock = el('input'); lock.type = 'text'; lock.disabled = true;
+          lock.value = C.mediaFor(src.mediaType, type) === 'TV' ? 'Series' : 'Movies';
+          grid.appendChild(cfField('TYPE', 'Locked by this source type.', lock));
+        }
+        if (type === 'LIST' || type === 'COLLECTION') {
+          const lock = el('input'); lock.type = 'text'; lock.disabled = true; lock.value = 'Original';
+          grid.appendChild(cfField('SORT', 'A list keeps its own order.', lock));
+        } else {
+          const media = C.mediaFor(src.mediaType, type);
+          const opts = ['popularity.desc', 'vote_average.desc', media === 'TV' ? 'first_air_date.desc' : 'primary_release_date.desc'];
+          grid.appendChild(cfField('SORT', 'Uses the same TMDB sort keys as the app.',
+            cfSelect(src, 'sortBy', opts, C.TMDB_SORT_NAME, refresh)));
+        }
+        card.appendChild(grid);
+        if (type === 'DISCOVER') {
+          const disc = el('details', 'cf-disc');
+          const sum = el('summary', '', 'Discover filters');
+          disc.appendChild(sum);
+          const fg = el('div', 'cf-grid cf-grid-3');
+          src.filters = (src.filters && typeof src.filters === 'object') ? src.filters : {};
+          C.DISCOVER_FILTERS.forEach(d => fg.appendChild(cfField(d.label.toUpperCase(), '', cfText(src.filters, d.key, d.ph, paint))));
+          disc.appendChild(fg);
+          card.appendChild(disc);
+        }
+        return card;
+      }
+
+      if (kind === 'trakt') {
+        grid.appendChild(cfField('DISPLAY TITLE', 'Shown as the Trakt row name.', cfText(src, 'title', 'Trakt List', refresh)));
+        grid.appendChild(cfField('TRAKT LIST ID OR URL', 'Use a numeric public list ID or its URL.',
+          cfText(src, 'traktListId', 'https://trakt.tv/lists/123456 or 123456', refresh)));
+        grid.appendChild(cfField('TYPE', 'Movies or series.',
+          cfSelect(src, 'mediaType', C.MEDIA_TYPES, { MOVIE: 'Movies', TV: 'Series' }, refresh)));
+        grid.appendChild(cfField('SORT', 'Uses the same Trakt sort keys as the app.',
+          cfSelect(src, 'sortBy', C.TRAKT_SORTS, C.TRAKT_SORT_NAME, refresh)));
+        grid.appendChild(cfField('DIRECTION', 'Ascending or descending list sort direction.',
+          cfSelect(src, 'sortHow', C.SORT_DIRS, C.SORT_DIR_NAME, refresh)));
+        card.appendChild(grid);
+        return card;
+      }
+
+      // addon catalog — the choices come from the profile's own add-ons
+      const pickWrap = el('div', 'cf-grid');
+      const sel2 = el('select');
+      // The option value is an INDEX into a flat list, not the three fields
+      // joined by a separator. There is no character guaranteed absent from an
+      // addonId or a catalogId, and the first attempt at this used a NUL —
+      // which git then read as a binary file and stopped normalising line
+      // endings in, rewriting all 8,090 lines of app.js in one commit.
+      const flat = [];
+      (catalogs || []).forEach(a => a.catalogs.forEach(c => flat.push({
+        addonId: a.addonId, addonName: a.name, type: c.type, catalogId: c.id, catalogName: c.name,
+      })));
+      const fill = () => {
+        clr(sel2);
+        const none = el('option', '', catalogs ? 'Choose a catalog…' : 'Reading add-on manifests…'); none.value = '';
+        sel2.appendChild(none);
+        let n = 0;
+        (catalogs || []).forEach(a => {
+          if (!a.catalogs.length) return;
+          const g = document.createElement('optgroup'); g.label = a.name;
+          a.catalogs.forEach(c => {
+            const o = el('option', '', c.name + ' (' + c.type + ')');
+            o.value = String(n++);
+            g.appendChild(o);
+          });
+          sel2.appendChild(g);
+        });
+        const at = flat.findIndex(x => x.addonId === src.addonId && x.type === src.type && x.catalogId === src.catalogId);
+        sel2.value = at >= 0 ? String(at) : '';
+      };
+      fill();
+      sel2.onchange = () => {
+        const hit = flat[Number(sel2.value)];
+        if (!hit) { src.addonId = ''; src.type = ''; src.catalogId = ''; refresh(); return; }
+        src.addonId = hit.addonId; src.type = hit.type; src.catalogId = hit.catalogId;
+        src.addonName = hit.addonName; src.catalogName = hit.catalogName;
+        refresh();
+      };
+      pickWrap.appendChild(cfField('CATALOG', 'From the add-ons installed on this profile.', sel2));
+      pickWrap.appendChild(cfField('GENRE', 'Optional genre the catalog understands.', cfText(src, 'genre', 'Action', refresh)));
+      card.appendChild(pickWrap);
+      if (!catalogs) {
+        cfAddonCatalogs().then(list => {
+          catalogs = list;
+          if (!pop.root.isConnected) return;
+          draw();
+        });
+      } else {
+        // Two different things, and conflating them would be a lie: an add-on
+        // whose manifest could not be READ, and an add-on that simply has no
+        // catalogs (every stream-only add-on, which is most of them).
+        const unread = catalogs.filter(a => a.error);
+        if (!catalogs.some(a => a.catalogs.length)) {
+          card.appendChild(el('p', 'cf-warn sm', 'No add-on on this profile publishes a catalog'
+            + (unread.length ? ' — and ' + unread.length + ' manifest' + (unread.length === 1 ? '' : 's') + ' could not be read.' : '.')
+            + ' TMDB and Trakt sources can still be added.'));
+        } else if (unread.length) {
+          card.appendChild(el('p', 'cf-warn sm', unread.length + ' add-on' + (unread.length === 1 ? '' : 's')
+            + ' could not be read, so any catalogs they have are not listed: ' + unread.map(d => d.name).join(', ') + '.'));
+        }
+      }
+      return card;
+    }
+
+    // ---- 4 artwork --------------------------------------------------------
+    function drawArtwork() {
+      const cols = el('div', 'cf-cols');
+      cols.appendChild(cfOutline());
+      const right = el('div', 'cf-col-r');
+      const f = folderAt();
+      if (!f) { right.appendChild(el('p', 'empty sm', 'Add a folder first.')); cols.appendChild(right); pane.appendChild(cols); return; }
+      right.appendChild(cfHead('Artwork and folder behaviour',
+        'Polish the selected folder without digging through source settings.'));
+      const grid = el('div', 'cf-grid');
+      [['coverImageUrl', 'COVER IMAGE URL', 'Optional poster or landscape image.', 'https://cdn.example.com/covers/action.jpg'],
+       ['coverEmoji', 'COVER EMOJI', 'Optional fallback marker.', '🎬'],
+       ['titleLogoUrl', 'TITLE LOGO URL', 'Optional transparent logo for branded rows.', 'https://cdn.example.com/logos/action.png'],
+       ['heroBackdropUrl', 'HERO BACKDROP URL', 'Optional wide hero image for focused states.', 'https://cdn.example.com/heroes/action.jpg'],
+       ['heroVideoUrl', 'HERO VIDEO URL', 'Optional video URL for TV hero playback.', 'https://cdn.example.com/heroes/action.mp4'],
+       ['focusGifUrl', 'FOCUS GIF URL', 'Optional animated asset shown on focus.', 'https://cdn.example.com/focus/action.gif']
+      ].forEach(([k, lab, hint, ph]) => grid.appendChild(cfField(lab, hint, cfText(f, k, ph, paint))));
+      right.appendChild(grid);
+      const checks = el('div', 'cf-checks');
+      checks.appendChild(cfCheck('Enable focus GIF', 'Only works when a focus GIF URL is set.', f, 'focusGifEnabled'));
+      checks.appendChild(cfCheck('Hide folder title', 'Use when artwork already communicates the folder clearly.', f, 'hideTitle'));
+      right.appendChild(checks);
+      const prev = el('div', 'cf-prev');
+      if (f.coverImageUrl) { const im = document.createElement('img'); im.src = f.coverImageUrl; im.alt = ''; im.referrerPolicy = 'no-referrer'; im.onerror = () => { prev.textContent = 'That cover image did not load.'; }; prev.appendChild(im); }
+      else prev.textContent = 'No cover image. Source autofill can populate cover artwork when metadata is available.';
+      right.appendChild(prev);
+      cols.appendChild(right);
+      pane.appendChild(cols);
+    }
+
+    // ---- 5 review ---------------------------------------------------------
+    function drawReview() {
+      pane.appendChild(cfHead('Final check', 'Review the structure exactly as it will be saved.'));
+      const stats = el('div', 'cf-stats');
+      const add = (n, l) => { const s = el('div', 'cf-stat'); s.appendChild(el('b', '', String(n))); s.appendChild(el('span', '', l)); stats.appendChild(s); };
+      add(folders().length, 'Folders');
+      add(folders().reduce((n, f) => n + C.sourcesOf(f).length, 0), 'Sources');
+      add(draft.viewMode, 'View mode');
+      pane.appendChild(stats);
+
+      const list = el('div', 'cf-rev');
+      folders().forEach((f, i) => {
+        const r = el('div', 'erow');
+        r.appendChild(el('span', 'pf-coll-n', String(i + 1)));
+        const b = el('div', 'eb');
+        b.appendChild(el('div', 'en', f.title || 'Folder ' + (i + 1)));
+        b.appendChild(el('div', 'es', (f.id || '—') + ' · ' + (f.tileShape || 'LANDSCAPE') + ' · '
+          + C.sourcesOf(f).length + ' sources'));
+        r.appendChild(b);
+        list.appendChild(r);
+        C.sourcesOf(f).forEach(s => {
+          const sr = el('div', 'erow cf-rev-src');
+          const sb = el('div', 'eb');
+          sb.appendChild(el('div', 'en', C.sourceTitle(s)));
+          sb.appendChild(el('div', 'es', C.sourceDetail(s)));
+          sr.appendChild(sb);
+          list.appendChild(sr);
+        });
+      });
+      pane.appendChild(list);
+
+      const probs = C.problems(draft);
+      const vbox = el('div', 'cf-valid');
+      vbox.appendChild(el('span', 'cf-lab', 'VALIDATION'));
+      if (!probs.length) vbox.appendChild(el('p', 'ok sm', 'Nothing to fix.'));
+      probs.forEach(p => vbox.appendChild(el('p', p.blocking ? 'err sm' : 'muted sm', p.text)));
+      pane.appendChild(vbox);
+    }
+
+    // ---- moving between steps, and committing ------------------------------
+    bBack.onclick = () => { const i = steps.indexOf(step); if (i > 0) { step = steps[i - 1]; draw(); } };
+    bNext.onclick = () => {
+      const i = steps.indexOf(step);
+      if (i < steps.length - 1) { step = steps[i + 1]; draw(); return; }
+      let out;
+      try { out = C.serializeCollection(draft); }
+      catch (e) {
+        note.textContent = e.message; note.className = 'cf-note cf-note-bad';
+        return;
+      }
+      const list = pfEdit.collections = Array.isArray(pfEdit.collections) ? pfEdit.collections : [];
+      const at = isNew ? -1 : list.indexOf(coll);
+      if (at >= 0) list[at] = out; else list.push(out);
+      dirty('collections');
+      renderPfCollections();
+      closeMkPop();
+      logAct((isNew ? 'Collection created: ' : 'Collection edited: ') + collLabel(out)
+        + ' — press “Save to profile” to send it to Nuvio.', 'ok');
     };
+
     draw();
-    const done = el('button', 'btn btn-primary', 'Done');
-    done.onclick = closeMkPop;
-    pop.foot.appendChild(done);
   }
 
   // CURRENTLY UNUSED (2026-09-15): the inline folder list this opened is a
