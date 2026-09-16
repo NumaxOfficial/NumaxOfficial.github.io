@@ -1774,17 +1774,37 @@
   // `allowLast` is the wizard's Exit-and-undo: it is putting back a profile it
   // created itself, so leaving the account with none is the correct outcome
   // there. The user-facing ✕ never passes it.
+  // Deleting a profile is `sync_delete_profile_data`, NOT a `sync_push_profiles`
+  // with the row left out.
+  //
+  // The first version did the latter and it silently did nothing: Nuvio
+  // accepted the write, the read-back found the profile still there, and the
+  // flow correctly refused to claim success. `sync_push_profiles` is an UPSERT
+  // over the rows you hand it — it adds and it updates, and a row you omit is
+  // simply not mentioned, so it stays. Nothing about its name says that, which
+  // is why the note in CLAUDE.md calling it a "whole-account full replace" read
+  // as license to delete through it.
+  //
+  // The right call was read off Nuvio's own account page (its deleteProfile is
+  // one line: `sync_delete_profile_data({p_profile_id})` and nothing else).
+  // Nuvio's own confirmation says it "removes all remote sync data for this
+  // profile and cannot be undone", and it refuses profile 1 outright.
+  //
+  // Everything around the write is unchanged, because none of it was wrong:
+  // two independent reads that must agree, a check that the profile is really
+  // there, a refusal to remove the last one, and a read-back afterwards that
+  // proves both that the target went and that nothing else did.
   async function deleteProfileIndex(aid, idx, allowLast) {
     const c = A.client(store, aid);
     const read = await wzReadProfiles(aid);
-    if (!read.crossChecked) throw new Error('could not double-check the profile list against Nuvio, and removing a profile rewrites the whole list — not risking it');
+    if (!read.crossChecked) throw new Error('could not double-check the profile list against Nuvio, and a delete cannot be undone — not risking it');
     if (!read.idx.includes(idx)) throw new Error('that profile is not on the account any more');
     if (read.idx.length <= 1 && !allowLast) throw new Error('this is the account’s only profile, and Nuvio needs at least one');
+    // Nuvio's own screen will not delete profile 1 at all — it is the primary,
+    // and other profiles can be set to inherit its add-ons and plugins.
+    if (idx === 1) throw new Error('profile 1 is the account’s primary profile and Nuvio does not allow deleting it');
     const keep = read.idx.filter(i => i !== idx);
-    const nextList = read.rows.map(normRow).filter(r => r.profile_index !== idx);
-    const missing = keep.filter(i => !nextList.some(x => x.profile_index === i));
-    if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost too');
-    await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
+    await c.rpc('sync_delete_profile_data', { p_profile_id: idx });
     inval(aid);
     const after = await wzReadProfiles(aid);
     const lost = keep.filter(i => !after.idx.includes(i));
