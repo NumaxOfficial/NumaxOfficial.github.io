@@ -513,6 +513,14 @@
   const G = { clientId: '841898218953-c5f3ide5lcsg8g2opn1ucrekvlq335rs.apps.googleusercontent.com', scope: 'openid email profile https://www.googleapis.com/auth/drive.file' };
   const DRIVE = 'https://www.googleapis.com/drive/v3', UP = 'https://www.googleapis.com/upload/drive/v3';
   function gReady() { return !!(window.google && window.google.accounts && window.google.accounts.oauth2); }
+  // The sidebar account block's open/closed state. One place, because three
+  // things close it: the card itself, a click outside, and signing out.
+  function sbAcctOpen(on) {
+    const a = $('sb-acct'), b = $('sb-user');
+    if (!a || !b) return;
+    a.classList.toggle('open', !!on);
+    b.setAttribute('aria-expanded', on ? 'true' : 'false');
+  }
   function signIn(after) {
     if (!gReady()) { status($('ac-log'), 'Google library still loading — try again in a second.', 'err'); return; }
     if (!gAuth.client) {
@@ -521,7 +529,13 @@
           if (resp && resp.error) { logAct('Google sign-in error: ' + resp.error, 'err'); return; }
           gAuth.token = resp;
           try { gAuth.user = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + resp.access_token } }).then(r => r.json()); } catch {}
-          if (gAuth.user && gAuth.user.email) { $('sb-name').textContent = gAuth.user.name || gAuth.user.email; $('sb-avatar').textContent = (gAuth.user.name || gAuth.user.email)[0].toUpperCase(); }
+          if (gAuth.user && gAuth.user.email) {
+            $('sb-name').textContent = gAuth.user.name || gAuth.user.email;
+            $('sb-avatar').textContent = (gAuth.user.name || gAuth.user.email)[0].toUpperCase();
+            // The card shows a name; the address is what actually says WHICH
+            // Google account, so it lives in the part that opens.
+            if ($('sb-mail')) $('sb-mail').textContent = gAuth.user.email;
+          }
           logAct('Signed in with Google', 'ok');
           await loadRegistry();
           if (typeof after === 'function') after();
@@ -4419,28 +4433,30 @@
     //
     // Both compositions are built symmetric about the centre of their own
     // viewBox (60,48), so the two cards line up with each other.
+    // Redrawn 2026-09-15: minimal, and the mark is left ALONE. The first
+    // version clipped it into a rounded square with preserveAspectRatio
+    // "slice" — the logo is 488x536, so a square crop cut its sides off and
+    // the result read as a badly-made app icon sitting on a tile. It is drawn
+    // at its own proportions now, on nothing, with "meet" so it can never be
+    // cropped again. Everything else on the card is a hairline: one idea per
+    // card, no second colour competing with the logo's own gradient.
     { id: 'have', name: 'I already have a Nuvio account',
       one: 'Pick the account, then the profile you want set up from scratch.',
-      // the account, and the profiles inside it
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<defs><clipPath id="wzLogoHave"><rect x="44" y="16" width="32" height="32" rx="9"/></clipPath></defs>'
-         + '<rect x="44" y="16" width="32" height="32" rx="9" fill="rgba(var(--ink),.06)" stroke="rgba(var(--ink),.16)" stroke-width="1.5"/>'
-         + '<image href="' + NUVIO_MARK + '" x="44" y="16" width="32" height="32" clip-path="url(#wzLogoHave)" preserveAspectRatio="xMidYMid slice"/>'
-         + '<path d="M60 48v10M38 70V60a2 2 0 0 1 2-2h40a2 2 0 0 1 2 2v10" stroke="rgba(var(--ink),.22)" stroke-width="1.5"/>'
-         + '<circle cx="38" cy="70" r="11" fill="rgba(var(--secondary-rgb),.22)" stroke="var(--secondary)" stroke-opacity=".7" stroke-width="1.5"/>'
-         + '<circle cx="60" cy="70" r="11" fill="rgba(var(--accent-rgb),.22)" stroke="var(--accent)" stroke-width="1.5"/>'
-         + '<circle cx="82" cy="70" r="11" fill="rgba(var(--cat-collections-rgb),.22)" stroke="var(--cat-collections)" stroke-opacity=".7" stroke-width="1.5"/>'
-         + '<circle cx="60" cy="67" r="3.4" fill="var(--accent)" stroke="none"/>'
-         + '<path d="M55.6 76a5 5 0 0 1 8.8 0" stroke="var(--accent)" stroke-width="1.6"/></svg>' },
+      // one account, the profiles under it, the middle one being set up
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<image href="' + NUVIO_MARK + '" x="44.5" y="12" width="31" height="34" preserveAspectRatio="xMidYMid meet"/>'
+         + '<path d="M60 47v5M38 52h44M38 52v6M60 52v6M82 52v6" stroke="rgba(var(--ink),.20)" stroke-width="1.4"/>'
+         + '<rect x="28" y="58" width="20" height="20" rx="6" fill="rgba(var(--ink),.05)" stroke="rgba(var(--ink),.18)" stroke-width="1.4"/>'
+         + '<rect x="50" y="58" width="20" height="20" rx="6" fill="rgba(var(--accent-rgb),.16)" stroke="var(--accent)" stroke-width="1.6"/>'
+         + '<rect x="72" y="58" width="20" height="20" rx="6" fill="rgba(var(--ink),.05)" stroke="rgba(var(--ink),.18)" stroke-width="1.4"/></svg>' },
     { id: 'new', name: 'I need to make a Nuvio account',
       one: 'Creates a real Nuvio account, links it here, and signs you straight in.',
-      // the same mark, not yet yours — an open slot with a plus on it
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<defs><clipPath id="wzLogoNew"><rect x="42" y="20" width="36" height="36" rx="10"/></clipPath></defs>'
-         + '<rect x="36" y="14" width="48" height="48" rx="13" fill="rgba(var(--ink),.04)" stroke="rgba(var(--ink),.22)" stroke-width="1.5" stroke-dasharray="6 6"/>'
-         + '<image href="' + NUVIO_MARK + '" x="42" y="20" width="36" height="36" clip-path="url(#wzLogoNew)" preserveAspectRatio="xMidYMid slice" opacity=".45"/>'
-         + '<circle cx="60" cy="70" r="12" fill="var(--accent)" stroke="none"/>'
-         + '<path d="M60 64v12M54 70h12" stroke="#fff" stroke-width="2.4"/></svg>' },
+      // the same mark, not yours yet — an empty slot, and one thing to press
+      art: '<svg viewBox="0 0 120 96" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+         + '<rect x="38" y="12" width="44" height="44" rx="13" stroke="rgba(var(--ink),.20)" stroke-width="1.4" stroke-dasharray="5 6"/>'
+         + '<image href="' + NUVIO_MARK + '" x="48" y="21" width="24" height="26" preserveAspectRatio="xMidYMid meet" opacity=".38"/>'
+         + '<circle cx="60" cy="66" r="12" fill="var(--accent)" stroke="none"/>'
+         + '<path d="M60 60v12M54 66h12" stroke="#fff" stroke-width="2.4"/></svg>' },
   ];
   function wzRenderEntry() {
     const box = $('wz-entry'); if (!box) return;
@@ -7490,8 +7506,20 @@
     paintTheme();
     // Signing out belongs to the account block it signs out of, at the bottom
     // of the rail — it used to be a card on a tab that held nothing else.
-    $('sb-user').onclick = async () => {
+    // The card opens in place. Signed out it is a sign-in button instead —
+    // there is nothing to expand and no account to sign out of.
+    $('sb-user').onclick = () => {
       if (!gAuth.token) { signIn(enterApp); return; }
+      sbAcctOpen(!$('sb-acct').classList.contains('open'));
+    };
+    // Clicking anywhere else closes it, which is what every menu does and the
+    // only thing that makes "click the card again" not the sole way out.
+    document.addEventListener('click', e => {
+      const a = $('sb-acct');
+      if (a && a.classList.contains('open') && !a.contains(e.target)) sbAcctOpen(false);
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') sbAcctOpen(false); });
+    $('sb-signout').onclick = async () => {
       if (!(await uiModal({
         title: 'Sign out of Google?',
         message: 'Numax will forget this session on this device.',
@@ -7504,7 +7532,10 @@
         danger: true, okLabel: 'Sign out'
       }))) return;
       gAuth.token = null; gAuth.user = null; store.clear(); invalAll();
-      $('sb-name').textContent = 'Signed out'; showView('view-landing'); logAct('Signed out', 'info');
+      sbAcctOpen(false);
+      $('sb-name').textContent = 'Signed out'; $('sb-avatar').textContent = 'N';
+      if ($('sb-mail')) $('sb-mail').textContent = '';
+      showView('view-landing'); logAct('Signed out', 'info');
     };
     $('act-clear').onclick = () => { activity.length = 0; renderActivity(); };
   }

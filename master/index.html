@@ -600,9 +600,36 @@
   .sb-theme.on .sb-theme-sw{ background:rgba(var(--accent-rgb),.3); border-color:rgba(var(--accent-rgb),.55); }
   .sb-theme.on .sb-theme-sw i{ transform:translateX(13px); background:var(--accent); }
 
-  .sb-user{ display:flex; align-items:center; gap:10px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; margin-top:8px; font-family:inherit; text-align:left; color:inherit; cursor:pointer;
-    transition:border-color var(--mo-micro,.14s) var(--mo-ease,ease), background var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .sb-acct{ margin-top:8px; }
+  .sb-user{ display:flex; align-items:center; gap:10px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; font-family:inherit; text-align:left; color:inherit; cursor:pointer;
+    transition:border-color var(--mo-micro,.14s) var(--mo-ease,ease), background var(--mo-micro,.14s) var(--mo-ease,ease), border-radius var(--mo-expand,.3s) var(--mo-ease,ease); }
   .sb-user:hover{ background:var(--surface-2); border-color:rgba(var(--ink),.22); }
+  /* Open, the card and the menu under it are ONE shape: the card drops its
+     bottom corners and its bottom hairline, and the menu grows the matching
+     pair. The two are separate elements only because the card is a button and
+     the menu holds another one. */
+  .sb-acct.open .sb-user{ background:var(--surface-2); border-color:rgba(var(--ink),.22);
+    border-bottom-left-radius:0; border-bottom-right-radius:0; border-bottom-color:transparent; }
+  .sb-acct.open .sb-user-car{ transform:rotate(180deg); }
+  .sb-user-car{ transition:transform var(--mo-expand,.3s) var(--mo-ease,ease); }
+  /* 0fr -> 1fr, not height:auto. CSS cannot transition FROM auto, so a
+     collapsible resting at auto snaps shut instead of animating — the same
+     trap mkDisc and syMeasure work around by hand. A grid row can do it
+     without measuring anything. */
+  .sb-user-menu{ display:grid; grid-template-rows:0fr;
+    transition:grid-template-rows var(--mo-expand,.3s) var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  .sb-acct.open .sb-user-menu{ grid-template-rows:1fr; }
+  .sb-user-menu-in{ overflow:hidden; }
+  .sb-acct.open .sb-user-menu-in{ background:var(--surface-2); border:1px solid rgba(var(--ink),.22); border-top:none;
+    border-radius:0 0 12px 12px; padding:2px 8px 8px; }
+  .sb-user-mail{ display:block; font-size:10.5px; color:var(--t35); padding:0 2px 7px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sb-user-mail:empty{ display:none; }
+  .sb-user-act{ display:flex; align-items:center; gap:8px; width:100%; padding:7px 8px; border-radius:9px;
+    background:transparent; border:1px solid transparent; color:var(--t70); font-family:inherit; font-size:12px; font-weight:600;
+    text-align:left; cursor:pointer;
+    transition:background var(--mo-micro,.14s) var(--mo-ease,ease), color var(--mo-micro,.14s) var(--mo-ease,ease), border-color var(--mo-micro,.14s) var(--mo-ease,ease); }
+  .sb-user-act svg{ width:15px; height:15px; flex:none; }
+  .sb-user-act:hover{ background:rgba(var(--danger-rgb),.12); border-color:rgba(var(--danger-rgb),.34); color:var(--danger-soft); }
   .sb-user-tx{ flex:1; min-width:0; overflow:hidden; }
   .sb-user-tx b, .sb-user-tx span{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .sb-user-car{ flex:none; width:15px; height:15px; color:var(--t35); }
@@ -795,7 +822,7 @@
     /* The rail is a horizontal strip here. The theme switch keeps its icon and
        drops its label and track, so it stays reachable without a Settings tab
        to fall back on; the account block and the spacers go. */
-    .sb-sec,.sb-spacer,.sb-user{ display:none; }
+    .sb-sec,.sb-spacer,.sb-acct{ display:none; }
     .sb-theme{ width:auto; margin-bottom:0; }
     .sb-theme-tx, .sb-theme-sw{ display:none; }
     .navbtn{ width:auto; }
@@ -1009,8 +1036,19 @@
   /* On the front door #wz-entry is the only visible child, so its bottom margin
      is just a gap above nothing. */
   .wz-pane[data-wzpane="account"].front #wz-entry{ margin-bottom:0; }
-  .wz-branch{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:0; }
+  .wz-branch{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:0; position:relative; }
   .wz-branch > .wz-acc, .wz-branch > .wz-sec{ flex:0 0 auto; order:1; }
+  /* Fills the empty right of the sign-up screen and takes nothing: it is
+     positioned out of flow, sits under everything, and eats no clicks. It
+     rests ON the bottom edge of the branch — the figure is drawn so its own
+     viewBox ends where the panel does, which is what makes it read as leaning
+     in rather than floating. Gone below 1150px or on a short window, where the
+     form column wants the whole width. */
+  .wz-peek{ position:absolute; right:clamp(4px,3%,54px); bottom:0; z-index:0;
+    width:clamp(116px,15vw,186px); pointer-events:none; opacity:.85; }
+  .wz-peek svg{ display:block; width:100%; height:auto; }
+  .wz-branch > .wz-sec, .wz-branch-bar{ position:relative; z-index:1; }
+  @media (max-width:1150px), (max-height:720px){ .wz-peek{ display:none; } }
   .wz-branch-bar{ order:2; margin-top:auto; padding-top:20px; margin-bottom:0;
     border-top:1px solid rgba(var(--ink),.07); }
   /* At size. The account select and the profile chips ARE the question on
@@ -2348,7 +2386,12 @@
   .sy-carry-row:has(#sy-cat-settings) .sy-carry-ic{ color:var(--cat-settings); }
   .mk-coll-card{ border-top:2px solid rgba(var(--cat-collections-rgb),.5); }
   .mk-prov{ border-left:2px solid rgba(var(--cat-plugins-rgb),.42); }
-  .api-badge{ color:var(--cat-keys); background:rgba(var(--cat-keys-rgb),.14); border:1px solid rgba(var(--cat-keys-rgb),.3); }
+  /* The one exception to the five colours: this badge is neutral, not gold
+     (Furqan, 2026-09-15). It sits on an account's own name row, where a gold
+     pill read as a status about the account rather than as a plain statement
+     of what the link holds. Built from --ink so it inverts with the theme —
+     white on the dark ground, ink on the light one. */
+  .api-badge{ color:var(--t); background:rgba(var(--ink),.10); border:1px solid rgba(var(--ink),.26); }
 
   /* TWO RANKS OF BUTTON.
      Red is rank one: the thing this screen is for. Blue is rank two: every
@@ -2477,11 +2520,27 @@
       <span class="sb-theme-tx">Light mode</span>
       <span class="sb-theme-sw" aria-hidden="true"><i></i></span>
     </button>
-    <button class="sb-user" id="sb-user" type="button" aria-haspopup="dialog">
-      <div class="av" id="sb-avatar">N</div>
-      <div class="sb-user-tx"><b id="sb-name">Signed out</b><span id="sb-sub">No accounts</span></div>
-      <svg class="sb-user-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 15 5-5 5 5"/></svg>
-    </button>
+    <!-- The account block opens in place rather than throwing a dialog at you
+         (Furqan, 2026-09-15). Clicking the card used to go straight to the
+         sign-out confirmation, which is a lot of screen for a button you might
+         only be hovering towards. It expands instead, and signing out is a
+         row inside it — still confirmed, because that part is destructive. -->
+    <div class="sb-acct" id="sb-acct">
+      <button class="sb-user" id="sb-user" type="button" aria-expanded="false" aria-controls="sb-user-menu">
+        <div class="av" id="sb-avatar">N</div>
+        <div class="sb-user-tx"><b id="sb-name">Signed out</b><span id="sb-sub">No accounts</span></div>
+        <svg class="sb-user-car" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m7 15 5-5 5 5"/></svg>
+      </button>
+      <div class="sb-user-menu" id="sb-user-menu">
+        <div class="sb-user-menu-in">
+          <span class="sb-user-mail" id="sb-mail"></span>
+          <button class="sb-user-act" id="sb-signout" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M15 17v2a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v2M10 12h10m0 0-3-3m3 3-3 3"/></svg>
+            <span>Sign out</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </aside>
 
   <main class="main">
@@ -2625,6 +2684,24 @@
                 <button class="btn btn-primary" id="wz-new-btn">Create account</button>
                 <div class="inline-status" id="wz-new-status"></div>
               </div>
+            </div>
+            <!-- The sign-up form is one narrow column, so the right of this
+                 screen is empty (Furqan, 2026-09-15: "add baymax here peeking
+                 in"). This is an ORIGINAL drawing in that spirit — a soft
+                 rounded helper leaning over the bottom edge — not a copy of
+                 anyone's character. It is decoration only: aria-hidden, no
+                 pointer events, and it hides itself the moment the column
+                 needs the room rather than pushing the form around. -->
+            <div class="wz-peek" aria-hidden="true">
+              <svg viewBox="0 0 200 150" fill="none">
+                <ellipse cx="100" cy="128" rx="40" ry="34" fill="rgba(var(--ink),.90)"/>
+                <ellipse cx="50" cy="132" rx="19" ry="14" fill="rgba(var(--ink),.90)"/>
+                <ellipse cx="150" cy="132" rx="19" ry="14" fill="rgba(var(--ink),.90)"/>
+                <ellipse cx="100" cy="66" rx="47" ry="43" fill="rgba(var(--ink),.94)"/>
+                <circle cx="80" cy="66" r="5.5" fill="var(--bg)"/>
+                <circle cx="120" cy="66" r="5.5" fill="var(--bg)"/>
+                <path d="M85.5 66h29" stroke="var(--bg)" stroke-width="3" stroke-linecap="round"/>
+              </svg>
             </div>
           </div>
         </div>
@@ -3200,6 +3277,6 @@
 <script src="./ui-motion.js?v=5f014671"></script>
 <script src="./market.js?v=e706379e"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
-<script src="./app.js?v=365c80e4"></script>
+<script src="./app.js?v=fcfcc8ad"></script>
 </body>
 </html>
