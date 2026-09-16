@@ -198,8 +198,19 @@
         // only take focus when it does not, so the two never fight.
         var inp = card.querySelector('.modal-input');
         if (!inp || inp.style.display === 'none') {
-          var f = focusables(card); if (f.length) f[f.length - 1].focus();
+          // preventScroll matters: the last focusable in a tall dialog is at the
+          // BOTTOM of it, and focusing it normally scrolls that dialog's own
+          // scroller all the way down before the reader has seen its top.
+          var f = focusables(card);
+          if (f.length) {
+            try { f[f.length - 1].focus({ preventScroll: true }); }
+            catch (e) { f[f.length - 1].focus(); }
+          }
         }
+        // However it got focus, a dialog opens showing its top.
+        var sc = card.querySelector('.mk-dlg-b');
+        if (sc) sc.scrollTop = 0;
+        card.scrollTop = 0;
       } else {
         r.classList.remove('mo-open');
         if (!reduced()) {

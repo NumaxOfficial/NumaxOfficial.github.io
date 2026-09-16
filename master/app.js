@@ -58,38 +58,157 @@
     // these three and nothing that corresponds to settings, watched or watch
     // progress — so on those it is not there at all rather than disabled.
     paintBarCat($('pf-editor-tabs'), kind);
+    const shop = kind === 'addons' || kind === 'plugins' || kind === 'collections';
     const br = $('pf-browse');
     if (br) {
-      const shop = kind === 'addons' || kind === 'plugins' || kind === 'collections';
       br.style.display = shop ? '' : 'none';
       if (shop) {
         br.textContent = 'Browse ' + (PF_TAB_LABEL[kind] || kind).toLowerCase();
         br.onclick = () => { nav('market'); switchMkTab(kind); };
       }
     }
-    // Settings is the one pane that is genuinely long — platform bar, section
-    // bar, then every group under it — inside a pane that is already the
-    // bottom third of a viewport-fit panel. This opens it full size.
-    const pop = $('pf-settings-pop');
-    if (pop) pop.style.display = kind === 'settings' ? '' : 'none';
+    // Add is the other half of Browse: the catalogue is for finding something,
+    // this is for the address you already have. A collection has no address to
+    // paste, so its Add opens the builder on a blank one — which is where the
+    // "+ New collection" button inside the pane used to be.
+    const add = $('pf-add');
+    if (add) {
+      const can = shop && (kind === 'collections' ? !!window.NumaxCollections : !!window.NumaxMarket);
+      add.style.display = can ? '' : 'none';
+      if (can) {
+        add.textContent = PF_ADD_LABEL[kind];
+        add.onclick = () => { if (kind === 'collections') openCollectionEditor(null, { isNew: true }); else pfAddDialog(kind); };
+      }
+    }
   }
+  const PF_ADD_LABEL = { addons: '+ Add add-on', plugins: '+ Add plugin', collections: '+ New collection' };
 
   // Moves the LIVE #pf-settings node into a big dialog and puts it back on
   // close — the same borrow-don't-rebuild rule the wizard's route panes and
   // ui-motion's carry chooser use. Rebuilding it here would mean a second copy
   // of the settings tree with its own handlers, and two things that can
   // disagree about what is selected.
-  function openPfSettingsDialog() {
-    const host = $('pf-settings'); if (!host || !pfEdit) return;
+  function openPfPaneDialog() {
+    const kind = pfEditorTab;
+    const host = $('pf-' + kind); if (!host || !pfEdit) return;
     const home = host.parentNode;
-    const pop = openMkPop(null, 'Settings — ' + (pfEdit.meta.name || 'profile'),
+    const pop = openMkPop(null, (PF_TAB_LABEL[kind] || kind) + ' — ' + (pfEdit.meta.name || 'profile'),
       'The same controls, with room to see them. Changes save with the profile as usual.');
     pop.root.classList.add('mk-dlg-wide', 'pf-set-dlg');
     pop.body.appendChild(host);
     pop.onClose = () => { if (host.parentNode !== home) home.appendChild(host); };
+    // The head's Add button does not travel with the pane, so the dialog carries
+    // its own rather than being the one place you cannot add anything.
+    if (PF_ADD_LABEL[kind] && (kind === 'collections' ? window.NumaxCollections : window.NumaxMarket)) {
+      const add = el('button', 'btn btn-ghost', PF_ADD_LABEL[kind]);
+      add.onclick = () => { if (kind === 'collections') openCollectionEditor(null, { isNew: true }); else pfAddDialog(kind); };
+      pop.foot.appendChild(add);
+    }
     const done = el('button', 'btn btn-primary', 'Done');
     done.onclick = closeMkPop;
     pop.foot.appendChild(done);
+  }
+
+  // Nuvio's own Add dialog, rebuilt: one address, one name. The row is appended
+  // to the profile being edited and marked dirty, so it saves through "Save to
+  // profile" like every other change in this pane — this adds no second write
+  // path, and there must never be one.
+  //
+  // A repository manifest is checked with market.js's own reader rather than
+  // with probeManifest: a plugin manifest is {name, version, scrapers} and
+  // carries none of the id/resources/types an add-on manifest is recognised by.
+  async function pfProbeRepo(raw) {
+    const url = MK.normalizeManifestUrl(raw);
+    try {
+      const m = await MK.loadManifest(url, true);
+      return { ok: true, url, manifest: m, count: (m.scrapers || []).length };
+    } catch (e) {
+      return { ok: false, reason: /unreachable|timed out/i.test(e.message || '') ? 'blocked' : 'notfound' };
+    }
+  }
+  async function pfAddDialog(kind) {
+    if (!pfEdit || !window.NumaxMarket) return;
+    const isAddon = kind === 'addons';
+    const pop = openMkPop(null, isAddon ? 'Add an add-on' : 'Add a plugin repository',
+      isAddon ? 'Paste the link the add-on’s site gave you — Numax works out the manifest URL.'
+              : 'Paste the repository’s manifest link. Nuvio stores one row per repository.');
+    const mine = pop;
+    const stale = () => mkPop !== mine;
+
+    const f1 = el('label', 'mk-f');
+    f1.appendChild(el('span', '', isAddon ? 'Link from the add-on’s site' : 'Repository manifest link'));
+    const inp = el('input', 'modal-input'); inp.type = 'url';
+    inp.placeholder = isAddon ? 'https://…/configure' : 'https://…/manifest.json';
+    f1.appendChild(inp); pop.body.appendChild(f1);
+    const chk = el('div', 'mk-chk'); pop.body.appendChild(chk);
+
+    const f2 = el('label', 'mk-f'); f2.appendChild(el('span', '', 'Name in Nuvio'));
+    const nm = el('input'); nm.type = 'text'; nm.placeholder = 'Name in Nuvio';
+    f2.appendChild(nm); pop.body.appendChild(f2);
+
+    if (!isAddon) {
+      const dn = el('div', 'mk-note');
+      dn.innerHTML = MK_INFO_SVG + '<div>' + WZ_PLUGIN_ONDEVICE + '</div>';
+      pop.body.appendChild(dn);
+    }
+
+    const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
+    const go = el('button', 'btn btn-primary', isAddon ? 'Add add-on' : 'Add plugin');
+    go.style.width = '100%'; go.disabled = true;
+    pop.foot.appendChild(go);
+
+    let resolved = null, probeSeq = 0, probeT = null;
+    const typed = () => inp.value.trim();
+    const finalUrl = () => resolved || (MK.resolveManifestUrl(typed())[0] || typed());
+    const note = (cls, text, sub) => {
+      clr(chk); chk.className = 'mk-chk ' + cls;
+      chk.appendChild(el('div', 'mk-chk-l', text));
+      if (sub) chk.appendChild(el('div', 'mk-chk-s', sub));
+    };
+    const paint = () => { go.disabled = !typed(); };
+    const probe = async () => {
+      const seq = ++probeSeq; const raw = typed(); resolved = null;
+      if (!raw) { clr(chk); chk.className = 'mk-chk'; paint(); return; }
+      if (!MK.resolveManifestUrl(raw).length) { note('bad', 'That is not a web address.'); paint(); return; }
+      note('wait', 'Checking that link…');
+      let r;
+      try { r = isAddon ? await MK.probeManifest(raw) : await pfProbeRepo(raw); }
+      catch (e) { r = { ok: false, reason: 'blocked' }; }
+      if (stale() || seq !== probeSeq) return;
+      if (r.ok) {
+        resolved = r.url;
+        const v = r.manifest.version ? ' v' + r.manifest.version : '';
+        note('ok', 'Found ' + (r.manifest.name || (isAddon ? 'this add-on' : 'this repository')) + v,
+          (r.count != null ? r.count + ' provider' + (r.count === 1 ? '' : 's') + ' inside. ' : '') + 'Saving: ' + r.url);
+        if (r.manifest.name && !nm.value.trim()) nm.value = r.manifest.name;
+      } else if (r.reason === 'blocked') {
+        // Same rule the Marketplace's Add box follows: a host we cannot read is
+        // not a host that is broken, and Nuvio's own dialog never checks either.
+        note('warn', 'Could not check this from here.',
+          'That is normal — many hosts block outside reads. Saving: ' + finalUrl());
+      } else {
+        note('bad', isAddon ? 'No add-on manifest at that address.' : 'No plugin manifest at that address.',
+          'You can still add it as-is.');
+      }
+      paint();
+    };
+    inp.addEventListener('input', () => { resolved = null; paint(); clearTimeout(probeT); probeT = setTimeout(probe, 450); });
+    inp.addEventListener('blur', () => { clearTimeout(probeT); probe(); });
+    inp.addEventListener('paste', () => setTimeout(probe, 0));
+
+    go.onclick = () => {
+      const url = finalUrl();
+      if (!/^https?:\/\//i.test(url)) { status(st, 'That doesn’t look like a URL.', 'err'); return; }
+      const list = pfEdit[kind];
+      const same = u => String(u || '').replace(/\/+$/, '').toLowerCase();
+      if (list.some(x => same(x.url) === same(url))) { status(st, 'That is already on this profile.', 'err'); return; }
+      const row = { url, name: nm.value.trim() || host(url), enabled: true };
+      list.push(row);
+      dirty(kind); renderPfList(kind);
+      closeMkPop();
+      status($('pf-save-status'), 'Added “' + row.name + '” — press Save to profile to write it to Nuvio.', 'ok');
+    };
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60);
   }
   const pfDirty = {};
   let syA = null, syI = null, sySnap = null;
@@ -430,7 +549,7 @@
   // views + nav
   // ======================================================================
   function showView(id) { document.querySelectorAll('.view').forEach(v => v.classList.toggle('current', v.id === id)); }
-  const TITLES = { wizard: 'Setup wizard', accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', templates: 'Templates', drive: 'Google Drive', market: 'Marketplace', activity: 'Activity' };
+  const TITLES = { wizard: 'Setup wizard', accounts: 'Nuvio accounts', profile: 'Profile', sync: 'Sync desk', drive: 'Google Drive', market: 'Marketplace', activity: 'Activity' };
   function enterApp() {
     showView('view-app');
     nav('accounts');
@@ -501,8 +620,7 @@
     if (panel === 'accounts') refreshAccounts();
     if (panel === 'profile') refreshProfileTab();
     if (panel === 'sync') refreshSyncTab();
-    if (panel === 'templates') refreshTemplates();
-    if (panel === 'drive') refreshDrive();
+    if (panel === 'drive') { refreshDrive(); refreshTemplates(); }
     if (panel === 'market') refreshMarket();
     if (panel === 'activity') renderActivity();
   }
@@ -984,16 +1102,9 @@
   }
   function renderPfCollections() {
     const box = $('pf-collections'); clr(box); const list = pfEdit.collections;
-    // Building one from scratch is the other half of the builder, and it has to
-    // start somewhere. Guarded on collections.js in the same way every
-    // marketplace control is guarded on market.js.
-    if (window.NumaxCollections) {
-      const bar = el('div', 'cf-newbar');
-      const mk = el('button', 'btn btn-ghost btn-xs', '+ New collection');
-      mk.onclick = () => openCollectionEditor(null, { isNew: true });
-      bar.appendChild(mk);
-      box.appendChild(bar);
-    }
+    // Building one from scratch is the other half of the builder. Its button is
+    // "+ New collection" in the pane header now, beside Browse collections —
+    // the same pair of controls the Add-ons and Plugins panes carry.
     if (!Array.isArray(list) || !list.length) { box.appendChild(el('p', 'empty sm', 'No collections.')); }
     (list || []).forEach((c, i) => {
       const row = el('div', 'erow'); row.appendChild(dragHandle());
@@ -1752,10 +1863,15 @@
     clr(chip); chip.appendChild(avatar(pfEdit.meta, 42)); chip.appendChild(el('span', 'pcn', pfEdit.meta.name));
   }
   // shared by the sticky Save button and by applying a template's "profile" part
-  async function pushProfileIdentity(accountId, idx, { name, avatarUrl }) {
+  // avatarId and color travel with the name because they are what the profile
+  // LOOKS like — putting back a restored profile's name while leaving somebody
+  // else's picture on it is not a restore. Each is only written when the caller
+  // actually has one, so the Profile tab's rename (which sends name + url only)
+  // still leaves the other two alone.
+  async function pushProfileIdentity(accountId, idx, { name, avatarUrl, avatarId, color }) {
     const c = A.client(store, accountId); const live = rawList(await c.pullProfiles()); if (!live.length) throw new Error("couldn't read profiles");
     if (!live.find(p => p.profile_index === idx)) throw new Error('profile no longer exists');
-    const next = live.map(p => { const r = normRow(p); if (p.profile_index === idx) { if (name) r.name = name.slice(0, 60); if (avatarUrl) r.avatar_url = avatarUrl; } return r; });
+    const next = live.map(p => { const r = normRow(p); if (p.profile_index === idx) { if (name) r.name = name.slice(0, 60); if (avatarUrl) r.avatar_url = avatarUrl; if (avatarId) r.avatar_id = avatarId; if (color) r.avatar_color_hex = color; } return r; });
     if (live.map(p => p.profile_index).sort().join() !== next.map(p => p.profile_index).sort().join()) throw new Error('profile list changed — reload');
     await c.rpc('sync_push_profiles', { p_profiles: next, p_client_max_profiles: 6 });
   }
@@ -1813,27 +1929,56 @@
     return { keep, after: after.idx };
   }
 
-  // Same document shape backupNow() writes, so this lands in the Drive tab's
-  // Restore list like any other backup — a delete with no way back is not
-  // something to offer without one.
-  async function backupProfileToDrive(aid, idx, name) {
+  // EVERYTHING about one profile that Nuvio will let us read back: who it is,
+  // what it has, and what has been watched on it. A backup missing any of these
+  // is one you cannot actually restore from, which is the only reason a backup
+  // exists at all.
+  //
+  // Three things this gets right that the two older copies of it did not:
+  //   - all THREE platforms' settings. The backup path read tv and mobile only,
+  //     so a desktop-only profile was backed up with no settings whatsoever.
+  //   - the profile's identity, including avatarId and colour, not just a name.
+  //   - provider_credentials, the OTHER home for API keys — the one the apps
+  //     actually read. Opt-in, exactly as the keys inside a settings blob are.
+  //   - watched history and watch progress, which were never in a backup.
+  async function fullProfileBackup(aid, idx, opts) {
+    const o = opts || {};
+    const keys = o.keys != null ? o.keys : accountKeysIncluded(aid);
     const c = A.client(store, aid);
-    const { backup } = await loadAccount(aid);
+    const { backup, profiles } = await loadAccount(aid);
     const slice = sliceProfile(backup, idx);
-    const keys = accountKeysIncluded(aid);
+    const meta = (profiles || []).find(p => p.index === idx) || { name: o.name || ('Profile ' + idx) };
+    const name = o.name || meta.name;
     const settings = {};
     for (const pl of PLATS) {
       const row = await c.pullSettings(idx, pl);
       if (row && row.settings_json) settings[pl] = keys ? row.settings_json : stripKeys(row.settings_json);
     }
+    const pick = a => Array.isArray(a) ? a.filter(r => r.profile_id === idx) : [];
+    const out = {
+      account: accountName(aid), accountId: aid, profileIndex: idx, name,
+      profile: { name, avatarUrl: meta.avatarUrl || null, avatarId: meta.avatarId || null, color: meta.color || null },
+      addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings,
+      watched: pick(backup.watched_items), watchProgress: pick(backup.watch_progress),
+    };
+    if (keys) {
+      try { out.credentials = await c.pullProviderCredentials(idx); }
+      catch (e) { logAct("Couldn't read API keys for the backup of " + name + ': ' + e.message, 'err'); }
+    }
+    return out;
+  }
+
+  // Same document shape backupNow() writes, so this lands in the Drive tab's
+  // Restore list like any other backup — a delete with no way back is not
+  // something to offer without one.
+  async function backupProfileToDrive(aid, idx, name) {
+    const keys = accountKeysIncluded(aid);
     const out = {
       app: 'numax', kind: 'backup', savedAt: new Date().toISOString(), includesKeys: keys,
-      profiles: [{
-        account: accountName(aid), accountId: aid, profileIndex: idx, name,
-        addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings,
-      }],
+      profiles: [await fullProfileBackup(aid, idx, { name, keys })],
     };
-    const file = safeName('numax-before-delete-' + name + '-' + new Date().toISOString().slice(0, 10)) + '.json';
+    // Named for what it is, so it is findable in a Drive folder months later.
+    const file = safeName(name + ' Backup') + '.json';
     const r = await driveUpload(file, out, { numax: 'backup' });
     return r.name || file;
   }
@@ -1948,12 +2093,25 @@
     if (!gAuth.token) { await uiAlert('Sign in with Google first.'); return; }
     if (!pfEdit) { await uiAlert('Open a profile first.'); return; }
     const root = $('tpl-save-root'), list = $('tpl-save-list'), ok = $('tpl-save-ok'), cancel = $('tpl-save-cancel'), bg = $('tpl-save-bg');
+    const nameBox = $('tpl-save-name');
     clr(list);
     const checks = {}, platChecks = {};
+    // The name is asked for HERE rather than in a second prompt after the
+    // dialog closes: one dialog, one answer. It keeps suggesting a name built
+    // from what is ticked until the user types one of their own, after which it
+    // never overwrites them.
+    let nameTouched = false;
+    const suggest = () => {
+      if (!nameBox || nameTouched) return;
+      const on = TPL_PARTS.map(p => p.key).filter(k => checks[k] && checks[k].checked && !checks[k].disabled);
+      const part = !on.length ? '' : (on.length === TPL_PARTS.length ? 'profile' : on.map(k => PF_TAB_LABEL[k] || k).join(', '));
+      nameBox.value = (pfEdit.meta.name + (part ? ' ' + part : '')).trim();
+    };
     TPL_PARTS.forEach(part => {
       const n = part.count(); const empty = !n;
       const row = el('label', 'pick'); if (empty) row.style.opacity = '.5';
       const cb = el('input'); cb.type = 'checkbox'; cb.disabled = empty; checks[part.key] = cb; row.appendChild(cb);
+      cb.addEventListener('change', suggest);
       const b = el('div', 'pb'); b.appendChild(el('div', 'pn', part.label));
       b.appendChild(el('div', 'ps', empty ? 'none on this profile' : (part.key === 'settings' ? 'available' : n + ' item' + (n === 1 ? '' : 's'))));
       row.appendChild(b); list.appendChild(row);
@@ -1971,6 +2129,11 @@
         list.appendChild(platRow);
       }
     });
+    if (nameBox) {
+      nameBox.value = '';
+      nameBox.oninput = () => { nameTouched = !!nameBox.value.trim(); };
+      suggest();
+    }
     root.style.display = '';
     return new Promise(resolve => {
       const done = async (proceed) => {
@@ -1978,6 +2141,8 @@
         if (!proceed) { resolve(); return; }
         const kinds = TPL_PARTS.map(p => p.key).filter(k => checks[k].checked && !checks[k].disabled);
         if (!kinds.length) { await uiAlert('Pick at least one thing to save.'); resolve(); return; }
+        const tplName = (nameBox && nameBox.value.trim()) || '';
+        if (!tplName) { await uiAlert('Give the template a name.'); resolve(); return; }
         let includeKeys = false;
         const selectedPlats = PLATS.filter(pl => platChecks[pl] && platChecks[pl].checked && !platChecks[pl].disabled);
         if (kinds.includes('settings')) {
@@ -1985,16 +2150,16 @@
           if (accountKeysIncluded(pfA)) includeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this template?', { okLabel: 'Include keys' });
           else await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values to include — settings will save without keys.');
         }
-        await saveTemplateParts(kinds, includeKeys, selectedPlats);
+        await saveTemplateParts(kinds, includeKeys, selectedPlats, tplName);
         resolve();
       };
       ok.onclick = () => done(true); cancel.onclick = () => done(false); bg.onclick = () => done(false);
     });
   }
-  async function saveTemplateParts(kinds, includeKeys, plats) {
+  async function saveTemplateParts(kinds, includeKeys, plats, name) {
     const isWholeProfile = kinds.length === TPL_PARTS.length;
-    const label = isWholeProfile ? 'profile' : kinds.map(k => PF_TAB_LABEL[k] || k).join(', ');
-    const name = await uiPrompt('Name this template', pfEdit.meta.name + ' ' + label); if (name == null || !name.trim()) return;
+    if (!name || !name.trim()) return;
+    name = name.trim();
     const tkind = isWholeProfile ? 'profile' : kinds.join('+');
     const payload = { app: 'numax', kind: 'template', tkind, name, savedAt: new Date().toISOString(), from: pfEdit.meta.name };
     if (kinds.includes('profile')) payload.profile = { name: pfEdit.meta.name, avatarUrl: pfEdit.meta.avatarUrl || null };
@@ -2014,7 +2179,7 @@
     if (kinds.includes('watchprogress')) payload.watchProgress = pfEdit.watchProgress || [];
     if (kinds.includes('watched')) payload.watched = pfEdit.watched || [];
     status($('pf-save-status'), 'Saving template…');
-    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Templates tab.', 'ok'); logAct('Saved template "' + name + '" (' + tkind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
+    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Google Drive tab.', 'ok'); logAct('Saved template "' + name + '" (' + tkind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
     catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); logAct('Template save failed: ' + e.message, 'err'); }
   }
   async function refreshTemplates() {
@@ -2100,11 +2265,75 @@
     return out;
   }
 
+  // ---- what a preview says -------------------------------------------------
+  // A preview NAMES what is changing. It used to say "+4", which is a number
+  // nobody can act on — you could not tell which four, or whether the one you
+  // cared about was among them. Every report bucket already carries the real
+  // names (engine.js maps add-ons and plugins to name||url and collections to
+  // title||name||id), so those are what goes on screen.
+  //
+  // Settings are named by GROUP — "Layout", "Playback" — not by leaf: nobody
+  // asked to copy `debrid_settings.preferred_resolver_provider_id`, they asked
+  // to copy their debrid setup. engine.groupLabel owns that mapping and is the
+  // same one the settings tree itself is drawn from.
+  //
+  // Watched history and watch progress are the one exception and keep a count:
+  // they are bulk rows, there can be thousands, and "247 items" is the honest
+  // unit for them — a wall of episode titles would say less, not more.
+  const PREVIEW_MAX_NAMES = 6;
+  function nameTags(cls, sign, names, why) {
+    const list = (names || []).filter(x => x != null && String(x).trim()).map(String);
+    if (!list.length) return '';
+    const shown = list.slice(0, PREVIEW_MAX_NAMES);
+    const t = why ? ' title="' + esc(why) + '"' : '';
+    let html = shown.map(n => '<span class="tag name ' + cls + '"' + t + '>' + esc(sign + n) + '</span>').join(' ');
+    if (list.length > shown.length) {
+      html += ' <span class="tag name ' + cls + '" title="' + esc(list.join('\n')) + '">and '
+        + (list.length - shown.length) + ' more</span>';
+    }
+    return html;
+  }
+  // The settings report names leaves ("layout_settings.posterSize") and whole
+  // groups ("trakt_settings_payload (payload)"). The group in front of the dot
+  // is the part worth showing, deduped — twelve changed leaves in Layout are
+  // one thing that changed, not twelve.
+  function settingsGroupNames(rep) {
+    const out = [];
+    ((rep && rep.changed) || []).forEach(entry => {
+      const g = String(entry).split('.')[0].replace(/\s*\((payload|block)\)\s*$/, '').trim();
+      if (!g) return;
+      const label = (E && E.groupLabel) ? E.groupLabel(g) : g;
+      if (label && out.indexOf(label) < 0) out.push(label);
+    });
+    return out;
+  }
+  // Every platform's changed groups, merged. A group that changed on both TV and
+  // mobile is still one group.
+  function settingsGroupsAcross(bucket) {
+    const out = [];
+    Object.keys(bucket || {}).forEach(p => settingsGroupNames(bucket[p]).forEach(n => { if (out.indexOf(n) < 0) out.push(n); }));
+    return out;
+  }
+
   // shared apply-plan renderer (templates + restore)
-  function tagHtml(cls, sign, arr) { return (arr && arr.length) ? `<span class="tag ${cls}">${sign}${arr.length}</span>` : ''; }
   function renderApplyPlan(res, st, plan, accountId, okMsg, extras) {
+    // The caller put a "Reading target…" shimmer up while it planned. The plan
+    // is here, so the reading is over — leaving it running left a shimmer on a
+    // surface with nothing in flight, which is the one thing that class means.
+    status(st, '');
     clr(res); const r = plan.report; const d = el('div', 'report');
-    const line = (label, o) => { if (!o) return; const bits = [tagHtml('add', '+', o.added), tagHtml('upd', '~', o.updated), tagHtml('rem', '−', o.removed)].filter(Boolean); if (bits.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' '); d.appendChild(x); } };
+    const line = (label, o) => {
+      if (!o) return;
+      const bits = [
+        nameTags('add', '+ ', o.added, 'Added to the profile'),
+        nameTags('upd', '~ ', o.updated, 'Already there, and changed'),
+        nameTags('rem', '− ', o.removed, 'Removed from the profile'),
+      ].filter(Boolean);
+      if (!bits.length) return;
+      const x = el('div', 'rline');
+      x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' ');
+      d.appendChild(x);
+    };
     line('Add-ons', r.addons); line('Plugins', r.plugins); line('Collections', r.collections);
     if (r.settings) {
       let ch = 0; const gapDetail = [], skipDetail = [];
@@ -2113,19 +2342,21 @@
         settingsSkipLines(r.settings[p], p).forEach(s => skipDetail.push(s));
         (r.settings[p].wontApply || []).forEach(g => gapDetail.push(p + ': ' + g));
       }
+      const groups = settingsGroupsAcross(r.settings);
       if (ch || skipDetail.length || gapDetail.length) {
         const x = el('div', 'rline');
         x.innerHTML = `<span class="rk">Settings</span>`
-          + (ch ? `<span class="tag upd">${ch} fields</span>` : '')
-          + (skipDetail.length ? `<span class="tag held" title="${esc(skipDetail.join('\n'))}">${skipDetail.length} skipped</span>` : '')
-          + (gapDetail.length ? `<span class="tag warn" title="${esc(gapDetail.join('\n'))}">${gapDetail.length} won't apply</span>` : '');
+          + nameTags('upd', '~ ', groups, 'Settings in this section change')
+          + (skipDetail.length ? ` <span class="tag held" title="${esc(skipDetail.join('\n'))}">some held back</span>` : '')
+          + (gapDetail.length ? ` <span class="tag warn" title="${esc(gapDetail.join('\n'))}">some won't apply</span>` : '');
         d.appendChild(x);
       }
     }
-    if (extras && Array.isArray(extras.watched) && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Watched</span><span class="tag add">+${extras.watched.length}</span>`; d.appendChild(x); }
-    if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Progress</span><span class="tag add">+${extras.watchProgress.length}</span>`; d.appendChild(x); }
-    if (extras && extras.identity && extras.identity.name) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Profile</span><span class="tag upd">name & photo</span>`; d.appendChild(x); }
-    if (extras && Array.isArray(extras.credentials) && extras.credentials.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">API keys</span><span class="tag add">+${extras.credentials.length}</span>`; d.appendChild(x); }
+    const itemLine = (label, n) => { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span><span class="tag add">${n} item${n === 1 ? '' : 's'}</span>`; d.appendChild(x); };
+    if (extras && Array.isArray(extras.watched) && extras.watched.length) itemLine('Watched', extras.watched.length);
+    if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) itemLine('Progress', extras.watchProgress.length);
+    if (extras && extras.identity && extras.identity.name) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Profile</span>` + nameTags('upd', '', [extras.identity.name + ' (name & photo)'], 'The profile is renamed'); d.appendChild(x); }
+    if (extras && Array.isArray(extras.credentials) && extras.credentials.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">API keys</span>` + nameTags('add', '+ ', extras.credentials.map(c => c.provider), 'This key is written to the profile'); d.appendChild(x); }
     const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name) || (extras.credentials && extras.credentials.length));
     if (!plan.hasChanges && !hasExtras) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
     res.appendChild(d);
@@ -2185,8 +2416,8 @@
     if (!list.length) { $('sy-body').classList.remove('open'); $('sy-empty').style.display = ''; return; }
     $('sy-empty').style.display = 'none'; $('sy-body').classList.add('open');
     sel.value = (prev && list.some(r => r.accountId === prev)) ? prev : (syA && list.some(r => r.accountId === syA) ? syA : list[0].accountId);
-    // the desk is only measurable once its panel is on screen
-    syOpenSec(sySecOpen || 'source');
+    sySecOpen = sySecOpen || 'source';
+    syncSteps();
     renderSySource(sel.value);
   }
   async function renderSySource(id) {
@@ -2235,7 +2466,13 @@
       renderReviewEmpty();
       const prof = (await loadAccount(id)).profiles.find(p => p.index === idx);
       sySrcLabel = prof ? (prof.name + ' · ' + accountName(id)) : '';
-      if (userPicked) syOpenSec('targets', { scroll: true }); else { syncSteps(); syRemeasure(); }
+      if (userPicked) {
+        // Close the source dialog first: two dialogs must never be open at once,
+        // and openMkPop's own closeMkPop would take the borrowed body with it
+        // before onClose had put it back.
+        closeMkPop();
+        setTimeout(() => { if (!mkPop) syPickDialog('targets'); }, 200);
+      } else { syncSteps(); syRemeasure(); }
     } catch (e) { sySnap = null; status($('sy-status'), "Couldn't read source: " + e.message, 'err'); }
   }
   function resetSel() {
@@ -2522,6 +2759,10 @@
   function syMeasure(sec) {
     const w = sec.querySelector('.sy-sec-w'), b = sec.querySelector('.sy-sec-b');
     if (!w || !b) return;
+    // A fixed section rests at auto for good, so a chooser opening inside it
+    // grows it with no measuring at all — and the height:auto trap that used to
+    // live here cannot apply. A picked section's body is not in the column.
+    if (sec.classList.contains('sy-sec-fixed') || sec.classList.contains('sy-pick')) { w.style.height = ''; return; }
     clearTimeout(w.__t);
     const anim = !((M.reduced && M.reduced()) || document.hidden);
     if (!sec.classList.contains('open')) {
@@ -2539,27 +2780,37 @@
     w.style.height = next + 'px';
     w.__t = setTimeout(() => { if (sec.classList.contains('open')) w.style.height = 'auto'; }, 320);
   }
-  function syOpenSec(key, opts) {
-    sySecOpen = key;
-    sySecs().forEach(sec => {
-      sec.classList.toggle('open', sec.dataset.systep === key);
-      syMeasure(sec);
-    });
+  // Steps 1 and 2 are dialogs now. "Which profile" and "which profiles" are one
+  // question each, and a question you answer once should not hold the column
+  // open while you answer the next one — which is what the accordion did, and
+  // why the worksheet below it was always half off-screen.
+  //
+  // The dialog BORROWS the live section body and gives it back on close: the
+  // same rule ui-motion's carry chooser, the wizard's route panes and the
+  // profile pane pop-out all follow. renderSySource and renderSyTargets keep
+  // writing into exactly the same nodes and neither knows where they are.
+  function syPickDialog(key) {
+    const sec = sySecs().find(x => x.dataset.systep === key); if (!sec) return;
+    const body = sec.querySelector('.sy-sec-b'); if (!body) return;
+    const home = body.parentNode;
+    const meta = key === 'source'
+      ? { t: 'Choose source', s: 'The profile whose setup gets copied.' }
+      : { t: 'Choose recipients', s: 'Every profile ticked here receives it.' };
+    const pop = openMkPop(null, meta.t, meta.s);
+    pop.root.classList.add('sy-pick-dlg');
+    pop.body.appendChild(body);
+    pop.onClose = () => { if (body.parentNode !== home) home.appendChild(body); syncSteps(); };
+    const done = el('button', 'btn btn-primary', 'Done');
+    done.onclick = closeMkPop;
+    pop.foot.appendChild(done);
     syncSteps();
-    if (opts && opts.scroll) {
-      const sec = sySecs().find(x => x.dataset.systep === key);
-      // The section is growing for the next ~260 ms. A smooth scroll aimed at a
-      // target whose height is changing under it overshoots and then crawls
-      // back, which is most of what read as jank here. Aim at the section's
-      // HEADER, which does not move, and only scroll when it is actually out of
-      // view — a scroll that had nothing to do never looks smooth.
-      const head = sec && sec.querySelector('.sy-sec-h');
-      if (head) requestAnimationFrame(() => {
-        const r = head.getBoundingClientRect();
-        if (r.top >= 0 && r.bottom <= (window.innerHeight || 0)) return;
-        head.scrollIntoView({ block: 'nearest', behavior: ((M.reduced && M.reduced()) || document.hidden) ? 'auto' : 'smooth' });
-      });
-    }
+  }
+  // Step 3 is always open, so "open a section" only ever means one of the two
+  // dialogs. Kept under the old name because several call sites say it.
+  function syOpenSec(key) {
+    if (key === 'carry') { sySecOpen = 'carry'; syncSteps(); return; }
+    sySecOpen = key;
+    syPickDialog(key);
   }
   // Re-measure whenever something inside a section changes its height (a carry
   // chooser opening, targets finishing their load) so the accordion never clips.
@@ -2600,17 +2851,27 @@
       // for the surfaces that cannot measure.
       carry: { done: carry.length > 0, parts: carry, sum: carry.length ? carry.join(', ') : 'Nothing selected yet.' }
     };
+    // With two of the three steps living in dialogs, "which one is open" is a
+    // state that lasts a few seconds and is not worth drawing. The stepper shows
+    // PROGRESS instead: every answered step is done, and the highlight sits on
+    // the first one still waiting for an answer.
+    const order = ['source', 'targets', 'carry'];
+    const next = order.find(k => !state[k].done) || 'carry';
     document.querySelectorAll('.sy-step[data-systep]').forEach(b => {
       const k = b.dataset.systep, st = state[k];
-      b.classList.toggle('on', sySecOpen === k);
-      b.classList.toggle('done', st.done && sySecOpen !== k);
-      b.setAttribute('aria-selected', sySecOpen === k ? 'true' : 'false');
+      b.classList.toggle('on', k === next);
+      b.classList.toggle('done', st.done);
+      b.setAttribute('aria-selected', k === next ? 'true' : 'false');
       const sum = b.querySelector('.sy-step-sum');
       if (sum) { if (st.parts && st.parts.length) fitParts(sum, st.parts); else sum.textContent = st.sum; }
     });
     sySecs().forEach(sec => {
       const st = state[sec.dataset.systep]; if (!st) return;
-      const sum = sec.querySelector('.sy-sec-sum'); if (sum) sum.textContent = st.done ? st.sum : '';
+      const sum = sec.querySelector('.sy-sec-sum'); if (!sum) return;
+      // A picked row shows its answer whether or not one has been given — it is
+      // the only thing on that row, so an empty one would read as broken.
+      sum.textContent = sec.classList.contains('sy-pick') ? st.sum : (st.done ? st.sum : '');
+      sum.classList.toggle('on', !!st.done);
     });
   }
   function updateSyCounts() {
@@ -2652,7 +2913,7 @@
           const on = syTargets.has(tid), first = syTargets.size === 0;
           on ? syTargets.delete(tid) : syTargets.add(tid);
           c.classList.toggle('on', !on); syncAcctBtn(); updateApplyBtnLabel(); scheduleLivePreview();
-          if (first && !on) syOpenSec('carry', { scroll: true });
+          void first;
         };
         chips.appendChild(c);
       });
@@ -2857,11 +3118,12 @@
 
       const line = (label, o) => {
         if (!o) return null;
-        const bits = [];
-        if (o.added && o.added.length) bits.push('<span class="tag add">+' + o.added.length + '</span>');
-        if (o.updated && o.updated.length) bits.push('<span class="tag upd">~' + o.updated.length + '</span>');
-        if (o.removed && o.removed.length) bits.push('<span class="tag rem">−' + o.removed.length + '</span>');
-        if (o.keptLocal && o.keptLocal.length) bits.push('<span class="tag keep">keeps ' + o.keptLocal.length + '</span>');
+        const bits = [
+          nameTags('add', '+ ', o.added, 'Added to this profile'),
+          nameTags('upd', '~ ', o.updated, 'Already there, and changed'),
+          nameTags('rem', '− ', o.removed, 'Removed from this profile'),
+          nameTags('keep', 'kept ', o.keptLocal, 'Only this profile has it already — a merge leaves it alone'),
+        ].filter(Boolean);
         if (!bits.length) return null;
         const x = el('div', 'rline'); x.innerHTML = '<span class="rk">' + label + '</span>' + bits.join(' '); return x;
       };
@@ -2877,24 +3139,38 @@
           (r.settings[pl].removed || []).forEach(g => remDetail.push(pl + ': ' + g));
           (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g));
         }
+        const groups = settingsGroupsAcross(r.settings);
         if (ch || skipDetail.length || gapDetail.length || remDetail.length) {
           const x = el('div', 'rline');
           x.innerHTML = '<span class="rk">Settings</span>'
-            + (ch ? '<span class="tag upd">' + ch + '</span>' : '')
-            + (remDetail.length ? '<span class="tag rem" title="' + esc(remDetail.join('\n')) + '">−' + remDetail.length + '</span>' : '')
-            + (skipDetail.length ? '<span class="tag held" title="' + esc(skipDetail.join('\n')) + '">' + skipDetail.length + ' skipped</span>' : '')
-            + (gapDetail.length ? '<span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">' + gapDetail.length + ' won\'t apply</span>' : '');
+            + nameTags('upd', '~ ', groups, 'Settings in this section change')
+            + (remDetail.length ? ' <span class="tag rem" title="' + esc(remDetail.join('\n')) + '">some dropped</span>' : '')
+            + (skipDetail.length ? ' <span class="tag held" title="' + esc(skipDetail.join('\n')) + '">some held back</span>' : '')
+            + (gapDetail.length ? ' <span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">some won\'t apply</span>' : '');
           rows.push(x);
         }
       }
-      if (extras.watchProgress && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Progress</span><span class="tag add">+' + extras.watchProgress.length + '</span>'; rows.push(x); }
-      if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span><span class="tag add">+' + extras.watched.length + '</span>'; rows.push(x); }
+      const nItems = n => '<span class="tag add">' + n + ' item' + (n === 1 ? '' : 's') + '</span>';
+      if (extras.watchProgress && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Progress</span>' + nItems(extras.watchProgress.length); rows.push(x); }
+      if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span>' + nItems(extras.watched.length); rows.push(x); }
       // removals line — explicit
       const remRow = el('div', 'rline');
+      const remNames = []
+        .concat((r.addons && r.addons.removed) || [])
+        .concat((r.plugins && r.plugins.removed) || [])
+        .concat((r.collections && r.collections.removed) || []);
       let settingsRem = 0;
-      if (r.settings) for (const pl of Object.keys(r.settings)) settingsRem += (r.settings[pl].removed || []).length;
-      const totalRem = ((r.addons && (r.addons.removed || []).length) || 0) + ((r.plugins && (r.plugins.removed || []).length) || 0) + ((r.collections && (r.collections.removed || []).length) || 0) + settingsRem;
-      remRow.innerHTML = '<span class="rk">Removals</span>' + (totalRem ? '<span class="tag rem">−' + totalRem + '</span>' : '<span style="font-size:12px;color:var(--t45)">None</span>');
+      if (r.settings) for (const pl of Object.keys(r.settings)) {
+        (r.settings[pl].removed || []).forEach(g => {
+          settingsRem++;
+          const label = (E && E.groupLabel) ? E.groupLabel(String(g).split('.')[0]) : g;
+          if (remNames.indexOf(label) < 0) remNames.push(label);
+        });
+      }
+      const totalRem = remNames.length || settingsRem;
+      remRow.innerHTML = '<span class="rk">Removals</span>'
+        + (totalRem ? nameTags('rem', '− ', remNames, 'This goes from the profile')
+                    : '<span style="font-size:12px;color:var(--t45)">None</span>');
       if (rows.length) rows.forEach(rw => d.appendChild(rw));
       d.appendChild(remRow);
       if (!rows.length && !totalRem) d.appendChild(el('div', 'no-change', 'Already matches — nothing to do.'));
@@ -3019,7 +3295,7 @@
     try {
       const out = { app: 'numax', kind: 'backup', savedAt: new Date().toISOString(), includesKeys: keys, profiles: [] }; const by = {};
       picked.forEach(tid => { const [id, i] = tid.split(':'); (by[id] = by[id] || []).push(parseInt(i, 10)); });
-      for (const aid of Object.keys(by)) { const c = A.client(store, aid); const { backup } = await loadAccount(aid); for (const idx of by[aid]) { const slice = sliceProfile(backup, idx); const meta = cache[aid].profiles.find(p => p.index === idx) || { name: 'Profile ' + idx }; const settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) settings[pl] = keys ? row.settings_json : stripKeys(row.settings_json); } out.profiles.push({ account: accountName(aid), accountId: aid, profileIndex: idx, name: meta.name, addons: slice.addons, plugins: slice.plugins, collections: slice.collections, settings }); } }
+      for (const aid of Object.keys(by)) for (const idx of by[aid]) out.profiles.push(await fullProfileBackup(aid, idx, { keys }));
       status(log, 'Uploading…'); const files = await driveFindByProp('numax', 'backup'); const existing = files.find(f => f.name === (safeName(name).endsWith('.json') ? safeName(name) : safeName(name) + '.json'));
       const r = await driveUpload(safeName(name).endsWith('.json') ? safeName(name) : safeName(name) + '.json', out, { numax: 'backup' }, existing && existing.id);
       status(log, (existing ? 'Updated ' : 'Saved ') + r.name + ' (' + out.profiles.length + ' profile' + (out.profiles.length === 1 ? '' : 's') + ').', 'ok'); logAct((existing ? 'Updated' : 'Saved') + ' backup "' + r.name + '"', 'ok'); celebrate($('dr-backup-btn').closest('.card')); refreshRestore();
@@ -3038,18 +3314,69 @@
     if (!Array.isArray(restoreDoc.profiles) || !restoreDoc.profiles.length) { clr(cfg); cfg.appendChild(el('p', 'empty sm', 'No profiles in that backup.')); return; }
     clr(cfg); cfg.appendChild(el('div', 'set-group-h', 'Restore from ' + file.name));
     const sw = el('label', 'fld'); sw.style.cssText = 'max-width:440px;margin-top:10px'; sw.appendChild(el('span', '', 'Which saved profile')); const src = el('select', 'sel'); restoreDoc.profiles.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name + ' · ' + (p.account || 'backup'); src.appendChild(o); }); sw.appendChild(src); cfg.appendChild(sw);
-    const tw = el('label', 'fld'); tw.style.cssText = 'max-width:440px;margin-top:10px'; tw.appendChild(el('span', '', 'Restore into')); const tsel = el('select', 'sel'); tw.appendChild(tsel); cfg.appendChild(tw);
-    for (const rec of store.list()) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } profiles.forEach(p => { const o = document.createElement('option'); o.value = rec.accountId + ':' + p.index; o.textContent = p.name + ' · ' + accountName(rec.accountId); tsel.appendChild(o); }); }
+    // "Restore into" is a dialog, not a dropdown — and the dialog is the one
+    // place that can offer a profile that does not exist yet.
+    const tw = el('div', 'fld'); tw.style.cssText = 'max-width:440px;margin-top:10px';
+    tw.appendChild(el('span', '', 'Restore into'));
+    const tbtn = el('button', 'btn btn-ghost dr-pickbtn', 'Choose a profile…'); tbtn.type = 'button';
+    tw.appendChild(tbtn); cfg.appendChild(tw);
+    let target = null;
+    const paintTarget = () => {
+      clr(tbtn);
+      if (!target) { tbtn.appendChild(document.createTextNode('Choose a profile…')); return; }
+      tbtn.appendChild(avatar(target.profile || { name: target.name }, 22));
+      tbtn.appendChild(el('span', 'dr-pickname', target.name + ' · ' + accountName(target.aid)));
+      tbtn.appendChild(el('span', 'dr-pickchange', 'Change'));
+    };
+    tbtn.onclick = async () => {
+      const savedNow = restoreDoc.profiles[parseInt(src.value, 10)] || {};
+      const picked = await pickProfileDialog({
+        title: 'Restore into which profile?',
+        sub: 'Pick the profile this backup is written onto. Anything it does not cover is left alone.',
+        label: 'Restore into',
+        allowNew: true,
+        suggestName: savedNow.name || '',
+      });
+      if (!picked) return;
+      target = picked;
+      const rec = (profilesCached(picked.aid) || []).find(p => p.index === picked.idx);
+      if (rec) target.profile = rec;
+      paintTarget();
+      // A profile that was just made has Nuvio's two default add-ons and
+      // nothing else, so "make it match the backup" is what was actually meant.
+      if (picked.created) { msel.value = 'overwrite'; msel.dispatchEvent(new Event('change', { bubbles: true })); }
+      status(st, picked.created ? 'Made “' + picked.name + '”. Preview the restore to see what goes onto it.' : '', picked.created ? 'ok' : '');
+    };
+    paintTarget();
+
     const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:10px'; mw.appendChild(el('span', '', 'How to apply')); const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge</option><option value="overwrite" data-label="Overwrite" data-hint="make this profile match the backup exactly">Overwrite</option>'; mw.appendChild(msel); cfg.appendChild(mw);
     const bar = el('div', 'actbar'); const btn = el('button', 'btn btn-primary', 'Preview restore'); const st = el('div', 'inline-status'); bar.appendChild(btn); bar.appendChild(st); cfg.appendChild(bar); const res = el('div'); res.style.marginTop = '12px'; cfg.appendChild(res);
     btn.onclick = async () => {
-      const saved = restoreDoc.profiles[parseInt(src.value, 10)]; const tid = tsel.value; if (!tid) { status(st, 'Pick a target.', 'err'); return; } const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10); const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
+      const saved = restoreDoc.profiles[parseInt(src.value, 10)];
+      if (!target) { status(st, 'Pick a profile to restore into.', 'err'); return; }
+      const aid = target.aid, idx = target.idx;
+      const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
       status(st, 'Reading target…');
-      try { const master = { addons: saved.addons || [], plugins: saved.plugins || [], collections: saved.collections || [], settings: saved.settings || {} }; const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
-        if (saved.settings && Object.keys(saved.settings).length) { state.settings = {}; for (const pl of ['tv', 'mobile']) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
+      try {
+        const master = { addons: saved.addons || [], plugins: saved.plugins || [], collections: saved.collections || [], settings: saved.settings || {} };
+        const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
+        // Every platform the BACKUP holds, not a hardcoded two — a desktop blob
+        // in the file used to be read against nothing and silently skipped.
+        if (saved.settings && Object.keys(saved.settings).length) { state.settings = {}; for (const pl of Object.keys(saved.settings)) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
         const cats = { addons: !!saved.addons, plugins: !!saved.plugins, collections: !!saved.collections, settings: !!(saved.settings && Object.keys(saved.settings).length) };
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        renderApplyPlan(res, st, plan, aid, 'Restored'); } catch (e) { status(st, e.message, 'err'); }
+        // includeSecrets here is safe for the same reason it is on a template: a
+        // backup only holds key values if it was taken with "Include API keys" on.
+        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: !!restoreDoc.includesKeys }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
+        // A backup now carries the whole profile, so a restore puts the whole
+        // profile back — identity, watch history and provider keys included.
+        renderApplyPlan(res, st, plan, aid, 'Restored', {
+          profileId: idx,
+          watched: saved.watched, watchProgress: saved.watchProgress,
+          identity: saved.profile || (saved.name ? { name: saved.name } : null),
+          credentials: saved.credentials,
+          credentialsReplace: msel.value === 'overwrite',
+        });
+      } catch (e) { status(st, e.message, 'err'); }
     };
   }
 
@@ -3552,6 +3879,17 @@
         };
         chips.appendChild(c); nodes.push({ key, node: c });
       });
+      // Nuvio caps an account at six profiles, so the chip only appears where
+      // there is actually a slot — a control that could only ever refuse is
+      // worse than no control (the same rule the profile delete ✕ follows).
+      if (o.onNew && g.items.length < 6) {
+        const nb = el('button', 'pchip multi mk-pick-chip mk-pick-new'); nb.type = 'button';
+        nb.appendChild(el('span', 'mk-pick-plus', '+'));
+        nb.appendChild(el('span', 'pcn', 'New profile'));
+        nb.title = 'Make a new profile on ' + g.name;
+        nb.onclick = () => o.onNew(g.aid, g.name);
+        chips.appendChild(nb);
+      }
       inner.appendChild(chips); w.appendChild(inner); sec.appendChild(w);
 
       const sync = () => {
@@ -3618,6 +3956,67 @@
     // synchronously and only when the dialog actually has a width: a hidden
     // dialog measures every name as overflowing and would shrink them all.
     wrap.querySelectorAll('.mk-pick-chip .pcn').forEach(fitChipName);
+  }
+
+  // "Which profile?" as a dialog rather than a dropdown. It is the same grouped,
+  // avatar-carrying picker the Marketplace already uses, so every surface that
+  // asks this question looks and behaves the same — and a long list of profiles
+  // gets a dialog's room instead of an OS-drawn select.
+  //
+  // `allowNew` offers a "+ New profile" chip on any account still under Nuvio's
+  // cap of six. Picking it names and creates the profile there and then, through
+  // createProfileOn and all of its safety checks, and resolves with it, so the
+  // caller never has to know which of the two happened.
+  //
+  // Resolves { aid, idx, name, created } or null when the dialog is dismissed.
+  function pickProfileDialog(o) {
+    const opts = o || {};
+    return new Promise(resolve => {
+      const pop = openMkPop(null, opts.title || 'Choose a profile', opts.sub || '');
+      const mine = pop;
+      const stale = () => mkPop !== mine;
+      // The answer is recorded BEFORE the dialog is closed, and onClose is the
+      // single place that resolves. closeMkPop() runs onClose synchronously, so
+      // a "close, then resolve" order would have the close resolve with null
+      // first and the real answer would be thrown away — which is exactly what
+      // it did.
+      let picked = null, settled = false;
+      pop.onClose = () => { if (settled) return; settled = true; resolve(picked); };
+
+      const tbox = el('div', 'mk-tgts'); pop.body.appendChild(tbox);
+      const st = el('div', 'inline-status'); st.style.marginTop = '10px'; pop.body.appendChild(st);
+
+      const chosen = new Set();
+      let targets = [];
+      const take = () => {
+        const key = [...chosen][0]; if (!key) return;
+        const t = targets.find(x => x.aid + ':' + x.idx === key); if (!t) return;
+        picked = { aid: t.aid, idx: t.idx, name: t.name, profile: t.profile || null, created: false };
+        closeMkPop();
+      };
+
+      const onNew = async (aid, acctName) => {
+        const name = await uiPrompt('Name the new profile on ' + acctName, opts.suggestName || '');
+        if (name == null || !String(name).trim()) return;
+        if (stale()) return;
+        try {
+          const made = await createProfileOn(aid, String(name).trim(), null, m => status(st, m));
+          logAct('Created profile ' + String(name).trim() + ' (index ' + made.index + ') on ' + acctName, 'ok');
+          if (stale()) return;
+          picked = { aid, idx: made.index, name: String(name).trim(), profile: null, created: true };
+          closeMkPop();
+        } catch (e) {
+          if (!stale()) status(st, "Couldn't create it: " + e.message, 'err');
+          logAct('Profile create failed — ' + e.message, 'err');
+        }
+      };
+
+      mkFillTargets(tbox, chosen, take, stale, {
+        single: true,
+        label: opts.label || 'Choose a profile',
+        onNew: opts.allowNew ? onNew : null,
+      }).then(got => { if (!stale() && got) targets = got; });
+    });
   }
 
   // Shrink a profile name until it fits its chip, down to a floor — below that
@@ -5179,34 +5578,51 @@
   // they disagree; on top of that this refuses to push at all unless the
   // cross-check actually ran, and re-reads immediately afterwards to confirm
   // every profile that existed before still exists.
+  // The one place a profile is created. Both callers — the wizard's step 1 and
+  // Restore's "into a new profile" — go through this, because adding a profile
+  // is a `sync_push_profiles` over the WHOLE list and every one of the checks
+  // below is load-bearing:
+  //   - two independent reads that have to agree (wzReadProfiles). A check made
+  //     against the same read you built the list from proves only that you
+  //     appended correctly, and says nothing about whether the read was short.
+  //   - the appended list must still contain every index that was there.
+  //   - a read-back afterwards proving the new one arrived and none went.
+  // Any future caller must use this rather than writing its own.
+  async function createProfileOn(aid, name, color, onStatus) {
+    const say = m => { if (onStatus) onStatus(m); };
+    const c = A.client(store, aid);
+    say('Checking the account before writing…');
+    const read = await wzReadProfiles(aid);
+    if (!read.crossChecked) {
+      throw new Error('could not double-check the profile list against Nuvio, and adding a profile rewrites the whole list — not risking it. Reload and try again');
+    }
+    if (read.idx.length >= 6) throw new Error('this account already has all six profiles');
+    let next = 1; while (read.idx.includes(next)) next++;
+    if (next > 6) throw new Error('no free profile slot');
+    const row = { profile_index: next, name: String(name).slice(0, 60), avatar_color_hex: color || '#1E88E5',
+      uses_primary_addons: false, uses_primary_plugins: false, avatar_id: null, avatar_url: null };
+    const nextList = read.rows.map(normRow).concat([row]);
+    const missing = read.idx.filter(i => !nextList.some(p => p.profile_index === i));
+    if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost');
+    say('Creating the profile…');
+    await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
+    inval(aid);
+    const after = await wzReadProfiles(aid);
+    if (!after.idx.includes(next)) throw new Error('Nuvio accepted the write but the profile is not there afterwards');
+    const lost = read.idx.filter(i => !after.idx.includes(i));
+    if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
+    return { index: next, before: read.idx, after: after.idx };
+  }
+
   async function wzCreateProfile() {
     const aid = $('wz-account').value, st = $('wz-profile-status');
     const name = $('wz-prof-name').value.trim();
     if (!aid) { status(st, 'Pick an account first.', 'err'); return; }
     if (!name) { status(st, 'Give the profile a name.', 'err'); return; }
     const btn = $('wz-prof-create'); btn.disabled = true;
-    status(st, 'Checking the account before writing…');
     try {
-      const c = A.client(store, aid);
-      const read = await wzReadProfiles(aid);
-      if (!read.crossChecked) {
-        throw new Error('could not double-check the profile list against Nuvio, and adding a profile rewrites the whole list — not risking it. Reload and try again');
-      }
-      if (read.idx.length >= 6) throw new Error('this account already has all six profiles');
-      let next = 1; while (read.idx.includes(next)) next++;
-      if (next > 6) throw new Error('no free profile slot');
-      const row = { profile_index: next, name: name.slice(0, 60), avatar_color_hex: $('wz-prof-color').value || '#1E88E5',
-        uses_primary_addons: false, uses_primary_plugins: false, avatar_id: null, avatar_url: null };
-      const nextList = read.rows.map(normRow).concat([row]);
-      const missing = read.idx.filter(i => !nextList.some(p => p.profile_index === i));
-      if (missing.length) throw new Error('safety check failed — profile ' + missing.join(', ') + ' would have been lost');
-      status(st, 'Creating the profile…');
-      await c.rpc('sync_push_profiles', { p_profiles: nextList, p_client_max_profiles: 6 });
-      inval(aid);
-      const after = await wzReadProfiles(aid);
-      if (!after.idx.includes(next)) throw new Error('Nuvio accepted the write but the profile is not there afterwards');
-      const lost = read.idx.filter(i => !after.idx.includes(i));
-      if (lost.length) throw new Error('profile ' + lost.join(', ') + ' went missing — restore from a Drive backup straight away');
+      const made = await createProfileOn(aid, name, $('wz-prof-color').value, m => status(st, m));
+      const next = made.index, read = { idx: made.before }, after = { idx: made.after };
       wz.aid = aid; wz.idx = next; wz.done = ['Created the profile “' + name + '”.'];
       // Creating a profile IS a change to the account, so the run locks here
       // too — and Exit can offer to delete exactly the profile it made.
@@ -7968,7 +8384,7 @@
     document.querySelectorAll('.pf-editor-tab').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     document.querySelectorAll('.pf-stat').forEach(b => b.onclick = () => switchPfEditorTab(b.dataset.pftab));
     $('pf-save-btn').onclick = saveAllDirty;
-    if ($('pf-settings-pop')) $('pf-settings-pop').onclick = openPfSettingsDialog;
+    if ($('pf-pane-pop')) $('pf-pane-pop').onclick = openPfPaneDialog;
     $('pf-tpl-profile').onclick = openSaveTemplateModal;
     // ---- setup wizard ----
     // Guarded as a block: wizard.js is optional in exactly the way market.js is,
@@ -8015,11 +8431,19 @@
     $('mk-prov-refresh').onclick = () => renderMkPlugins(true);
     $('mk-prov-close').onclick = () => { $('mk-prov-detail-card').style.display = 'none'; };
     $('sy-account').onchange = () => renderSySource($('sy-account').value);
-    // stepper: the header chips and the section headers open the same sections
-    document.querySelectorAll('.sy-step[data-systep]').forEach(b => b.onclick = () => syOpenSec(b.dataset.systep, { scroll: true }));
-    document.querySelectorAll('.sy-sec[data-systep] .sy-sec-h').forEach(h => h.onclick = () => {
-      const sec = h.closest('.sy-sec');
-      syOpenSec(sec.classList.contains('open') ? '' : sec.dataset.systep);
+    // Steps 1 and 2 open their dialog from either their own Choose button or
+    // their chip in the stepper. Step 3 is always open, so its chip only
+    // scrolls the worksheet into view rather than pretending to switch to it.
+    document.querySelectorAll('.sy-pick-btn[data-sypick]').forEach(b => b.onclick = () => syPickDialog(b.dataset.sypick));
+    document.querySelectorAll('.sy-step[data-systep]').forEach(b => b.onclick = () => {
+      const k = b.dataset.systep;
+      if (k === 'carry') {
+        const sec = sySecs().find(x => x.dataset.systep === 'carry');
+        const head = sec && sec.querySelector('.sy-sec-h');
+        if (head) head.scrollIntoView({ block: 'nearest', behavior: ((M.reduced && M.reduced()) || document.hidden) ? 'auto' : 'smooth' });
+        return;
+      }
+      syPickDialog(k);
     });
     $('sy-oldapp-dismiss').onclick = () => { $('sy-oldapp-notice').style.display = 'none'; };
     $('sy-select-all').onclick = sySelectAll;
