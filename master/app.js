@@ -474,6 +474,7 @@
       if (opts.input) { inp.style.display = ''; inp.value = opts.defaultVal || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30); } else inp.style.display = 'none';
       ok.textContent = opts.okLabel || 'Confirm'; ok.className = 'btn ' + (opts.danger ? 'danger-btn' : 'btn-primary');
       cancel.style.display = opts.noCancel ? 'none' : '';
+      cancel.textContent = opts.cancelLabel || 'Cancel';
       root.style.display = '';
       const done = v => { root.style.display = 'none'; ok.onclick = cancel.onclick = $('modal-bg').onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
       ok.onclick = () => done(opts.input ? inp.value : true);
@@ -3230,7 +3231,6 @@
   // DRIVE (backup / restore)
   // ======================================================================
   async function refreshDrive() {
-    status($('dr-status'), gAuth.token ? (gAuth.user && gAuth.user.email ? 'Connected as ' + gAuth.user.email : 'Connected.') : 'Not connected.', gAuth.token ? 'ok' : 'err');
     const box = $('dr-backup-picker'); const list = store.list();
     // refreshRestore() must run on EVERY path: it owns the restore list, whose
     // placeholder is static markup in index.html. The old early return here
@@ -5304,7 +5304,7 @@
     wzVerified.clear();
     ['keys', 'streams', 'meta'].forEach(k => { wzPending[k].length = 0; });
     ['wz-entry', 'wz-keys', 'wz-meta', 'wz-collections', 'wz-modes', 'wz-routes', 'wz-instances',
-     'wz-native-debrid', 'wz-p2p', 'wz-plugins', 'wz-stream-addons', 'wz-aio-install', 'wz-p2p-install',
+     'wz-native-debrid', 'wz-p2p', 'wz-stream-addons', 'wz-aio-install', 'wz-p2p-install',
      'wz-sim-install', 'wz-sim-result', 'wz-native-res', 'wz-keys-res', 'wz-summary']
       .forEach(id => { const n = $(id); if (n) { n.dataset.built = ''; clr(n); } });
     // The TorBox box keeps its own built flag (its tick is wired to it, not to
@@ -5318,7 +5318,7 @@
     ['wz-keys-status', 'wz-native-status', 'wz-sim-status', 'wz-profile-status', 'wz-new-status',
      'wz-inst-status'].forEach(id => { const n = $(id); if (n) status(n, ''); });
     ['wz-sim-result', 'wz-sim-install', 'wz-mode-simple', 'wz-mode-advanced', 'wz-route-aiostreams',
-     'wz-route-native', 'wz-route-plugins', 'wz-newprof'].forEach(id => { const n = $(id); if (n) n.style.display = 'none'; });
+     'wz-route-native', 'wz-newprof'].forEach(id => { const n = $(id); if (n) n.style.display = 'none'; });
     if ($('wz-account')) $('wz-account').disabled = false;
     refreshWizard();
   }
@@ -5371,66 +5371,56 @@
   // of the two answers applies, instead of being two full columns of controls
   // that only one of them will ever use.
   // The two front doors are the only thing on their screen, so they carry the
-  // screen. `art` is drawn here rather than borrowed: there is no third party
-  // to take a mark from, and the wizard's own step icon is the only other
-  // drawn thing in the app. Line weight matches the sidebar icons.
+  // screen (redrawn 2026-09-17, Furqan: "they look empty, random pieces put
+  // together"). Each is one composed card: a kicker, the answer, a line on
+  // what it does, three things that happen, and a call to action — with the
+  // mascot as the picture. Waving on the first (welcome back); peeking up over
+  // the bottom edge on the second (new here).
   // Nuvio's published icon, read off the <link rel="icon"> on nuvio.tv and
   // checked live (200, image/png). Never a guessed URL — same rule as the
   // curated add-on list.
   const NUVIO_MARK = 'https://nuvio.tv/assets/Logo_1080x1080.png';
   const WZ_ENTRY = [
-    // Nuvio's own mark carries both cards — it is what the question is about,
-    // and a real logo reads as the product where a hand-drawn rectangle reads
-    // as a placeholder. The URL is Nuvio's published icon, taken from the
-    // <link rel="icon"> on nuvio.tv itself and checked (200, image/png), not
-    // guessed. An <image> inside inline SVG needs no CORS; if it ever stops
-    // answering, the tile it sits in is already drawn underneath it.
-    //
-    // Both compositions are built symmetric about the centre of their own
-    // viewBox (60,48), so the two cards line up with each other.
-    // Redrawn 2026-09-15: minimal, and the mark is left ALONE. The first
-    // version clipped it into a rounded square with preserveAspectRatio
-    // "slice" — the logo is 488x536, so a square crop cut its sides off and
-    // the result read as a badly-made app icon sitting on a tile. It is drawn
-    // at its own proportions now, on nothing, with "meet" so it can never be
-    // cropped again. Everything else on the card is a hairline: one idea per
-    // card, no second colour competing with the logo's own gradient.
-    { id: 'have', name: 'I already have a Nuvio account',
-      one: 'Pick the account, then the profile you want set up from scratch.',
-      // one account, the profiles under it, the middle one being set up
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<image href="' + NUVIO_MARK + '" x="44.5" y="12" width="31" height="34" preserveAspectRatio="xMidYMid meet"/>'
-         + '<path d="M60 47v5M38 52h44M38 52v6M60 52v6M82 52v6" stroke="rgba(var(--ink),.20)" stroke-width="1.4"/>'
-         + '<rect x="28" y="58" width="20" height="20" rx="6" fill="rgba(var(--ink),.05)" stroke="rgba(var(--ink),.18)" stroke-width="1.4"/>'
-         + '<rect x="50" y="58" width="20" height="20" rx="6" fill="rgba(var(--accent-rgb),.16)" stroke="var(--accent)" stroke-width="1.6"/>'
-         + '<rect x="72" y="58" width="20" height="20" rx="6" fill="rgba(var(--ink),.05)" stroke="rgba(var(--ink),.18)" stroke-width="1.4"/></svg>' },
-    { id: 'new', name: 'I need to make a Nuvio account',
-      one: 'Creates a real Nuvio account, links it here, and signs you straight in.',
-      // the same mark, not yours yet — an empty slot, and one thing to press
-      art: '<svg viewBox="0 0 120 96" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-         + '<rect x="38" y="12" width="44" height="44" rx="13" stroke="rgba(var(--ink),.20)" stroke-width="1.4" stroke-dasharray="5 6"/>'
-         + '<image href="' + NUVIO_MARK + '" x="48" y="21" width="24" height="26" preserveAspectRatio="xMidYMid meet" opacity=".38"/>'
-         + '<circle cx="60" cy="66" r="12" fill="var(--accent)" stroke="none"/>'
-         + '<path d="M60 60v12M54 66h12" stroke="#fff" stroke-width="2.4"/></svg>' },
+    { id: 'have', kicker: 'Welcome back', name: 'I already have a Nuvio account',
+      one: 'Pick one of your linked accounts, then the profile you want set up.',
+      points: ['Uses an account already linked in Numax', 'Set up an existing profile, or add a fresh one', 'API keys, streams and metadata come next'],
+      cta: 'Choose my account', mascot: 'wave' },
+    { id: 'new', kicker: 'New to Nuvio', name: 'I need to make a Nuvio account',
+      one: 'Numax creates a real Nuvio account, links it here, and signs you straight in.',
+      points: ['An email and a password is all it takes', 'No confirmation email to wait for', 'Then straight on to your first profile'],
+      cta: 'Create an account', mascot: 'ledge' },
   ];
   function wzRenderEntry() {
     const box = $('wz-entry'); if (!box) return;
     if (box.dataset.built !== '1') {
       clr(box);
       WZ_ENTRY.forEach(e => {
-        const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); wzPaintHead(); });
+        const card = wzCard('wz-door wz-door-' + e.id, () => { wz.entry = e.id; wzPaintEntry(); wzPaintHead(); });
         card.dataset.wzentry = e.id;
-        // The mascot's first home (Furqan, 2026-09-16): peeking over the top
-        // edge of the first front door, hands on the card, eyes on the pointer.
-        if (!box.firstChild && window.NumaxMascot) {
-          const m = window.NumaxMascot.create({ pose: 'ledge', size: 104, anim: ['idle', 'blink'], follow: true, className: 'wz-entry-mascot' });
-          card.appendChild(m);
+        card.setAttribute('aria-label', e.name + '. ' + e.one);
+        const tx = el('div', 'wz-door-tx');
+        const k = el('div', 'wz-door-k');
+        const mark = el('img'); mark.src = NUVIO_MARK; mark.alt = ''; mark.onerror = () => mark.remove();
+        k.appendChild(mark); k.appendChild(el('span', '', e.kicker));
+        tx.appendChild(k);
+        tx.appendChild(el('div', 'wz-door-n', e.name));
+        tx.appendChild(el('div', 'wz-door-one', e.one));
+        const ul = el('ul', 'wz-door-pts');
+        e.points.forEach(p => ul.appendChild(el('li', '', p)));
+        tx.appendChild(ul);
+        const cta = el('span', 'wz-door-cta');
+        cta.appendChild(el('span', '', e.cta));
+        const arr = el('span', 'wz-door-arr'); arr.setAttribute('aria-hidden', 'true'); arr.textContent = '\u2192';
+        cta.appendChild(arr);
+        tx.appendChild(cta);
+        card.appendChild(tx);
+        const art = el('div', 'wz-door-art');
+        if (window.NumaxMascot) {
+          const m = window.NumaxMascot.create({ pose: e.mascot, size: '100%', follow: true });
+          art.appendChild(m);
           card.addEventListener('mouseenter', () => window.NumaxMascot.play(m, 'hop'));
         }
-        if (e.art) { const a = el('div', 'wz-entry-art'); a.innerHTML = e.art; card.appendChild(a); }
-        const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', e.name));
-        card.appendChild(h);
-        card.appendChild(el('div', 'wz-pick-one', e.one));
+        card.appendChild(art);
         box.appendChild(card);
       });
       box.dataset.built = '1';
@@ -6720,12 +6710,10 @@
       const n = $('wz-route-' + k);
       if (n && !n.closest('.mk-dlg')) n.style.display = 'none';
     });
-    wzPaintRouteHint(adv);
     if (adv) wzRenderStreamAddons();
     if (wz.mode === 'simple') wzRenderSimple();
     if (adv && wz.route === 'aiostreams') wzRenderAio();
     if (adv && wz.route === 'native') wzRenderNative();
-    if (adv && wz.route === 'plugins') wzRenderPlugins();
   }
 
   // Opens one route's setup in a dialog, by MOVING the live pane into it
@@ -6734,6 +6722,9 @@
   // rebuilt copy would register a second set. A comment node holds its place so
   // it goes back exactly where it came from when the dialog closes.
   function wzOpenRoute(id) {
+    // Plugins has nothing to set up before the browser, so the card opens the
+    // browser itself (Furqan, 2026-09-17). Its one caveat moved in there.
+    if (id === 'plugins') { wzPluginDialog(); return; }
     const pane = $('wz-route-' + id); if (!pane) return;
     const r = (WZ.ROUTES || []).find(x => x.id === id) || {};
     if (pane.closest('.mk-dlg')) return;            // already open
@@ -6750,22 +6741,6 @@
     const done = el('button', 'btn btn-primary', 'Done');
     done.onclick = closeMkPop;
     pop.foot.appendChild(done);
-  }
-  // The chosen route, and the way back into its dialog. Without this, reopening
-  // it means clicking a card that already looks chosen — which reads as inert.
-  function wzPaintRouteHint(adv) {
-    const hint = $('wz-route-hint'); if (!hint) return;
-    const r = adv ? (WZ.ROUTES || []).find(x => x.id === wz.route) : null;
-    clr(hint);
-    if (!r) { hint.style.display = 'none'; return; }
-    hint.style.display = '';
-    const tx = el('span', 'wz-route-hint-tx');
-    tx.innerHTML = '<b>' + esc(r.name) + '</b> is your route.';
-    hint.appendChild(tx);
-    hint.appendChild(el('span', 'wz-pick-sp'));
-    const b = el('button', 'btn btn-primary btn-xs', 'Open its setup');
-    b.onclick = () => wzOpenRoute(r.id);
-    hint.appendChild(b);
   }
 
   // ---- step 3: every other stream add-on ----------------------------------
@@ -7550,23 +7525,9 @@
   // subscription — and no debrid either, which is why it sits alongside the
   // other two rather than competing with them.
   //
-  // This pane is read-only. The write is wzAddPlugin, which is mkWrite —
-  // engine.planTarget + api.applyPlan, the same path as everything else.
-  function wzRenderPlugins() {
-    const box = $('wz-plugins'); if (!box || box.dataset.built === '1') return;
-    const P = WZ.PLUGINS;
-    clr(box);
-    // One caveat and one button. The three paragraphs that used to stand
-    // between them said nothing somebody pressing "Browse" could act on, and
-    // the dialog they open says the part that matters at the point it matters.
-    const warn = el('div', 'wz-catch'); warn.innerHTML = P.caveat; box.appendChild(warn);
-    const run = el('div', 'wz-run');
-    const b = el('button', 'btn btn-primary', P.browse);
-    b.onclick = wzPluginDialog;
-    run.appendChild(b);
-    box.appendChild(run);
-    box.dataset.built = '1';
-  }
+  // The route card opens the browser below directly. The write is
+  // wzAddPlugin, which is mkWrite — engine.planTarget + api.applyPlan, the
+  // same path as everything else.
 
   // The repository browser. Deliberately the Marketplace's own dialog
   // (openMkPop) and not a second mechanism: it already carries this app's
@@ -7582,7 +7543,7 @@
     const stale = () => mkPop !== mine;
 
     const note = el('div', 'mk-note');
-    note.innerHTML = MK_INFO_SVG + '<div>' + P.ondevice + '</div>';
+    note.innerHTML = MK_INFO_SVG + '<div>' + P.caveat + ' ' + P.ondevice + '</div>';
     pop.body.appendChild(note);
 
     const bar = el('div', 'wz-plug-bar');
@@ -8472,8 +8433,24 @@
     // API keys are no longer a modal prompt — they are the "API keys and provider
     // credentials" row in the settings tree, matching Nuvio's own dialog. Turning
     // Settings off clears that opt-in too, so keys can never ride along unnoticed.
-    $('sy-cat-settings').addEventListener('change', () => {
-      if (!$('sy-cat-settings').checked) { syCreds.copy = false; syCreds.replace = false; sySettingsIncludeKeys = false; }
+    // Ticking it asks once (Furqan, 2026-09-17): yes turns on BOTH key
+    // switches — copy, and overwrite matching keys. Only asked when the
+    // source account was linked with keys; otherwise there is nothing to copy
+    // and the keys section already says why.
+    $('sy-cat-settings').addEventListener('change', async () => {
+      const cb = $('sy-cat-settings');
+      if (!cb.checked) { syCreds.copy = false; syCreds.replace = false; sySettingsIncludeKeys = false; }
+      else if (syA && accountKeysIncluded(syA)) {
+        const src = syA + ':' + syI;
+        const yes = await uiModal({ title: 'Include API keys?',
+          message: 'Copy this profile\'s API keys (debrid, TMDB, MDBList and the rest) along with its settings? Matching keys on the target are replaced.',
+          okLabel: 'Include API keys', cancelLabel: 'Leave keys out' });
+        // The source may have changed, or the box been unticked, while the
+        // dialog was open — an answer for a different source is not applied.
+        if (src !== syA + ':' + syI || !cb.checked) return;
+        syCreds.copy = !!yes; syCreds.replace = !!yes; sySettingsIncludeKeys = !!yes;
+        syKeysAnsweredFor = src;
+      }
       renderSyTree(); updateSyCounts(); scheduleLivePreview();
     });
     // live preview on mode change
