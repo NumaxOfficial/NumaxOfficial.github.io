@@ -623,7 +623,7 @@
     if (panel === 'accounts') refreshAccounts();
     if (panel === 'profile') refreshProfileTab();
     if (panel === 'sync') refreshSyncTab();
-    if (panel === 'drive') { refreshDrive(); refreshTemplates(); }
+    if (panel === 'drive') refreshDrive();
     if (panel === 'market') refreshMarket();
     if (panel === 'activity') renderActivity();
   }
@@ -682,7 +682,11 @@
     if (!r || !r.id) throw new Error('Drive did not confirm the write.'); return r;
   }
   async function driveDownload(id) { const r = await withTimeout(fetch(`${DRIVE}/files/${id}?alt=media`, { headers: auth() }), READ_TIMEOUT, 'Reading that file from Drive'); if (!r.ok) throw new Error('Read failed (' + r.status + ').'); return r.json(); }
-  async function driveDelete(id) { await fetch(`${DRIVE}/files/${id}`, { method: 'DELETE', headers: auth() }); }
+  async function driveDelete(id) {
+    const r = await fetch(`${DRIVE}/files/${id}`, { method: 'DELETE', headers: auth() });
+    // 204 on success; anything else is a delete that did not happen.
+    if (!r.ok && r.status !== 404) throw new Error('Drive refused the delete (' + r.status + ').');
+  }
 
   // ---- account registry in Drive ----
   let registryFileId = null;
@@ -2182,74 +2186,9 @@
     if (kinds.includes('watchprogress')) payload.watchProgress = pfEdit.watchProgress || [];
     if (kinds.includes('watched')) payload.watched = pfEdit.watched || [];
     status($('pf-save-status'), 'Saving template…');
-    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Google Drive tab.', 'ok'); logAct('Saved template "' + name + '" (' + tkind + ')', 'ok'); if ($('tpl-list')) refreshTemplates(); }
+    try { await driveUpload(safeName('numax-tpl-' + name) + '.json', payload, { numax: 'template', tkind }); status($('pf-save-status'), 'Template “' + name + '” saved to Drive — see the Google Drive tab.', 'ok'); logAct('Saved template "' + name + '" (' + tkind + ')', 'ok'); }
     catch (e) { status($('pf-save-status'), "Couldn't save template: " + e.message, 'err'); logAct('Template save failed: ' + e.message, 'err'); }
   }
-  async function refreshTemplates() {
-    const box = $('tpl-list'); clr(box); status($('tpl-status'), '');
-    if (!gAuth.token) { box.appendChild(el('p', 'empty', 'Sign in with Google to see templates.')); return; }
-    box.appendChild(el('p', 'muted sm shimmer', 'Loading…'));
-    let files; try { files = await driveFindByProp('numax', 'template'); } catch (e) { clr(box); box.appendChild(el('p', 'empty err-text', e.message)); return; }
-    clr(box);
-    if (!files.length) {
-      box.appendChild(emptyState(null, 'No templates yet.',
-        'Open a profile, then use “Save as template” to keep its add-ons, plugins, collections or settings for reuse on any other profile.',
-        '<rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/>'));
-      return;
-    }
-    files.forEach(f => {
-      const kind = (f.appProperties && f.appProperties.tkind) || 'template';
-      const tname = f.name.replace(/^numax-tpl-/, '').replace(/\.json$/, '');
-      const row = el('div', 'erow');
-      const b = el('div', 'eb'); b.appendChild(el('div', 'en', tname)); b.appendChild(el('div', 'es', kind + ' · ' + (f.modifiedTime ? new Date(f.modifiedTime).toLocaleDateString() : ''))); row.appendChild(b);
-      const ap = el('button', 'btn btn-solid btn-xs', 'Apply'); ap.onclick = () => openTemplateApply(f); row.appendChild(ap);
-      const del = el('button', 'iconbtn', '✕'); del.title = 'Delete template';
-      del.onclick = async () => {
-        if (!(await uiModal({
-          title: 'Delete “' + tname + '”?',
-          message: 'This template will be removed from your Google Drive.',
-          details: [
-            'Affects <b>Numax only</b> — it deletes the template file Numax created in your Drive.',
-            'Profiles you already applied this template to are <b>not changed</b>.',
-            '<b>Not reversible</b> — Numax cannot recover the file once it is deleted.'
-          ],
-          danger: true, okLabel: 'Delete'
-        }))) return;
-        await driveDelete(f.id); logAct('Deleted a template', 'info'); refreshTemplates();
-      };
-      row.appendChild(del);
-      box.appendChild(row);
-    });
-  }
-  async function openTemplateApply(file) {
-    const card = $('tpl-apply-card'), body = $('tpl-apply-body'); card.style.display = ''; clr(body); body.appendChild(el('p', 'muted sm shimmer', 'Reading template…'));
-    $('tpl-apply-title').textContent = 'Apply ' + file.name.replace(/^numax-tpl-/, '').replace(/\.json$/, '');
-    let doc; try { doc = await driveDownload(file.id); } catch (e) { clr(body); body.appendChild(el('p', 'empty err-text', e.message)); return; }
-    clr(body);
-    // target picker
-    const tw = el('label', 'fld'); tw.style.maxWidth = '440px'; tw.appendChild(el('span', '', 'Apply to profile'));
-    const tsel = el('select', 'sel'); tw.appendChild(tsel); body.appendChild(tw);
-    for (const rec of store.list()) { let profiles; try { profiles = (await loadAccount(rec.accountId)).profiles; } catch { continue; } profiles.forEach(p => { const o = document.createElement('option'); o.value = rec.accountId + ':' + p.index; o.textContent = p.name + ' · ' + accountName(rec.accountId); tsel.appendChild(o); }); }
-    const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:12px'; mw.appendChild(el('span', '', 'How to apply'));
-    const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge</option><option value="overwrite" data-label="Overwrite" data-hint="match the template exactly">Overwrite</option>'; mw.appendChild(msel); body.appendChild(mw);
-    const bar = el('div', 'actbar'); const btn = el('button', 'btn btn-primary', 'Preview'); const st = el('div', 'inline-status'); bar.appendChild(btn); bar.appendChild(st); body.appendChild(bar);
-    const res = el('div'); res.style.marginTop = '12px'; body.appendChild(res);
-    btn.onclick = async () => {
-      const tid = tsel.value; if (!tid) { status(st, 'Pick a target.', 'err'); return; } const [aid, iStr] = tid.split(':'); const idx = parseInt(iStr, 10);
-      const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
-      status(st, 'Reading target…');
-      try {
-        const master = { addons: doc.addons || [], plugins: doc.plugins || [], collections: doc.collections || [], settings: doc.settings || {} };
-        const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
-        if (doc.settings && Object.keys(doc.settings).length) { state.settings = {}; for (const pl of Object.keys(doc.settings)) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
-        const cats = { addons: !!(doc.addons), plugins: !!(doc.plugins), collections: !!(doc.collections), settings: !!(doc.settings && Object.keys(doc.settings).length) };
-        // includeSecrets:true here is safe — a template only carries key values if the save-time "include API keys?" prompt was answered yes
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: true }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        renderApplyPlan(res, st, plan, aid, 'Template applied', { watched: doc.watched, watchProgress: doc.watchProgress, profileId: idx, identity: doc.profile, credentials: doc.credentials, credentialsReplace: msel.value === 'overwrite' });
-      } catch (e) { status(st, e.message, 'err'); }
-    };
-  }
-
   // Every settings leaf the engine declined to copy, as one readable line each, so
   // both preview surfaces can show exactly what was left behind instead of only
   // counting what changed. Buckets come from engine.mergeSettingsBlob's report.
@@ -3270,85 +3209,301 @@
       status(log, (existing ? 'Updated ' : 'Saved ') + r.name + ' (' + out.profiles.length + ' profile' + (out.profiles.length === 1 ? '' : 's') + ').', 'ok'); logAct((existing ? 'Updated' : 'Saved') + ' backup "' + r.name + '"', 'ok'); celebrate($('dr-backup-btn').closest('.card')); refreshRestore();
     } catch (e) { status(log, 'Backup failed: ' + e.message, 'err'); } finally { $('dr-backup-btn').disabled = false; }
   }
-  let restoreDoc = null;
-  async function refreshRestore() {
-    const box = $('dr-restore-list'); clr(box); if (!gAuth.token) { box.appendChild(el('p', 'empty sm', 'Connect Google Drive.')); return; }
-    box.appendChild(el('p', 'muted sm shimmer', 'Loading…')); let files; try { files = await driveFindByProp('numax', 'backup'); } catch (e) { clr(box); box.appendChild(el('p', 'empty err-text', e.message)); return; }
-    clr(box); if (!files.length) { box.appendChild(el('p', 'empty sm', 'No backups yet.')); return; }
-    files.forEach(f => { const row = el('div', 'erow'); const b = el('div', 'eb'); b.appendChild(el('div', 'en', f.name)); b.appendChild(el('div', 'es', f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : '')); row.appendChild(b); const op = el('button', 'btn btn-solid btn-xs', 'Open'); op.onclick = () => loadRestore(f); row.appendChild(op); box.appendChild(row); });
+  // ---- restore: one card, one browser (Furqan, 2026-09-17) ----------------
+  // The Restore card is three steps, top to bottom: what to restore (Browse
+  // opens a dialog with a Profiles tab — every profile inside every backup —
+  // and a Templates tab), which profile it goes onto (greyed out until the
+  // first is answered), and, unless that profile was just made, Merge or
+  // Overwrite. The preview underneath runs by itself as soon as both are
+  // known, and it is the same pvReport every other preview uses.
+  //
+  // Templates used to be a third card on this tab. They are a kind of thing
+  // to restore, so they live in the same browser now.
+  //
+  // Every write still goes through renderApplyPlan -> api.applyPlan; the only
+  // new writes here are to the user's own Drive files (deleting a backup or a
+  // template, or rewriting a backup without one of its profiles).
+  const dr = { src: null, target: null, mode: 'merge', gen: 0 };
+  const drDocs = {};   // fileId + modifiedTime -> parsed file, so tabs do not re-download
+  const drTplName = f => f.name.replace(/^numax-tpl-/, '').replace(/\.json$/, '');
+  const drKey = f => f.id + '@' + (f.modifiedTime || '');
+  async function drRead(f) {
+    const k = drKey(f);
+    if (!drDocs[k]) drDocs[k] = driveDownload(f.id).catch(e => { delete drDocs[k]; throw e; });
+    return drDocs[k];
   }
-  async function loadRestore(file) {
-    const cfg = $('dr-restore-config'); cfg.style.display = ''; clr(cfg); cfg.appendChild(el('p', 'muted sm shimmer', 'Reading ' + file.name + '…'));
-    try { restoreDoc = await driveDownload(file.id); restoreDoc._file = file; } catch (e) { clr(cfg); cfg.appendChild(el('p', 'empty err-text', e.message)); return; }
-    if (!Array.isArray(restoreDoc.profiles) || !restoreDoc.profiles.length) { clr(cfg); cfg.appendChild(el('p', 'empty sm', 'No profiles in that backup.')); return; }
-    clr(cfg); cfg.appendChild(el('div', 'set-group-h', 'Restore from ' + file.name));
-    const sw = el('label', 'fld'); sw.style.cssText = 'max-width:440px;margin-top:10px'; sw.appendChild(el('span', '', 'Which saved profile')); const src = el('select', 'sel'); restoreDoc.profiles.forEach((p, i) => { const o = document.createElement('option'); o.value = i; o.textContent = p.name + ' · ' + (p.account || 'backup'); src.appendChild(o); }); sw.appendChild(src); cfg.appendChild(sw);
-    // "Restore into" is a dialog, not a dropdown — and the dialog is the one
-    // place that can offer a profile that does not exist yet.
-    const tw = el('div', 'fld'); tw.style.cssText = 'max-width:440px;margin-top:10px';
-    tw.appendChild(el('span', '', 'Restore into'));
-    const tbtn = el('button', 'btn btn-ghost dr-pickbtn', 'Choose a profile…'); tbtn.type = 'button';
-    tw.appendChild(tbtn); cfg.appendChild(tw);
-    let target = null;
-    const paintTarget = () => {
-      clr(tbtn);
-      if (!target) { tbtn.appendChild(document.createTextNode('Choose a profile…')); return; }
-      tbtn.appendChild(avatar(target.profile || { name: target.name }, 22));
-      tbtn.appendChild(el('span', 'dr-pickname', target.name + ' · ' + accountName(target.aid)));
+  function drCounts(s) {
+    const n = (a, one) => Array.isArray(a) && a.length ? a.length + ' ' + one + (a.length === 1 ? '' : 's') : '';
+    return [n(s.addons, 'add-on'), n(s.plugins, 'plugin'), n(s.collections, 'collection'),
+      s.settings && Object.keys(s.settings).length ? 'settings' : '',
+      n(s.watched, 'watched item'), Array.isArray(s.credentials) && s.credentials.length ? 'API keys' : '']
+      .filter(Boolean).join(' · ') || 'nothing in it';
+  }
+  function refreshRestore() { paintRestore(); }
+  function paintRestore() {
+    const box = $('dr-restore'); if (!box) return;
+    clr(box);
+    if (!gAuth.token) { box.appendChild(el('p', 'empty sm', 'Sign in with Google to restore.')); return; }
+
+    // 1 — what to restore
+    const s1 = el('div', 'dr-step');
+    s1.appendChild(el('div', 'dr-step-h', 'What to restore'));
+    const pick = el('div', 'dr-chosen' + (dr.src ? '' : ' empty'));
+    if (dr.src) {
+      pick.appendChild(dr.src.kind === 'backup' ? avatar(dr.src.saved.profile || { name: dr.src.label }, 30) : el('span', 'dr-tpl-ic', 'T'));
+      const tx = el('div', 'dr-chosen-tx');
+      tx.appendChild(el('div', 'dr-chosen-n', dr.src.label));
+      tx.appendChild(el('div', 'dr-chosen-s', dr.src.sub));
+      pick.appendChild(tx);
+    } else pick.appendChild(el('span', 'muted sm', 'Nothing picked yet — browse your backups and templates.'));
+    const br = el('button', 'btn ' + (dr.src ? 'btn-ghost' : 'btn-primary') + ' btn-xs', dr.src ? 'Change' : 'Browse');
+    br.type = 'button'; br.onclick = () => drBrowse(dr.src && dr.src.kind === 'template' ? 'templates' : 'profiles');
+    pick.appendChild(br);
+    s1.appendChild(pick);
+    box.appendChild(s1);
+
+    // 2 — where it goes
+    const s2 = el('div', 'dr-step' + (dr.src ? '' : ' off'));
+    s2.appendChild(el('div', 'dr-step-h', 'Restore to'));
+    const tbtn = el('button', 'btn btn-ghost dr-pickbtn'); tbtn.type = 'button';
+    tbtn.disabled = !dr.src;
+    if (dr.target) {
+      tbtn.appendChild(avatar(dr.target.profile || { name: dr.target.name }, 22));
+      tbtn.appendChild(el('span', 'dr-pickname', dr.target.name + ' · ' + accountName(dr.target.aid)));
       tbtn.appendChild(el('span', 'dr-pickchange', 'Change'));
-    };
-    tbtn.onclick = async () => {
-      const savedNow = restoreDoc.profiles[parseInt(src.value, 10)] || {};
-      const picked = await pickProfileDialog({
-        title: 'Restore into which profile?',
-        sub: 'Pick the profile this backup is written onto. Anything it does not cover is left alone.',
-        label: 'Restore into',
-        allowNew: true,
-        suggestName: savedNow.name || '',
-      });
-      if (!picked) return;
-      target = picked;
-      const rec = (profilesCached(picked.aid) || []).find(p => p.index === picked.idx);
-      if (rec) target.profile = rec;
-      paintTarget();
-      // A profile that was just made has Nuvio's two default add-ons and
-      // nothing else, so "make it match the backup" is what was actually meant.
-      if (picked.created) { msel.value = 'overwrite'; msel.dispatchEvent(new Event('change', { bubbles: true })); }
-      status(st, picked.created ? 'Made “' + picked.name + '”. Preview the restore to see what goes onto it.' : '', picked.created ? 'ok' : '');
-    };
-    paintTarget();
+    } else tbtn.appendChild(document.createTextNode(dr.src ? 'Choose a profile…' : 'Pick what to restore first'));
+    tbtn.onclick = drPickTarget;
+    s2.appendChild(tbtn);
+    box.appendChild(s2);
 
-    const mw = el('label', 'fld'); mw.style.cssText = 'max-width:440px;margin-top:10px'; mw.appendChild(el('span', '', 'How to apply')); const msel = el('select', 'sel'); msel.innerHTML = '<option value="merge" data-label="Merge" data-hint="add and update, keep the rest">Merge</option><option value="overwrite" data-label="Overwrite" data-hint="make this profile match the backup exactly">Overwrite</option>'; mw.appendChild(msel); cfg.appendChild(mw);
-    const bar = el('div', 'actbar'); const btn = el('button', 'btn btn-primary', 'Preview restore'); const st = el('div', 'inline-status'); bar.appendChild(btn); bar.appendChild(st); cfg.appendChild(bar); const res = el('div'); res.style.marginTop = '12px'; cfg.appendChild(res);
-    btn.onclick = async () => {
-      const saved = restoreDoc.profiles[parseInt(src.value, 10)];
-      if (!target) { status(st, 'Pick a profile to restore into.', 'err'); return; }
-      const aid = target.aid, idx = target.idx;
-      const mode = msel.value === 'overwrite' ? 'mirror' : 'merge';
-      status(st, 'Reading target…');
-      try {
-        const master = { addons: saved.addons || [], plugins: saved.plugins || [], collections: saved.collections || [], settings: saved.settings || {} };
-        const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
-        // Every platform the BACKUP holds, not a hardcoded two — a desktop blob
-        // in the file used to be read against nothing and silently skipped.
-        if (saved.settings && Object.keys(saved.settings).length) { state.settings = {}; for (const pl of Object.keys(saved.settings)) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
-        const cats = { addons: !!saved.addons, plugins: !!saved.plugins, collections: !!saved.collections, settings: !!(saved.settings && Object.keys(saved.settings).length) };
-        // includeSecrets here is safe for the same reason it is on a template: a
-        // backup only holds key values if it was taken with "Include API keys" on.
-        const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: !!restoreDoc.includesKeys }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
-        // A backup now carries the whole profile, so a restore puts the whole
-        // profile back — identity, watch history and provider keys included.
-        renderApplyPlan(res, st, plan, aid, 'Restored', {
-          profileId: idx,
-          watched: saved.watched, watchProgress: saved.watchProgress,
-          identity: saved.profile || (saved.name ? { name: saved.name } : null),
-          credentials: saved.credentials,
-          credentialsReplace: msel.value === 'overwrite',
+    // 3 — merge or overwrite, only onto a profile that already existed
+    if (dr.src && dr.target) {
+      const s3 = el('div', 'dr-step');
+      if (dr.target.created) {
+        s3.appendChild(el('div', 'dr-step-h', 'How'));
+        s3.appendChild(el('p', 'muted sm', 'New profile — it is set up to match exactly what you picked.'));
+      } else {
+        s3.appendChild(el('div', 'dr-step-h', 'How to apply'));
+        const wrap = el('div', 'mk-seg-wrap' + (dr.mode === 'overwrite' ? ' danger' : ''));
+        const seg = el('div', 'mk-seg');
+        const MODES = [
+          ['merge', 'Merge', 'Adds and updates what you picked, and keeps everything else already on the profile.'],
+          ['overwrite', 'Overwrite', 'Makes the profile match exactly — anything on it that is not in what you picked is removed.'],
+        ];
+        MODES.forEach(([v, t]) => {
+          const b = el('button', 'mk-seg-b' + (dr.mode === v ? ' on' : ''), t); b.type = 'button';
+          b.onclick = () => { if (dr.mode === v) return; dr.mode = v; paintRestore(); };
+          seg.appendChild(b);
         });
-      } catch (e) { status(st, e.message, 'err'); }
-    };
+        wrap.appendChild(seg);
+        wrap.appendChild(el('div', 'mk-seg-d', MODES.find(m => m[0] === dr.mode)[2]));
+        s3.appendChild(wrap);
+      }
+      box.appendChild(s3);
+
+      // 4 — the preview, and Apply under it
+      const s4 = el('div', 'dr-step');
+      s4.appendChild(el('div', 'dr-step-h', 'Preview'));
+      const st = el('div', 'inline-status'); const res = el('div');
+      s4.appendChild(st); s4.appendChild(res);
+      box.appendChild(s4);
+      drPreview(st, res);
+    }
+  }
+  async function drPickTarget() {
+    if (!dr.src) return;
+    const picked = await pickProfileDialog({
+      title: 'Restore to which profile?',
+      sub: 'Pick the profile this is written onto, or make a new one for it.',
+      label: 'Restore to',
+      allowNew: true,
+      suggestName: dr.src.kind === 'backup' ? (dr.src.saved.name || '') : '',
+    });
+    if (!picked) return;
+    const rec = (profilesCached(picked.aid) || []).find(p => p.index === picked.idx);
+    if (rec) picked.profile = rec;
+    dr.target = picked;
+    // A profile that was just made has Nuvio's two default add-ons and nothing
+    // else, so "make it match" is what was meant — and there is no choice to ask.
+    if (picked.created) dr.mode = 'overwrite';
+    paintRestore();
+  }
+  async function drPreview(st, res) {
+    const gen = ++dr.gen;
+    const { src, target } = dr;
+    const saved = src.saved, aid = target.aid, idx = target.idx;
+    const mode = dr.mode === 'overwrite' ? 'mirror' : 'merge';
+    status(st, 'Reading ' + target.name + '…');
+    try {
+      const master = { addons: saved.addons || [], plugins: saved.plugins || [], collections: saved.collections || [], settings: saved.settings || {} };
+      const c = A.client(store, aid); const { backup } = await loadAccount(aid); const state = sliceProfile(backup, idx); const upd = {};
+      // Every platform the file holds, not a hardcoded two.
+      if (saved.settings && Object.keys(saved.settings).length) { state.settings = {}; for (const pl of Object.keys(saved.settings)) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { state.settings[pl] = row.settings_json; upd[pl] = row.updated_at; } } }
+      if (gen !== dr.gen) return;
+      const cats = { addons: !!saved.addons, plugins: !!saved.plugins, collections: !!saved.collections, settings: !!(saved.settings && Object.keys(saved.settings).length) };
+      // includeSecrets is safe for the same reason it always was: a backup or
+      // template only holds key values if it was saved with keys switched on.
+      const plan = E.planTarget(master, state, { categories: cats, modes: { addons: mode, plugins: mode, collections: mode }, settings: { includePersonal: true, includeSecrets: !!src.keys }, profileId: idx, originClientId: 'numax-web', settingsUpdatedAt: upd });
+      renderApplyPlan(res, st, plan, aid, src.kind === 'backup' ? 'Restored' : 'Template applied', {
+        profileId: idx,
+        watched: saved.watched, watchProgress: saved.watchProgress,
+        identity: saved.profile || (src.kind === 'backup' && saved.name ? { name: saved.name } : null),
+        credentials: saved.credentials,
+        credentialsReplace: dr.mode === 'overwrite',
+      });
+    } catch (e) { if (gen === dr.gen) status(st, e.message, 'err'); }
   }
 
+  // The browser. Profiles lists every profile inside every backup file, grouped
+  // by file; Templates lists the templates. Everything can be deleted from here.
+  function drBrowse(tab) {
+    const pop = openMkPop(null, 'Choose what to restore', 'Everything here is a file Numax keeps in your own Google Drive.');
+    pop.root.classList.add('dr-dlg');
+    const mine = pop; const stale = () => mkPop !== mine;
+    const seg = el('div', 'mk-seg dr-tabs');
+    const list = el('div', 'dr-browse');
+    const tabs = [['profiles', 'Profiles'], ['templates', 'Templates']];
+    const btns = tabs.map(([k, t]) => {
+      const b = el('button', 'mk-seg-b', t); b.type = 'button';
+      b.onclick = () => show(k);
+      seg.appendChild(b); return b;
+    });
+    pop.body.appendChild(seg); pop.body.appendChild(list);
+    const choose = src => { dr.src = src; dr.gen++; closeMkPop(); paintRestore(); };
+    const show = k => {
+      tab = k;
+      btns.forEach((b, i) => b.classList.toggle('on', tabs[i][0] === k));
+      if (k === 'profiles') drListBackups(list, stale, () => tab === 'profiles', choose);
+      else drListTemplates(list, stale, () => tab === 'templates', choose);
+    };
+    show(tab || 'profiles');
+  }
+  // `live()` is false once the dialog closed OR the other tab was opened, so a
+  // slow read never paints over what is on screen now.
+  async function drListBackups(list, stale, onTab, choose) {
+    const live = () => !stale() && onTab();
+    clr(list); list.appendChild(el('p', 'muted sm shimmer', 'Reading your backups…'));
+    let files; try { files = await driveFindByProp('numax', 'backup'); } catch (e) { if (live()) { clr(list); list.appendChild(el('p', 'empty err-text', e.message)); } return; }
+    if (!live()) return;
+    clr(list);
+    if (!files.length) { list.appendChild(el('p', 'empty sm', 'No backups yet. Back a profile up on the left and it shows up here.')); return; }
+    files.forEach(f => {
+      const grp = el('div', 'dr-grp');
+      const h = el('div', 'dr-grp-h');
+      const ht = el('div', 'dr-grp-tx');
+      ht.appendChild(el('b', '', f.name.replace(/\.json$/, '')));
+      ht.appendChild(el('span', '', f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : ''));
+      h.appendChild(ht);
+      const delAll = el('button', 'btn btn-ghost btn-xs dr-del', 'Delete backup'); delAll.type = 'button';
+      delAll.onclick = async () => {
+        if (!(await drConfirmDelete('Delete the backup “' + f.name.replace(/\.json$/, '') + '”?', 'The whole backup file, with every profile in it, is removed from your Google Drive.'))) return;
+        try {
+          await driveDelete(f.id);
+          logAct('Deleted backup "' + f.name + '"', 'info');
+          if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
+        } catch (e) { logAct("Couldn't delete backup: " + e.message, 'err'); }
+        if (!stale()) drListBackups(list, stale, onTab, choose);
+      };
+      h.appendChild(delAll);
+      grp.appendChild(h);
+      const rows = el('div', 'dr-grp-rows');
+      rows.appendChild(el('p', 'muted sm shimmer', 'Opening…'));
+      grp.appendChild(rows);
+      list.appendChild(grp);
+      drRead(f).then(doc => {
+        if (!live()) return;
+        clr(rows);
+        const profs = Array.isArray(doc.profiles) ? doc.profiles : [];
+        if (!profs.length) { rows.appendChild(el('p', 'empty sm', 'No profiles in this backup.')); return; }
+        profs.forEach((p, i) => {
+          const r = el('div', 'erow dr-row');
+          r.appendChild(avatar(p.profile || { name: p.name }, 30));
+          const b = el('div', 'eb');
+          b.appendChild(el('div', 'en', p.name || 'Unnamed profile'));
+          b.appendChild(el('div', 'es', (p.account ? p.account + ' · ' : '') + drCounts(p)));
+          r.appendChild(b);
+          const use = el('button', 'btn btn-primary btn-xs', 'Restore this'); use.type = 'button';
+          use.onclick = () => choose({ kind: 'backup', label: p.name || 'Unnamed profile', sub: 'From backup “' + f.name.replace(/\.json$/, '') + '” · ' + drCounts(p), saved: p, keys: !!doc.includesKeys, fileId: f.id });
+          r.appendChild(use);
+          const del = el('button', 'iconbtn', '✕'); del.type = 'button'; del.title = 'Delete this profile from the backup';
+          del.onclick = async () => {
+            const last = profs.length === 1;
+            if (!(await drConfirmDelete('Delete “' + (p.name || 'this profile') + '” from this backup?',
+              last ? 'It is the only profile in “' + f.name.replace(/\.json$/, '') + '”, so the whole backup file is removed from your Google Drive.'
+                : 'The backup “' + f.name.replace(/\.json$/, '') + '” is saved again without it. ' + (profs.length === 2 ? 'The other profile in it stays.' : 'The other ' + (profs.length - 1) + ' profiles in it stay.')))) return;
+            try {
+              if (last) await driveDelete(f.id);
+              else {
+                const next = Object.assign({}, doc, { profiles: profs.filter((_, j) => j !== i), savedAt: doc.savedAt });
+                await driveUpload(f.name, next, { numax: 'backup' }, f.id);
+              }
+              logAct('Deleted ' + (p.name || 'a profile') + ' from backup "' + f.name + '"', 'info');
+              if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
+            } catch (e) { logAct("Couldn't delete it: " + e.message, 'err'); }
+            if (!stale()) drListBackups(list, stale, onTab, choose);
+          };
+          r.appendChild(del);
+          rows.appendChild(r);
+        });
+      }).catch(e => { if (live()) { clr(rows); rows.appendChild(el('p', 'empty sm err-text', "Couldn't open it: " + e.message)); } });
+    });
+  }
+  async function drListTemplates(list, stale, onTab, choose) {
+    const live = () => !stale() && onTab();
+    clr(list); list.appendChild(el('p', 'muted sm shimmer', 'Reading your templates…'));
+    let files; try { files = await driveFindByProp('numax', 'template'); } catch (e) { if (live()) { clr(list); list.appendChild(el('p', 'empty err-text', e.message)); } return; }
+    if (!live()) return;
+    clr(list);
+    if (!files.length) {
+      list.appendChild(emptyState(null, 'No templates yet.',
+        'Open a profile, then use “Save as template” to keep its add-ons, plugins, collections or settings for reuse on any other profile.',
+        '<rect x="4" y="4" width="7" height="7" rx="1.4"/><rect x="13" y="4" width="7" height="7" rx="1.4"/><rect x="4" y="13" width="7" height="7" rx="1.4"/><rect x="13" y="13" width="7" height="7" rx="1.4"/>'));
+      return;
+    }
+    files.forEach(f => {
+      const kind = (f.appProperties && f.appProperties.tkind) || 'template';
+      const tname = drTplName(f);
+      const kindTx = kind === 'profile' ? 'Whole profile' : kind.split('+').join(', ');
+      const r = el('div', 'erow dr-row');
+      r.appendChild(el('span', 'dr-tpl-ic', 'T'));
+      const b = el('div', 'eb');
+      b.appendChild(el('div', 'en', tname));
+      b.appendChild(el('div', 'es', kindTx + (f.modifiedTime ? ' · ' + new Date(f.modifiedTime).toLocaleDateString() : '')));
+      r.appendChild(b);
+      const use = el('button', 'btn btn-primary btn-xs', 'Use this'); use.type = 'button';
+      use.onclick = async () => {
+        use.disabled = true; use.textContent = 'Opening…';
+        try {
+          const doc = await drRead(f);
+          if (stale()) return;
+          choose({ kind: 'template', label: tname, sub: 'Template · ' + drCounts(doc), saved: doc, keys: true, fileId: f.id });
+        } catch (e) { use.disabled = false; use.textContent = 'Use this'; logAct("Couldn't open template: " + e.message, 'err'); b.appendChild(el('div', 'es err-text', "Couldn't open it: " + e.message)); }
+      };
+      r.appendChild(use);
+      const del = el('button', 'iconbtn', '✕'); del.type = 'button'; del.title = 'Delete template';
+      del.onclick = async () => {
+        if (!(await drConfirmDelete('Delete the template “' + tname + '”?', 'The template file is removed from your Google Drive. Profiles you already applied it to are not changed.'))) return;
+        try {
+          await driveDelete(f.id);
+          logAct('Deleted template "' + tname + '"', 'info');
+          if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
+        } catch (e) { logAct("Couldn't delete template: " + e.message, 'err'); }
+        if (!stale()) drListTemplates(list, stale, onTab, choose);
+      };
+      r.appendChild(del);
+      list.appendChild(r);
+    });
+  }
+  function drConfirmDelete(title, message) {
+    return uiModal({
+      title, message,
+      details: [
+        'Affects <b>Numax only</b> — nothing on any Nuvio profile changes.',
+        '<b>Not reversible</b> — Numax cannot recover a file once it is deleted.',
+      ],
+      danger: true, okLabel: 'Delete',
+    });
+  }
   // ======================================================================
   // MARKETPLACE
   // Add-ons are configured on their own sites; Numax only writes back the
@@ -8462,8 +8617,7 @@
       scheduleLivePreview();
     });
     $('sy-preview').onclick = syncPreview; $('sy-apply').onclick = syncApply; $('sy-confirm').onchange = () => { $('sy-apply').disabled = !$('sy-confirm').checked; };
-    $('tpl-refresh').onclick = refreshTemplates;
-    $('dr-backup-btn').onclick = backupNow; $('dr-restore-refresh').onclick = refreshRestore; togWire('dr-keys', () => {});
+    $('dr-backup-btn').onclick = backupNow; togWire('dr-keys', () => {});
     // The theme switch lives in the sidebar rail now; the Settings tab is gone.
     $('sb-theme').onclick = () => setTheme(themeNow() !== 'light');
     paintTheme();

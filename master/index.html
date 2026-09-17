@@ -689,9 +689,6 @@
   .panel-cols{ display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:18px; align-items:start; }
   .panel-cols > .card{ margin-bottom:0; }
   /* row lists that are one line each read fine in columns once they fit */
-  #tpl-list, #dr-restore-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:8px; align-content:start; }
-  #tpl-list > *, #dr-restore-list > *{ margin-bottom:0; }
-  #tpl-list > p, #tpl-list > .mo-empty, #dr-restore-list > p, #dr-restore-list > .mo-empty{ grid-column:1/-1; }
   .panel[data-panel="market"]{ max-width:1800px; }
   /* Viewport-fit panels: flex children of .main, so they end exactly where the
      window does whatever the topbar measures. The old height:calc(100dvh - 52px)
@@ -2179,6 +2176,32 @@
     border:1px dashed var(--line); font-size:16px; line-height:1; }
   /* The chosen restore target, shown on the button that opens the picker. */
   .dr-pickbtn{ display:flex; align-items:center; gap:9px; width:100%; justify-content:flex-start; text-align:left; }
+  /* Restore: three steps, and the browser dialog behind Browse */
+  #dr-restore{ display:flex; flex-direction:column; gap:18px; }
+  .dr-step-h{ font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--t55); margin-bottom:8px; }
+  .dr-step.off{ opacity:.45; }
+  .dr-step.off .dr-pickbtn{ cursor:not-allowed; }
+  .dr-chosen{ display:flex; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px 12px; min-height:54px; }
+  .dr-chosen.empty{ border-style:dashed; }
+  .dr-chosen > .muted, .dr-chosen-tx{ flex:1 1 auto; min-width:0; }
+  .dr-chosen .btn{ flex:none; }
+  .dr-chosen-n{ font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dr-chosen-s{ font-size:11.5px; color:var(--t45); margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dr-tpl-ic{ flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center; font-size:13px; font-weight:700;
+    color:var(--accent); background:rgba(var(--accent-rgb),.14); border:1px solid rgba(var(--accent-rgb),.3); }
+  .dr-dlg .mk-dlg{ width:min(720px,94vw); height:min(80dvh, 100% - 32px); }
+  .dr-dlg .dr-tabs{ margin-bottom:14px; }
+  .dr-browse{ display:flex; flex-direction:column; gap:14px; }
+  .dr-grp{ border:1px solid var(--line); border-radius:13px; padding:10px 10px 2px; }
+  .dr-grp-h{ display:flex; align-items:center; gap:10px; padding:2px 4px 10px; }
+  .dr-grp-tx{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .dr-grp-tx b{ font-size:13.5px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dr-grp-tx span{ font-size:11px; color:var(--t45); }
+  .dr-grp-h .btn, .dr-row .btn, .dr-row .iconbtn{ flex:none; }
+  .dr-row .eb{ flex:1 1 auto; min-width:0; }
+  .dr-row .es{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .dr-grp-h .dr-del{ color:var(--danger-soft); }
+  .dr-grp-h .dr-del:hover{ border-color:rgba(var(--danger-rgb),.5); }
   .dr-pickname{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .dr-pickchange{ margin-left:auto; flex:none; font-size:11px; color:var(--t45); }
   .mk-inst{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:9px; }
@@ -3389,25 +3412,12 @@
           <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
         </div>
         <div class="actbar"><button class="btn btn-primary" id="dr-backup-btn">Back up to Drive</button><div class="inline-status" id="dr-backup-log"></div></div></div>
-      <div class="card"><div class="chead"><h3>Restore</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="dr-restore-refresh">Refresh list</button></div>
+      <!-- Restore is three steps and one browser (2026-09-17): Browse picks a
+           profile out of a backup, or a template; the templates card that used
+           to sit beside this one lives inside that browser now. -->
+      <div class="card"><div class="chead"><h3>Restore</h3></div>
         <div class="dr-scroll">
-          <!-- Resting state, not a shimmer: nothing is loading until the tab is
-               opened and refreshRestore() runs, and a shimmer that starts at page
-               load reads as a task that never finishes. -->
-          <div id="dr-restore-list"><p class="empty sm">Open this tab to list your backups.</p></div>
-          <div id="dr-restore-config" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px"></div>
-        </div></div>
-      <div class="card"><div class="chead"><h3>Templates</h3><span class="spacer"></span><button class="btn btn-ghost btn-xs" id="tpl-refresh">Refresh</button></div>
-        <div class="dr-scroll">
-          <p class="muted sm" style="margin-bottom:12px">A profile's add-ons, plugins, collections, settings — or the whole profile — saved once and applied to any other. Save one with “Save as template” on the Profile tab.</p>
-          <div id="tpl-status" class="inline-status" style="margin-bottom:8px"></div>
-          <div id="tpl-list"></div>
-          <!-- Same arrangement the Restore card uses: the apply surface opens
-               under the list, inside the card's own scroller, rather than as a
-               fourth card that would reshuffle a viewport-fit row. -->
-          <div id="tpl-apply-card" style="display:none;margin-top:14px;border-top:1px solid var(--line-2);padding-top:16px">
-            <div class="chead"><h3 id="tpl-apply-title">Apply template</h3></div>
-            <div id="tpl-apply-body"></div></div>
+          <div id="dr-restore"><p class="empty sm">Open this tab to restore.</p></div>
         </div></div>
       </div>
     </section>
@@ -3524,6 +3534,6 @@
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
 <script src="./mascot.js?v=ca081ba6"></script>
-<script src="./app.js?v=bd27d12f"></script>
+<script src="./app.js?v=b9fde37f"></script>
 </body>
 </html>
