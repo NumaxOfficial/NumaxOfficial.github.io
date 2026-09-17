@@ -88,25 +88,27 @@
   // ui-motion's carry chooser use. Rebuilding it here would mean a second copy
   // of the settings tree with its own handlers, and two things that can
   // disagree about what is selected.
+  // The whole tabbed card moves into the dialog — tab bar, pane heading with
+  // its Add and Browse, and every pane — so any tab can be reached from the
+  // big window (Furqan, 2026-09-16). It is the LIVE card, borrowed and given
+  // back, like every other pop-out here: switchPfEditorTab and the renderers
+  // address it by id and neither knows where it currently is.
   function openPfPaneDialog() {
-    const kind = pfEditorTab;
-    const host = $('pf-' + kind); if (!host || !pfEdit) return;
-    const home = host.parentNode;
-    const pop = openMkPop(null, (PF_TAB_LABEL[kind] || kind) + ' — ' + (pfEdit.meta.name || 'profile'),
-      'The same controls, with room to see them. Changes save with the profile as usual.');
-    pop.root.classList.add('mk-dlg-wide', 'pf-set-dlg');
-    pop.body.appendChild(host);
-    pop.onClose = () => { if (host.parentNode !== home) home.appendChild(host); };
-    // The head's Add button does not travel with the pane, so the dialog carries
-    // its own rather than being the one place you cannot add anything.
-    if (PF_ADD_LABEL[kind] && (kind === 'collections' ? window.NumaxCollections : window.NumaxMarket)) {
-      const add = el('button', 'btn btn-ghost', PF_ADD_LABEL[kind]);
-      add.onclick = () => { if (kind === 'collections') openCollectionEditor(null, { isNew: true }); else pfAddDialog(kind); };
-      pop.foot.appendChild(add);
-    }
+    const card = document.querySelector('.pf-tabs-card'); if (!card || !pfEdit) return;
+    const home = card.parentNode, next = card.nextSibling;
+    const pop = openMkPop(null, pfEdit.meta.name || 'Profile',
+      'Everything on this profile, with room to see it. Changes save with the profile as usual.');
+    pop.root.classList.add('mk-dlg-wide', 'pf-set-dlg', 'pf-card-dlg');
+    pop.body.appendChild(card);
+    pop.onClose = () => { if (card.parentNode !== home) home.insertBefore(card, next); switchPfEditorTab(pfEditorTab); };
+    const save = el('button', 'btn btn-ghost', 'Save to profile');
+    save.disabled = !Object.keys(pfDirty).length;
+    save.onclick = async () => { save.disabled = true; await saveAllDirty(); save.disabled = !Object.keys(pfDirty).length; };
+    pop.foot.appendChild(save);
     const done = el('button', 'btn btn-primary', 'Done');
     done.onclick = closeMkPop;
     pop.foot.appendChild(done);
+    switchPfEditorTab(pfEditorTab);
   }
 
   // Nuvio's own Add dialog, rebuilt: one address, one name. The row is appended
@@ -2266,53 +2268,93 @@
   }
 
   // ---- what a preview says -------------------------------------------------
-  // A preview NAMES what is changing. It used to say "+4", which is a number
-  // nobody can act on — you could not tell which four, or whether the one you
-  // cared about was among them. Every report bucket already carries the real
-  // names (engine.js maps add-ons and plugins to name||url and collections to
-  // title||name||id), so those are what goes on screen.
+  // One block per section, and under it plain lines saying what happens there
+  // ("Adds  Subtitles, Main"). It used to be a row of coloured pills, and before
+  // that a "+4"; Furqan found both cluttered (2026-09-16 17:05). The names come
+  // straight from the report — engine.js already maps add-ons and plugins to
+  // name||url and collections to title||name||id.
   //
-  // Settings are named by GROUP — "Layout", "Playback" — not by leaf: nobody
-  // asked to copy `debrid_settings.preferred_resolver_provider_id`, they asked
-  // to copy their debrid setup. engine.groupLabel owns that mapping and is the
-  // same one the settings tree itself is drawn from.
-  //
-  // Watched history and watch progress are the one exception and keep a count:
-  // they are bulk rows, there can be thousands, and "247 items" is the honest
-  // unit for them — a wall of episode titles would say less, not more.
-  const PREVIEW_MAX_NAMES = 6;
-  function nameTags(cls, sign, names, why) {
+  // Settings are named by GROUP through engine.groupLabel ("Layout",
+  // "Playback"), never by leaf. Watched and progress stay a count: they are
+  // bulk history rows and a list of episode titles would say less, not more.
+  const PREVIEW_MAX_NAMES = 8;
+  function pvNames(names) {
     const list = (names || []).filter(x => x != null && String(x).trim()).map(String);
-    if (!list.length) return '';
     const shown = list.slice(0, PREVIEW_MAX_NAMES);
-    const t = why ? ' title="' + esc(why) + '"' : '';
-    let html = shown.map(n => '<span class="tag name ' + cls + '"' + t + '>' + esc(sign + n) + '</span>').join(' ');
-    if (list.length > shown.length) {
-      html += ' <span class="tag name ' + cls + '" title="' + esc(list.join('\n')) + '">and '
-        + (list.length - shown.length) + ' more</span>';
-    }
-    return html;
+    const more = list.length - shown.length;
+    return { n: list.length, text: shown.join(', ') + (more ? ', and ' + more + ' more' : ''), all: list.join('\n') };
+  }
+  // A section heading and its lines. `lines` is [tone, verb, names|string, title?];
+  // an empty list of names drops the line, and a section with no lines is not drawn.
+  function pvSection(label, lines, why) {
+    const rows = [];
+    lines.forEach(([tone, verb, what, tip]) => {
+      const v = Array.isArray(what) ? pvNames(what) : { n: what ? 1 : 0, text: what || '', all: tip || '' };
+      if (!v.n) return;
+      const r = el('div', 'pv-l');
+      r.appendChild(el('span', 'pv-v ' + tone, verb));
+      const t = el('span', 'pv-t', v.text);
+      if (v.all && v.all !== v.text) t.title = v.all;
+      r.appendChild(t);
+      rows.push(r);
+    });
+    if (!rows.length) return null;
+    const s = el('div', 'pv-sec');
+    const h = el('div', 'pv-h', label);
+    if (why) h.title = why;
+    s.appendChild(h);
+    rows.forEach(r => s.appendChild(r));
+    return s;
   }
   // The settings report names leaves ("layout_settings.posterSize") and whole
-  // groups ("trakt_settings_payload (payload)"). The group in front of the dot
-  // is the part worth showing, deduped — twelve changed leaves in Layout are
-  // one thing that changed, not twelve.
-  function settingsGroupNames(rep) {
+  // groups ("trakt_settings_payload (payload)"); the group in front of the dot
+  // is what is shown, once, however many of its leaves changed.
+  function pvGroup(entry) {
+    const g = String(entry).split('.')[0].replace(/\s*\((payload|block)\)\s*$/, '').trim();
+    return g ? ((E && E.groupLabel) ? E.groupLabel(g) : g) : '';
+  }
+  function pvGroups(bucket, field) {
     const out = [];
-    ((rep && rep.changed) || []).forEach(entry => {
-      const g = String(entry).split('.')[0].replace(/\s*\((payload|block)\)\s*$/, '').trim();
-      if (!g) return;
-      const label = (E && E.groupLabel) ? E.groupLabel(g) : g;
-      if (label && out.indexOf(label) < 0) out.push(label);
-    });
+    Object.keys(bucket || {}).forEach(p => ((bucket[p] && bucket[p][field]) || []).forEach(x => {
+      const l = pvGroup(x); if (l && out.indexOf(l) < 0) out.push(l);
+    }));
     return out;
   }
-  // Every platform's changed groups, merged. A group that changed on both TV and
-  // mobile is still one group.
-  function settingsGroupsAcross(bucket) {
-    const out = [];
-    Object.keys(bucket || {}).forEach(p => settingsGroupNames(bucket[p]).forEach(n => { if (out.indexOf(n) < 0) out.push(n); }));
-    return out;
+  // Everything a plan (plus its extras) will do, as sections. Shared by Sync
+  // Desk, templates and restore so all three read the same way.
+  function pvReport(r, extras, o) {
+    const opt = o || {};
+    const x = extras || {};
+    const secs = [];
+    const list = (label, b) => b && pvSection(label, [
+      ['add', 'Adds', b.added],
+      ['upd', 'Updates', b.updated],
+      ['rem', 'Removes', b.removed],
+      ['keep', 'Keeps', b.keptLocal, 'Only this profile has these — a merge leaves them alone'],
+    ]);
+    secs.push(list('Add-ons', r.addons), list('Plugins', r.plugins), list('Collections', r.collections));
+    if (r.settings) {
+      const held = [], gaps = [];
+      Object.keys(r.settings).forEach(p => {
+        settingsSkipLines(r.settings[p], p).forEach(s => held.push(s));
+        (r.settings[p].wontApply || []).forEach(g => gaps.push(p + ': ' + g));
+      });
+      secs.push(pvSection('Settings', [
+        ['upd', 'Changes', pvGroups(r.settings, 'changed')],
+        ['rem', 'Clears', pvGroups(r.settings, 'removed')],
+        ['keep', 'Leaves out', held.length ? 'Some fields, like API keys (hover for the list)' : '', held.join('\n')],
+        ['keep', 'Can\u2019t apply', gaps.length ? 'A few fields this app version does not read (hover for the list)' : '', gaps.join('\n')],
+      ], opt.settingsWhy));
+    }
+    const items = n => n + ' item' + (n === 1 ? '' : 's');
+    if (Array.isArray(x.watchProgress) && x.watchProgress.length) secs.push(pvSection('Watch progress', [['add', 'Adds', items(x.watchProgress.length)]]));
+    if (Array.isArray(x.watched) && x.watched.length) secs.push(pvSection('Watched', [['add', 'Adds', items(x.watched.length)]]));
+    if (x.identity && x.identity.name) secs.push(pvSection('Profile', [['upd', 'Becomes', x.identity.name + ', with its picture']]));
+    if (Array.isArray(x.credentials) && x.credentials.length) secs.push(pvSection('API keys', [['add', 'Writes', x.credentials.map(c => c.provider)]]));
+    const wrap = el('div', 'pv');
+    secs.filter(Boolean).forEach(s => wrap.appendChild(s));
+    if (!wrap.firstChild) wrap.appendChild(el('div', 'pv-none', 'Already matches — nothing to do.'));
+    return wrap;
   }
 
   // shared apply-plan renderer (templates + restore)
@@ -2322,43 +2364,8 @@
     // surface with nothing in flight, which is the one thing that class means.
     status(st, '');
     clr(res); const r = plan.report; const d = el('div', 'report');
-    const line = (label, o) => {
-      if (!o) return;
-      const bits = [
-        nameTags('add', '+ ', o.added, 'Added to the profile'),
-        nameTags('upd', '~ ', o.updated, 'Already there, and changed'),
-        nameTags('rem', '− ', o.removed, 'Removed from the profile'),
-      ].filter(Boolean);
-      if (!bits.length) return;
-      const x = el('div', 'rline');
-      x.innerHTML = `<span class="rk">${label}</span>` + bits.join(' ');
-      d.appendChild(x);
-    };
-    line('Add-ons', r.addons); line('Plugins', r.plugins); line('Collections', r.collections);
-    if (r.settings) {
-      let ch = 0; const gapDetail = [], skipDetail = [];
-      for (const p of Object.keys(r.settings)) {
-        ch += r.settings[p].changed.length;
-        settingsSkipLines(r.settings[p], p).forEach(s => skipDetail.push(s));
-        (r.settings[p].wontApply || []).forEach(g => gapDetail.push(p + ': ' + g));
-      }
-      const groups = settingsGroupsAcross(r.settings);
-      if (ch || skipDetail.length || gapDetail.length) {
-        const x = el('div', 'rline');
-        x.innerHTML = `<span class="rk">Settings</span>`
-          + nameTags('upd', '~ ', groups, 'Settings in this section change')
-          + (skipDetail.length ? ` <span class="tag held" title="${esc(skipDetail.join('\n'))}">some held back</span>` : '')
-          + (gapDetail.length ? ` <span class="tag warn" title="${esc(gapDetail.join('\n'))}">some won't apply</span>` : '');
-        d.appendChild(x);
-      }
-    }
-    const itemLine = (label, n) => { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">${label}</span><span class="tag add">${n} item${n === 1 ? '' : 's'}</span>`; d.appendChild(x); };
-    if (extras && Array.isArray(extras.watched) && extras.watched.length) itemLine('Watched', extras.watched.length);
-    if (extras && Array.isArray(extras.watchProgress) && extras.watchProgress.length) itemLine('Progress', extras.watchProgress.length);
-    if (extras && extras.identity && extras.identity.name) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">Profile</span>` + nameTags('upd', '', [extras.identity.name + ' (name & photo)'], 'The profile is renamed'); d.appendChild(x); }
-    if (extras && Array.isArray(extras.credentials) && extras.credentials.length) { const x = el('div', 'rline'); x.innerHTML = `<span class="rk">API keys</span>` + nameTags('add', '+ ', extras.credentials.map(c => c.provider), 'This key is written to the profile'); d.appendChild(x); }
     const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name) || (extras.credentials && extras.credentials.length));
-    if (!plan.hasChanges && !hasExtras) d.appendChild(el('div', 'rline muted', 'Already matches — nothing to do.'));
+    d.appendChild(pvReport(r, extras));
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
     if (plan.hasRemovals) { const w = el('label', 'confirm'); const cb = el('input'); cb.type = 'checkbox'; cb.onchange = () => { confirmed = cb.checked; ap.disabled = !confirmed; }; w.appendChild(cb); w.appendChild(el('span', '', 'This removes items the target has that this doesn\'t. I understand.')); res.appendChild(w); }
@@ -2447,6 +2454,7 @@
       syCreds.copy = false; syCreds.replace = false;
       syKeysAnsweredFor = null;
     }
+    if (syA !== id || syI !== idx) { syDevOn = false; syDevPaint(); }
     syA = id; syI = idx;
     document.querySelectorAll('#sy-source .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
     status($('sy-status'), 'Reading source…');
@@ -2573,8 +2581,21 @@
   //   settings    every tab except Appearance
   //   API keys    on, including overwriting keys the target already has
   //   watch state never — that is the profile's own history
+  // A toggle (Furqan, 2026-09-16): the first press applies the recommended
+  // picks, the next one clears every pick. The label says which press is next.
+  let syDevOn = false;
+  function syDevPaint() { const b = $('sy-dev-choice'); if (b) { b.textContent = syDevOn ? 'Deselect all' : 'Developer\'s choice'; b.classList.toggle('on', syDevOn); } }
+  function syDevClear() {
+    ['addons', 'plugins', 'collections', 'settings'].forEach(k => { sySel[k] = new Set(); });
+    ['addons', 'plugins', 'collections', 'settings', 'watchprogress', 'watched'].forEach(k => { const cb = $('sy-cat-' + k); if (cb) cb.checked = false; });
+    syCreds.copy = false; syCreds.replace = false; sySettingsIncludeKeys = false;
+    renderSyItems(); renderSyTree(); updateSyCounts(); scheduleLivePreview();
+    syDevOn = false; syDevPaint();
+    logAct('Developer\'s choice cleared — nothing is selected to carry over', 'info');
+  }
   function syDevChoice() {
     if (!sySnap) return;
+    if (syDevOn) { syDevClear(); return; }
 
     // Keys first: whether they are included decides which settings leaves
     // count as copyable, so tabStat() below has to be asked after this.
@@ -2612,6 +2633,7 @@
       + ', ' + sySel.plugins.size + ' plugin(s), ' + sySel.collections.size + ' collection(s), '
       + sySel.settings.size + ' settings tab(s), API keys '
       + (keysLinked ? 'on with overwrite' : 'off — account not linked with keys'), 'info');
+    syDevOn = true; syDevPaint();
   }
 
   // Sync Desk settings are split into TV / Mobile / Desktop / API keys sections so the
@@ -3093,87 +3115,21 @@
     const box = $('sy-results'); clr(box);
     plans.forEach(({ tid, plan, extras, nuvio }) => {
       const nm = tidName(tid);
-      const r = plan.report; const d = el('div', 'sy-card-report');
+      const d = el('div', 'sy-card-report');
+      // Who it is, and nothing else. The "changes / block copy" badges were
+      // jargon on a surface meant to be read at a glance; the body below says
+      // whether anything changes, and the copy method is in the Settings
+      // heading's tooltip for anyone who wants it.
       const head = el('div', 'rhead');
       head.appendChild(avatar(nm.profile, 26));
-      const nameSpan = el('span', 'rhead-name'); nameSpan.textContent = nm.name;
-      head.appendChild(nameSpan);
-      const acctBadge = el('span', 'rbadge no'); acctBadge.textContent = nm.acct;
-      acctBadge.style.background = 'var(--surface)'; acctBadge.style.border = '1px solid var(--line)';
-      head.appendChild(acctBadge);
-      const chgBadge = el('span', 'rbadge ' + (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) ? 'chg' : 'no'));
-      chgBadge.textContent = (plan.hasChanges || (extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length)) ? 'changes' : 'no change';
-      head.appendChild(chgBadge);
-      // Which copy path this target will take — Nuvio's own server-side copy, or
-      // Numax moving the chosen blocks verbatim. Cross-account always takes the latter.
-      if ($('sy-cat-settings') && $('sy-cat-settings').checked) {
-        const pathBadge = el('span', 'rbadge no');
-        pathBadge.textContent = (nuvio && nuvio.ok) ? 'Nuvio copy' : 'block copy';
-        pathBadge.title = (nuvio && nuvio.ok)
-          ? "Uses Nuvio's own sync_copy_profile_setup — whole platforms, same account."
-          : 'Numax copies the selected blocks verbatim' + (nuvio && nuvio.why ? ' (' + nuvio.why + ')' : '') + '.';
-        head.appendChild(pathBadge);
-      }
+      head.appendChild(el('span', 'rhead-name', nm.name));
+      head.appendChild(el('span', 'rhead-acct', nm.acct));
       d.appendChild(head);
-
-      const line = (label, o) => {
-        if (!o) return null;
-        const bits = [
-          nameTags('add', '+ ', o.added, 'Added to this profile'),
-          nameTags('upd', '~ ', o.updated, 'Already there, and changed'),
-          nameTags('rem', '− ', o.removed, 'Removed from this profile'),
-          nameTags('keep', 'kept ', o.keptLocal, 'Only this profile has it already — a merge leaves it alone'),
-        ].filter(Boolean);
-        if (!bits.length) return null;
-        const x = el('div', 'rline'); x.innerHTML = '<span class="rk">' + label + '</span>' + bits.join(' '); return x;
-      };
-      const rows = [];
-      const a = line('Add-ons', r.addons); if (a) rows.push(a);
-      const p = line('Plugins', r.plugins); if (p) rows.push(p);
-      const c = line('Collections', r.collections); if (c) rows.push(c);
-      if (r.settings) {
-        let ch = 0; const gapDetail = [], skipDetail = [], remDetail = [];
-        for (const pl of Object.keys(r.settings)) {
-          ch += r.settings[pl].changed.length;
-          settingsSkipLines(r.settings[pl], pl).forEach(s => skipDetail.push(s));
-          (r.settings[pl].removed || []).forEach(g => remDetail.push(pl + ': ' + g));
-          (r.settings[pl].wontApply || []).forEach(g => gapDetail.push(pl + ': ' + g));
-        }
-        const groups = settingsGroupsAcross(r.settings);
-        if (ch || skipDetail.length || gapDetail.length || remDetail.length) {
-          const x = el('div', 'rline');
-          x.innerHTML = '<span class="rk">Settings</span>'
-            + nameTags('upd', '~ ', groups, 'Settings in this section change')
-            + (remDetail.length ? ' <span class="tag rem" title="' + esc(remDetail.join('\n')) + '">some dropped</span>' : '')
-            + (skipDetail.length ? ' <span class="tag held" title="' + esc(skipDetail.join('\n')) + '">some held back</span>' : '')
-            + (gapDetail.length ? ' <span class="tag warn" title="' + esc(gapDetail.join('\n')) + '">some won\'t apply</span>' : '');
-          rows.push(x);
-        }
-      }
-      const nItems = n => '<span class="tag add">' + n + ' item' + (n === 1 ? '' : 's') + '</span>';
-      if (extras.watchProgress && extras.watchProgress.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Progress</span>' + nItems(extras.watchProgress.length); rows.push(x); }
-      if (extras.watched && extras.watched.length) { const x = el('div', 'rline'); x.innerHTML = '<span class="rk">Watched</span>' + nItems(extras.watched.length); rows.push(x); }
-      // removals line — explicit
-      const remRow = el('div', 'rline');
-      const remNames = []
-        .concat((r.addons && r.addons.removed) || [])
-        .concat((r.plugins && r.plugins.removed) || [])
-        .concat((r.collections && r.collections.removed) || []);
-      let settingsRem = 0;
-      if (r.settings) for (const pl of Object.keys(r.settings)) {
-        (r.settings[pl].removed || []).forEach(g => {
-          settingsRem++;
-          const label = (E && E.groupLabel) ? E.groupLabel(String(g).split('.')[0]) : g;
-          if (remNames.indexOf(label) < 0) remNames.push(label);
-        });
-      }
-      const totalRem = remNames.length || settingsRem;
-      remRow.innerHTML = '<span class="rk">Removals</span>'
-        + (totalRem ? nameTags('rem', '− ', remNames, 'This goes from the profile')
-                    : '<span style="font-size:12px;color:var(--t45)">None</span>');
-      if (rows.length) rows.forEach(rw => d.appendChild(rw));
-      d.appendChild(remRow);
-      if (!rows.length && !totalRem) d.appendChild(el('div', 'no-change', 'Already matches — nothing to do.'));
+      const why = ($('sy-cat-settings') && $('sy-cat-settings').checked)
+        ? ((nuvio && nuvio.ok) ? "Copied with Nuvio's own profile copy — whole platforms, same account."
+          : 'Numax copies the chosen settings sections' + (nuvio && nuvio.why ? ' (' + nuvio.why + ')' : '') + '.')
+        : '';
+      d.appendChild(pvReport(plan.report, extras, { settingsWhy: why }));
       box.appendChild(d);
     });
   }
@@ -3290,7 +3246,20 @@
   const drPicked = new Set();
   async function backupNow() {
     const log = $('dr-backup-log'); const picked = [...drPicked]; if (!picked.length) { status(log, 'Pick at least one profile.', 'err'); return; }
-    const name = $('dr-name').value.trim() || ('numax-backup-' + new Date().toISOString().slice(0, 10)); const keys = $('dr-keys').classList.contains('on');
+    // Asked every time (Furqan, 2026-09-16). The suggestion is the profile's
+    // own name for a single-profile backup, since that is what it gets called
+    // when a profile is deleted too.
+    let suggest = 'Numax backup ' + new Date().toISOString().slice(0, 10);
+    if (picked.length === 1) {
+      const [pa, pi] = picked[0].split(':');
+      const pr = (profilesCached(pa) || []).find(p => p.index === parseInt(pi, 10));
+      if (pr) suggest = pr.name + ' Backup';
+    }
+    const asked = await uiModal({ message: 'Name this backup', details: ['A name you have used before replaces that backup in your Drive.'], input: true, defaultVal: suggest, okLabel: 'Back up' });
+    if (asked == null) return;
+    const name = String(asked).trim();
+    if (!name) { status(log, 'A backup needs a name.', 'err'); return; }
+    const keys = $('dr-keys').classList.contains('on');
     $('dr-backup-btn').disabled = true; status(log, 'Building backup…');
     try {
       const out = { app: 'numax', kind: 'backup', savedAt: new Date().toISOString(), includesKeys: keys, profiles: [] }; const by = {};
@@ -3599,10 +3568,11 @@
         acts.appendChild(b);
       }
       const add = el('button', 'btn btn-ghost btn-xs', 'Add'); add.title = 'Put this add-on on one or more profiles';
-      // The catalogue link goes in prefilled, so the common case ("I just want
-      // the default setup") is one click and a tick rather than a copy-paste
-      // round trip. Configure first and paste over it when you need settings.
-      add.onclick = () => openAddToProfile(add, s.name, s.url || '');
+      // Never prefilled (Furqan, 2026-09-16): every add-on here has to be set
+      // up on its own site first, and the link that site hands back is the
+      // only one worth saving. The dialog offers the site instead.
+      add.onclick = () => openAddToProfile(add, s.name, s.url || '',
+        s.instances ? 'Pick an instance with “Choose instance” and set it up there' : '');
       acts.appendChild(add);
       c.appendChild(acts); sbox.appendChild(c);
     });
@@ -3840,6 +3810,10 @@
       wrap.appendChild(top);
     }
 
+    // The account cards get their own grid so the Select-all row above them is
+    // not one of its rows — every row there is made the same height.
+    const grid = el('div', 'mk-pick-grid');
+    wrap.appendChild(grid);
     byAcct.forEach((g, gi) => {
       const sec = el('div', 'mk-pick-acct');
       const head = el('button', 'mk-pick-h'); head.type = 'button';
@@ -3935,7 +3909,7 @@
       // callback, and the group would then paint at its CSS height of 0 — an
       // empty picker. A fresh render should not animate anyway.
       if (open) w.style.height = 'auto';
-      wrap.appendChild(sec);
+      grid.appendChild(sec);
     });
     if (topAll) {
       topAll.onclick = () => {
@@ -4073,14 +4047,30 @@
   // refuse cross-origin reads, and Nuvio's own Add Plugin dialog never checks
   // either — so that case warns and still lets the write through. Only an
   // address that answers and is definitely not a manifest is called out.
-  async function openAddToProfile(anchor, name, presetUrl) {
-    const pop = openMkPop(anchor, 'Add ' + name, 'Paste the link its site gave you — Numax works out the manifest URL.');
+  // `siteUrl` is where the add-on is configured. It is NOT put in the box:
+  // the link to save is the one that site produces after you set it up, so the
+  // box always starts empty and the site is one button away.
+  async function openAddToProfile(anchor, name, siteUrl, firstStep) {
+    const pop = openMkPop(anchor, 'Add ' + name, 'Set it up on its own site first, then paste the link it gives you.');
     const mine = pop;
     const stale = () => mkPop !== mine;
 
-    const f1 = el('label', 'mk-f'); f1.appendChild(el('span', '', 'Link from the add-on’s site'));
-    const inp = el('input', 'modal-input'); inp.type = 'url'; inp.placeholder = 'https://…/configure';
-    if (presetUrl) inp.value = presetUrl;
+    if (!siteUrl && firstStep) {
+      const step = el('div', 'mk-step1');
+      step.appendChild(el('span', '', '1. ' + firstStep));
+      pop.body.appendChild(step);
+    }
+    if (siteUrl) {
+      const step = el('div', 'mk-step1');
+      step.appendChild(el('span', '', '1. Configure ' + name + ' on its site'));
+      const go = el('button', 'btn btn-ghost btn-xs', 'Open ' + host(siteUrl));
+      go.type = 'button';
+      go.onclick = () => { openTab(siteUrl); logAct('Opened ' + name + ' to configure it', 'info'); };
+      step.appendChild(go);
+      pop.body.appendChild(step);
+    }
+    const f1 = el('label', 'mk-f'); f1.appendChild(el('span', '', (siteUrl || firstStep ? '2. ' : '') + 'Paste the link it gave you'));
+    const inp = el('input', 'modal-input'); inp.type = 'url'; inp.placeholder = 'https://…/manifest.json or its install link';
     f1.appendChild(inp); pop.body.appendChild(f1);
     const chk = el('div', 'mk-chk'); pop.body.appendChild(chk);
 
@@ -4166,7 +4156,7 @@
     if (!got) { go.disabled = true; return; }
     targets = got;
     reset();
-    if (presetUrl) probe(); else setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60);
+    setTimeout(() => { try { inp.focus(); } catch (e) {} }, 60);
   }
 
   // Plugins get the same dialog add-ons do. They used to install from a block
@@ -4269,14 +4259,21 @@
 
     const anyChange = plans.some(p => p.plan.hasChanges);
     const anyRemoval = plans.some(p => p.plan.hasRemovals);
+    // One section per profile, in the same plain wording every other preview
+    // uses. (This called a pill helper that was removed on 2026-09-16 and threw
+    // on every add — caught by the leftover-reference sweep, not by a user.)
     const rep = el('div', 'report');
+    const pv = el('div', 'pv');
     plans.forEach(({ t, plan }) => {
       const r = (plan.report && plan.report[kind]) || {};
-      const bits = [tagHtml('add', '+', r.added), tagHtml('upd', '~', r.updated), tagHtml('rem', '−', r.removed)].filter(Boolean);
-      const line = el('div', 'rline');
-      line.innerHTML = '<span class="rk">' + esc(t.name) + '</span>' + (bits.length ? bits.join(' ') : '<span class="tag keep">no change</span>');
-      rep.appendChild(line);
+      const sec = pvSection(t.name, [
+        ['add', 'Adds', r.added],
+        ['upd', 'Updates', r.updated],
+        ['rem', 'Removes', r.removed],
+      ]) || pvSection(t.name, [['keep', 'No change', 'Already there']]);
+      pv.appendChild(sec);
     });
+    rep.appendChild(pv);
     res.appendChild(rep);
     status(st, '');
 
@@ -5423,6 +5420,13 @@
       WZ_ENTRY.forEach(e => {
         const card = wzCard('', () => { wz.entry = e.id; wzPaintEntry(); wzPaintHead(); });
         card.dataset.wzentry = e.id;
+        // The mascot's first home (Furqan, 2026-09-16): peeking over the top
+        // edge of the first front door, hands on the card, eyes on the pointer.
+        if (!box.firstChild && window.NumaxMascot) {
+          const m = window.NumaxMascot.create({ pose: 'ledge', size: 104, anim: ['idle', 'blink'], follow: true, className: 'wz-entry-mascot' });
+          card.appendChild(m);
+          card.addEventListener('mouseenter', () => window.NumaxMascot.play(m, 'hop'));
+        }
         if (e.art) { const a = el('div', 'wz-entry-art'); a.innerHTML = e.art; card.appendChild(a); }
         const h = el('div', 'wz-pick-h'); h.appendChild(el('span', 'wz-pick-n', e.name));
         card.appendChild(h);
@@ -7888,7 +7892,6 @@
           step: 'meta', label: m.name,
           hint: 'The manifest link ' + m.name + ' gave you.',
           defaultName: m.installName || m.name,
-          defaultUrl: m.check || '',
           top: true,
         });
         box.appendChild(w);

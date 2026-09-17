@@ -207,6 +207,12 @@
   .pf-editor-tab:hover{ color:var(--t); }
   .pf-editor-tab.on{ color:var(--t); border-bottom-color:var(--accent); }
   .pf-tabs-pop{ flex:none; margin-left:auto; position:sticky; right:0; align-self:center; }
+  /* Inside its own pop-out the expand button has nothing left to do. */
+  .pf-card-dlg .pf-tabs-pop{ display:none; }
+  .pf-card-dlg .mk-dlg-b{ padding:0; }
+  .pf-card-dlg .pf-tabs-card{ margin:0; border:0; box-shadow:none; background:none; display:flex; flex-direction:column; min-height:100%; }
+  .pf-card-dlg .pf-tabs-bar{ position:sticky; top:0; z-index:2; background:var(--float-bg); }
+  .pf-card-dlg .pf-panes-wrap{ padding:0 22px 18px; }
   .pf-tabs-header{ display:flex; align-items:center; padding:14px 22px 6px; gap:10px; flex:none; }
   .pf-tabs-header h3{ font-size:16px; font-weight:700; }
   .pf-tabs-header .spacer{ flex:1; }
@@ -250,6 +256,12 @@
   .sy-left::-webkit-scrollbar-thumb{ background:rgba(var(--ink),.12); border-radius:4px; }
   .sy-right .sy-review-card{ flex:1 1 auto; display:flex; flex-direction:column; min-height:180px; margin-bottom:0; padding:0; }
   .sy-card{ background:var(--glass-bg); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid var(--glass-border); border-radius:14px; padding:18px 20px; box-shadow:var(--glass-glow); }
+  /* Sync desk only: the shared 34px halo read as fog around six cards packed
+     this close together. A 10px one and a white edge instead. */
+  .panel[data-panel="sync"] .sy-cols .sy-card{ border-color:rgba(255,255,255,.62);
+    box-shadow:0 0 0 1px rgba(var(--ink),.05) inset, 0 0 10px -5px rgba(255,255,255,.55); }
+  :root[data-theme="light"] .panel[data-panel="sync"] .sy-cols .sy-card{ border-color:rgba(var(--ink),.24);
+    box-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 4px 12px -8px rgba(18,26,43,.25); }
   .sy-card-h{ display:flex; align-items:center; gap:8px; margin-bottom:14px; }
   .sy-card-h h3{ font-size:15px; font-weight:700; letter-spacing:-.005em; }
   .sy-card-h .spacer{ flex:1; }
@@ -810,11 +822,22 @@
   .tag.add{ background:rgba(67,160,71,.18); color:var(--ok-soft); } .tag.upd{ background:rgba(240,160,32,.16); color:var(--warn-soft); }
   .tag.rem{ background:rgba(var(--danger-rgb),.16); color:var(--danger-soft); } .tag.keep,.tag.held{ background:var(--surface-2); color:var(--t45); }
   .tag.held[title]{ cursor:help; }
-  /* A tag that carries a NAME rather than a count. Tabular figures are for
-     numbers and make a word look spaced-out, and one very long collection
-     title must not be allowed to push the row wider than its card. */
-  .tag.name{ font-variant-numeric:normal; font-weight:600; max-width:210px;
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* Previews: a heading per section, then plain lines. The verb carries the
+     colour; the names are ordinary text that wraps. */
+  .pv{ display:flex; flex-direction:column; gap:10px; }
+  .pv-sec{ display:flex; flex-direction:column; gap:3px; }
+  .pv-sec + .pv-sec{ padding-top:10px; border-top:1px solid var(--line-2); }
+  .pv-h{ font-size:12.5px; font-weight:700; color:var(--t); }
+  .pv-h[title]{ cursor:help; }
+  .pv-l{ display:grid; grid-template-columns:78px minmax(0,1fr); gap:10px; font-size:12.5px; line-height:1.45; }
+  .pv-v{ font-weight:600; }
+  .pv-v.add{ color:var(--ok-soft); } .pv-v.upd{ color:var(--warn-soft); }
+  .pv-v.rem{ color:var(--danger-soft); } .pv-v.keep{ color:var(--t45); }
+  .pv-t{ color:var(--t70); overflow-wrap:anywhere; }
+  .pv-t[title]{ cursor:help; }
+  .pv-none{ font-size:12.5px; color:var(--t45); font-style:italic; }
+  .report .pv{ padding:8px 10px; }
+  .sy-card-report .rhead-acct{ font-size:11.5px; color:var(--t45); white-space:nowrap; }
   .tag.warn{ background:rgba(255,152,0,.18); color:var(--warn); cursor:help; }
   /* .confirm is defined in the review/change-summary block above. */
   .actbar{ display:flex; align-items:center; gap:14px; margin-top:14px; flex-wrap:wrap; }
@@ -1228,8 +1251,14 @@
   #wz-entry{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; flex:1 1 auto; min-height:0; }
   #wz-entry .wz-pick{ padding:32px 28px; min-height:220px; justify-content:center; align-items:center;
     text-align:center; gap:14px;
-    background:linear-gradient(155deg, rgba(var(--ink),.07), rgba(var(--ink),.015) 55%, rgba(0,0,0,.1)); }
-  #wz-entry .wz-pick:hover{ background:linear-gradient(155deg, rgba(var(--ink),.1), rgba(var(--ink),.02) 55%, rgba(0,0,0,.08)); }
+    background:linear-gradient(155deg, #17151b, #0e0d11 60%, #0b0a0d);
+    border:1px solid rgba(255,255,255,.62) !important; overflow:visible; }
+  #wz-entry .wz-pick:hover{ background:linear-gradient(155deg, #1d1b22, #121116 60%, #0d0c10);
+    border-color:rgba(255,255,255,.9) !important; }
+  /* The mascot sits on the first card's top edge, hands over it, the way the
+     "peeking over a ledge" render does — so the grid leaves room above. */
+  #wz-entry{ padding-top:58px; }
+  #wz-entry .wz-entry-mascot{ position:absolute; right:26px; bottom:100%; margin-bottom:-9px; pointer-events:none; z-index:2; }
   #wz-entry .wz-pick-h{ justify-content:center; }
   #wz-entry .wz-pick-n{ font-size:18px; }
   /* flex:none, overriding `.wz-pick > .wz-pick-one{ flex:1 1 auto }`. That rule
@@ -2005,6 +2034,9 @@
   .mk-f input{ width:100%; }
 
   /* the pasted-link verdict — a fact about the address, not a form error */
+  .mk-step1{ display:flex; align-items:center; gap:10px; margin-bottom:14px; font-size:12.5px; font-weight:600; }
+  .mk-step1 > span{ flex:1; min-width:0; }
+  .mk-step1 .btn{ flex:none; }
   .mk-chk{ font-size:12px; line-height:1.5; margin:-6px 0 12px; padding:0; }
   .mk-chk:empty{ display:none; }
   .mk-chk-l{ font-weight:600; }
@@ -2049,9 +2081,16 @@
      the only place two accounts stacked full-width instead of sitting side by
      side. The track minimum decides for itself — a 413px card gets one column,
      a dialog gets two — so one rule covers both. */
+  /* Every account card is the same size. align-items:start let each card be
+     as tall as its own profiles, so a row holding a one-profile account next
+     to a five-profile one left a hole under the short card — the gaps. The
+     cards live in their own grid (the Select-all row is outside it) so that
+     grid-auto-rows:1fr makes every ROW as tall as the tallest card, and
+     stretch makes every card fill its row. */
+  .mk-pick-grid{ display:grid; grid-template-columns:minmax(0,1fr); grid-auto-rows:1fr; gap:8px; align-items:stretch; }
+  .mk-pick-grid > .mk-pick-acct{ display:flex; flex-direction:column; min-width:0; }
   @media (min-width:760px){
-    .mk-pick.multi{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); align-items:start; gap:8px; }
-    .mk-pick.multi .mk-pick-top{ grid-column:1/-1; }
+    .mk-pick.multi .mk-pick-grid{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
   }
   .mk-pick-acct{ border:1px solid var(--line); border-radius:12px; background:var(--surface); overflow:hidden;
     transition:border-color var(--mo-micro,.14s) var(--mo-ease,ease); }
@@ -2084,12 +2123,11 @@
      for three ended with a third of the row reserved and empty. auto-fit
      collapses the empty tracks and the 1fr max hands that width back to the
      chips that exist, so a row is always full whatever the count. */
-  /* auto-FILL, not auto-fit. auto-fit collapses the tracks nothing landed in
-     and shares their width out, so one profile became a 612px pill and two
-     became 303px each — the chip changed size with how many there were.
-     auto-fill keeps the tracks the container can hold, so a chip is one width
-     whatever the count, and a row that fills up divides it exactly. */
-  .mk-pick-chips{ display:grid; grid-template-columns:repeat(auto-fill,minmax(148px,1fr)); gap:7px; }
+  /* The ACCOUNT card is the fixed thing and the profile pills inside it flex
+     to fill it (Furqan, 2026-09-16 17:02). The earlier auto-fill kept empty
+     tracks, which is exactly the "random spaces" inside a card with two
+     profiles; auto-fit shares the card out between the pills it has. */
+  .mk-pick-chips{ display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:7px; }
   .mk-pick-chip{ flex-direction:row; gap:8px; min-width:0; padding:7px 13px 7px 8px; border-radius:11px; border-width:1.5px; justify-content:flex-start; }
   .mk-pick-chip .av{ flex:none; }
   .mk-pick-chip .pcn{ font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -2606,9 +2644,9 @@
   :root[data-theme="light"] .wz-pane .wz-pick{ background:rgba(var(--ink),.03); }
   :root[data-theme="light"] .wz-pane .wz-pick:hover{ background:rgba(var(--ink),.055); }
   :root[data-theme="light"] #wz-entry .wz-pick{
-    background:linear-gradient(155deg, rgba(255,255,255,.95), rgba(255,255,255,.6)); }
+    background:linear-gradient(155deg, #fff, #f7f8fb); border-color:rgba(var(--ink),.26) !important; }
   :root[data-theme="light"] #wz-entry .wz-pick:hover{
-    background:linear-gradient(155deg, #fff, rgba(255,255,255,.75)); }
+    background:#fff; border-color:rgba(var(--ink),.45) !important; }
   :root[data-theme="light"] .wz-queued,
   :root[data-theme="light"] .wz-route-hint,
   :root[data-theme="light"] .mk-pick-chip{ background:rgba(var(--ink),.03); }
@@ -3313,9 +3351,8 @@
       <div class="panel-cols">
       <div class="card"><div class="chead"><h3>Back up</h3></div>
         <div class="dr-scroll">
-          <p class="muted sm" style="margin-bottom:12px">Pick the profiles to include, then name the file. Backing up to the same name updates that file.</p>
+          <p class="muted sm" style="margin-bottom:12px">Pick the profiles to include. You name the file when you press Back up — using a name you have used before replaces that file.</p>
           <div id="dr-backup-picker"></div>
-          <label class="fld" style="max-width:440px;margin-top:14px"><span>File name</span><input id="dr-name" type="text" placeholder="numax-backup"></label>
           <div class="switch-row" style="margin-top:14px"><div class="tx"><b>Include API keys</b><span>Off by default. Only on if you want provider keys saved inside the backup.</span></div><button class="tog" id="dr-keys" role="switch"></button></div>
         </div>
         <div class="actbar"><button class="btn btn-primary" id="dr-backup-btn">Back up to Drive</button><div class="inline-status" id="dr-backup-log"></div></div></div>
@@ -3448,11 +3485,12 @@
 <script src="./store.js?v=5e895a2c"></script>
 <script src="./engine.js?v=37047507"></script>
 <script src="./meta.js?v=2fac004b"></script>
-<script src="./nuvio-settings-schema.js?v=8fdac466"></script>
+<script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
 <script src="./ui-motion.js?v=2d4d14a8"></script>
 <script src="./market.js?v=d723c06a"></script>
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
-<script src="./app.js?v=647fb013"></script>
+<script src="./mascot.js?v=d8b1eee4"></script>
+<script src="./app.js?v=8c7a0f0e"></script>
 </body>
 </html>
