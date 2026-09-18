@@ -172,13 +172,58 @@ function platformSyncGapReason(platform, group, leaf) {
 
 /**
  * Reconcile a target list against master for a url-keyed list surface.
- * mode 'mirror' -> target becomes exactly master (extras deleted).
- * mode 'merge'  -> master items added/updated, target extras kept.
+ * mode 'mirror' -> target becomes exactly master (extras deleted), in master's order.
+ * mode 'merge'  -> master items added, target extras kept, target's order kept and
+ *                  anything new appended after it.
+ * opts.order 'source' (merge only) -> order by the sort_order the caller put on master's
+ *                  rows instead (the wizard's "put this at the top" builds the whole
+ *                  list itself); a target-only row keeps its own sort_order.
  * Returns { result, report } where result is the complete list to push.
+ *
+ * WHAT MERGE CAN AND CANNOT KEEP (release sweep, 2026-09-17). Two different add-ons
+ * always both survive a merge. The SAME add-on on both sides can only be one thing:
+ * if the source has it switched off and the target on, or named differently, the
+ * source's version wins. Those are listed in report.replaced with each field's before
+ * and after, so the UI can say exactly what a merge overwrites instead of implying it
+ * kept everything. Position is NOT one of those fields in merge — a merge never moves
+ * something already on the target.
+ *
+ * Every result is renumbered 0..n-1. Before this, merge kept each row's own
+ * sort_order: the source's for copied rows, the target's for the rest, so two add-ons
+ * could share a slot and an add-on the target already had jumped to wherever it sat on
+ * the source (found live: Cinemeta went from first to last on a merge).
  */
-function reconcileList(masterList, targetList, mode) {
-  const M = Array.isArray(masterList) ? masterList : [];
-  const T = Array.isArray(targetList) ? targetList : [];
+const ITEM_FIELDS = [['enabled', 'On/off'], ['name', 'Name'], ['repo_type', 'Type']];
+
+function byOrder(list) {
+  return list.map((x, i) => [x, i])
+    .sort((a, b) => ((Number(a[0].sort_order) || 0) - (Number(b[0].sort_order) || 0)) || (a[1] - b[1]))
+    .map((p) => p[0]);
+}
+
+// The source's row for an item the target already has. The name falls back to the
+// target's: Nuvio stores some add-ons with an empty name, and an empty name on the
+// source is "unknown", not "rename it to nothing".
+function mergedItem(tItem, mItem) {
+  const out = Object.assign({}, tItem, mItem);
+  out.name = (mItem.name != null && String(mItem.name).trim() !== '') ? mItem.name : (tItem.name ?? null);
+  if (mItem.repo_type === undefined && tItem.repo_type !== undefined) out.repo_type = tItem.repo_type;
+  return out;
+}
+
+function itemDiffs(tItem, merged) {
+  const out = [];
+  for (const [k, label] of ITEM_FIELDS) {
+    const a = k === 'enabled' ? (tItem[k] ?? true) : (tItem[k] ?? null);
+    const b = k === 'enabled' ? (merged[k] ?? true) : (merged[k] ?? null);
+    if (a !== b) out.push({ field: k, label, from: a, to: b });
+  }
+  return out;
+}
+
+function reconcileList(masterList, targetList, mode, opts = {}) {
+  const M = byOrder(Array.isArray(masterList) ? masterList : []);
+  const T = byOrder(Array.isArray(targetList) ? targetList : []);
   const byUrl = (arr) => new Map(arr.map((x) => [x.url, x]));
   const mMap = byUrl(M);
   const tMap = byUrl(T);
@@ -187,11 +232,12 @@ function reconcileList(masterList, targetList, mode) {
   const updated = [];
   const removed = [];
 
-  // Items master defines: add if missing, update if present-but-different.
+  // Items master defines: add if missing, replace if present-but-different.
   for (const [url, mItem] of mMap) {
     const tItem = tMap.get(url);
-    if (!tItem) added.push(mItem);
-    else if (!shallowEqualItem(mItem, tItem)) updated.push({ url, from: tItem, to: mItem });
+    if (!tItem) { added.push(mItem); continue; }
+    const diffs = itemDiffs(tItem, mergedItem(tItem, mItem));
+    if (diffs.length) updated.push({ url, from: tItem, to: mItem, diffs });
   }
   // Items only the target has.
   for (const [url, tItem] of tMap) {
@@ -200,28 +246,36 @@ function reconcileList(masterList, targetList, mode) {
 
   let result;
   if (mode === 'mirror') {
-    result = M.slice(); // exact master
+    result = M.map((m) => (tMap.has(m.url) ? mergedItem(tMap.get(m.url), m) : Object.assign({}, m)));
   } else {
-    // merge: keep target extras, take master's version of shared items, append master-only.
-    result = T.map((t) => (mMap.has(t.url) ? mMap.get(t.url) : t))
-      .concat(added);
+    result = T.map((t) => (mMap.has(t.url) ? mergedItem(t, mMap.get(t.url)) : Object.assign({}, t)))
+      .concat(added.map((m) => Object.assign({}, m)));
+    if (opts.order === 'source') {
+      const want = (x) => (mMap.has(x.url) ? mMap.get(x.url).sort_order : x.sort_order);
+      result = result.map((x, i) => [x, i])
+        .sort((a, b) => ((Number(want(a[0])) || 0) - (Number(want(b[0])) || 0)) || (a[1] - b[1]))
+        .map((p) => p[0]);
+    }
   }
+  result.forEach((x, i) => { x.sort_order = i; });
 
+  // A different sequence of the rows both sides keep is a real change (mirror, or a
+  // merge ordered by the source). Merge in the target's own order never reorders.
+  const seq = (list) => list.map((x) => x.url).filter((u) => tMap.has(u) && result.some((r) => r.url === u)).join('\n');
+  const reordered = seq(result) !== seq(T);
+
+  const nm = (x) => x.name || x.url;
   return {
     result,
     report: {
-      added: added.map((x) => x.name || x.url),
-      updated: updated.map((x) => x.to.name || x.url),
-      removed: mode === 'mirror' ? removed.map((x) => x.name || x.url) : [],
-      keptLocal: mode === 'merge' ? removed.map((x) => x.name || x.url) : [],
+      added: added.map(nm),
+      updated: updated.map((x) => x.to.name || x.from.name || x.url),
+      replaced: updated.map((x) => ({ name: x.to.name || x.from.name || x.url, diffs: x.diffs })),
+      removed: mode === 'mirror' ? removed.map(nm) : [],
+      keptLocal: mode === 'merge' ? removed.map(nm) : [],
+      reordered,
     },
   };
-}
-
-function shallowEqualItem(a, b) {
-  // Compare the fields Nuvio stores for addons/plugins.
-  const keys = ['url', 'name', 'enabled', 'sort_order', 'repo_type'];
-  return keys.every((k) => (a[k] ?? null) === (b[k] ?? null));
 }
 
 // ---------- collections (single jsonb array blob) ----------
@@ -235,6 +289,17 @@ function collectionKey(c) {
   return 'json:' + JSON.stringify(c);
 }
 
+// Merge keeps every collection either side has. A collection BOTH sides have (same
+// id) can only be one version: it used to silently keep the target's, so a merge
+// never delivered an updated collection and never said so. Now the source's version
+// replaces it in place and it is listed in report.replaced, same rule as add-ons.
+function collectionShape(c) {
+  const folders = c && Array.isArray(c.folders) ? c.folders : null;
+  if (!folders) return null;
+  const sources = folders.reduce((n, f) => n + (f && Array.isArray(f.sources) ? f.sources.length : 0), 0);
+  return folders.length + ' folder' + (folders.length === 1 ? '' : 's') + ', ' + sources + ' source' + (sources === 1 ? '' : 's');
+}
+
 function reconcileCollections(masterArr, targetArr, mode) {
   const M = Array.isArray(masterArr) ? masterArr : [];
   const T = Array.isArray(targetArr) ? targetArr : [];
@@ -243,16 +308,23 @@ function reconcileCollections(masterArr, targetArr, mode) {
 
   const added = [...mKeys].filter(([k]) => !tKeys.has(k)).map(([, c]) => c);
   const removed = [...tKeys].filter(([k]) => !mKeys.has(k)).map(([, c]) => c);
+  const updated = [...mKeys].filter(([k, c]) => tKeys.has(k) && JSON.stringify(tKeys.get(k)) !== JSON.stringify(c))
+    .map(([k, c]) => ({ from: tKeys.get(k), to: c }));
 
   let result;
   if (mode === 'mirror') result = M.slice();
-  else result = T.concat(added);
+  else result = T.map((c) => (mKeys.has(collectionKey(c)) ? mKeys.get(collectionKey(c)) : c)).concat(added);
 
   const label = (c) => (c && (c.title ?? c.name ?? c.id)) || '(unnamed collection)';
   return {
     result,
     report: {
       added: added.map(label),
+      updated: updated.map((u) => label(u.to)),
+      replaced: updated.map((u) => {
+        const a = collectionShape(u.from), b = collectionShape(u.to);
+        return { name: label(u.to), diffs: [{ field: 'contents', label: 'Contents', from: a && a !== b ? a : 'this profile\u2019s version', to: b && a !== b ? b : 'the source\u2019s version' }] };
+      }),
       removed: mode === 'mirror' ? removed.map(label) : [],
       keptLocal: mode === 'merge' ? removed.map(label) : [],
     },
@@ -363,6 +435,11 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
   const skippedUnreadable = [];
   const removed = [];
   const wontApply = [];
+  // Every value this write puts in place of one the target already shows: a setting
+  // holds one value, so a merge cannot keep both. `from` is undefined when the target
+  // was still on Nuvio's default. The UI lists these as "what Merge replaces".
+  const replaced = [];
+  const leafValue = (x) => (x && typeof x === 'object' && !Array.isArray(x) && 'value' in x ? x.value : x);
 
   for (const group of Object.keys(mFeat)) {
     const mGroup = mFeat[group];
@@ -373,7 +450,20 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
       if (s.empty) continue;  // nothing configured on the source — nothing to carry
       if (s.skip) { skippedUnreadable.push(group + ' — ' + s.skip); continue; }
       (s.stripped || []).forEach((x) => (x.why === 'secret' ? skippedSecrets : skippedAccount).push(x.leaf));
-      if (out.features[group] !== s.value) { out.features[group] = s.value; changed.push(group + ' (payload)'); }
+      if (out.features[group] !== s.value) {
+        let before = {}, after = {};
+        try { before = typeof out.features[group] === 'string' && out.features[group].trim() ? JSON.parse(out.features[group]) : {}; } catch { before = {}; }
+        try { after = JSON.parse(s.value); } catch { after = {}; }
+        if (after && typeof after === 'object' && !Array.isArray(after)) {
+          Object.keys(after).forEach((k) => {
+            if (JSON.stringify(before && before[k]) !== JSON.stringify(after[k])) replaced.push({ group, leaf: k, from: before ? before[k] : undefined, to: after[k], payload: true });
+          });
+          if (opts.blockMode === 'replace' && before && typeof before === 'object') {
+            Object.keys(before).forEach((k) => { if (!(k in after)) replaced.push({ group, leaf: k, from: before[k], to: undefined, payload: true }); });
+          }
+        }
+        out.features[group] = s.value; changed.push(group + ' (payload)');
+      }
       continue;
     }
 
@@ -402,6 +492,10 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
         removed.push(group + '.' + leaf);
       }
       if (JSON.stringify(out.features[group]) !== JSON.stringify(built)) {
+        const was = (out.features[group] && typeof out.features[group] === 'object') ? out.features[group] : {};
+        new Set([...Object.keys(was), ...Object.keys(built)]).forEach((leaf) => {
+          if (JSON.stringify(was[leaf]) !== JSON.stringify(built[leaf])) replaced.push({ group, leaf, from: leafValue(was[leaf]), to: leafValue(built[leaf]) });
+        });
         out.features[group] = built;
         changed.push(group + ' (block)');
         const gapReason = platform && Object.keys(mGroup).map((l) => platformSyncGapReason(platform, group, l)).find(Boolean);
@@ -423,6 +517,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
         // Lazy-create the group only when we actually have a leaf to write.
         if (!out.features[group] || typeof out.features[group] !== 'object') out.features[group] = {};
         out.features[group][leaf] = deepClone(mLeaf);
+        replaced.push({ group, leaf, from: leafValue(before), to: leafValue(mLeaf) });
         const gapReason = platform && platformSyncGapReason(platform, group, leaf);
         if (gapReason) wontApply.push(group + '.' + leaf + ' — ' + gapReason);
         changed.push(group + '.' + leaf);
@@ -430,7 +525,7 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
     }
   }
 
-  return { result: out, report: { changed, skippedSecrets, skippedAccount, skippedPersonal, skippedUnreadable, removed, wontApply } };
+  return { result: out, report: { changed, replaced, skippedSecrets, skippedAccount, skippedPersonal, skippedUnreadable, removed, wontApply } };
 }
 
 // ---------- top-level: plan one target ----------
@@ -443,6 +538,8 @@ function mergeSettingsBlob(masterBlob, targetBlob, opts = {}, platform) {
  * options: {
  *   categories: { addons?, plugins?, collections?, settings? } (booleans),
  *   modes: { addons:'merge'|'mirror', plugins:..., collections:... },
+ *   listOrder: 'source' (optional) — merge add-ons/plugins in the sort_order the
+ *     caller put on master's rows rather than the target's own order,
  *   settings: { includePersonal?: bool, includeSecrets?: bool },
  *   profileId: number, originClientId: string,
  * }
@@ -462,20 +559,20 @@ function planTarget(master, target, options) {
   let hasRemovals = false;
 
   if (cats.addons && master.addons) {
-    const { result, report: r } = reconcileList(master.addons, target.addons, modes.addons || 'merge');
+    const { result, report: r } = reconcileList(master.addons, target.addons, modes.addons || 'merge', { order: options.listOrder });
     report.addons = r;
     if (r.removed.length) hasRemovals = true;
-    if (r.added.length || r.updated.length || r.removed.length) {
+    if (r.added.length || r.updated.length || r.removed.length || r.reordered) {
       ops.push({ surface: 'addons', rpc: 'sync_push_addons',
         params: { p_addons: stripListForPush(result), p_profile_id: options.profileId, p_origin_client_id: origin } });
     }
   }
 
   if (cats.plugins && master.plugins) {
-    const { result, report: r } = reconcileList(master.plugins, target.plugins, modes.plugins || 'merge');
+    const { result, report: r } = reconcileList(master.plugins, target.plugins, modes.plugins || 'merge', { order: options.listOrder });
     report.plugins = r;
     if (r.removed.length) hasRemovals = true;
-    if (r.added.length || r.updated.length || r.removed.length) {
+    if (r.added.length || r.updated.length || r.removed.length || r.reordered) {
       ops.push({ surface: 'plugins', rpc: 'sync_push_plugins',
         params: { p_plugins: stripListForPush(result, true), p_profile_id: options.profileId, p_origin_client_id: origin } });
     }
@@ -485,7 +582,7 @@ function planTarget(master, target, options) {
     const { result, report: r } = reconcileCollections(master.collections, target.collections, modes.collections || 'merge');
     report.collections = r;
     if (r.removed.length) hasRemovals = true;
-    if (r.added.length || r.removed.length) {
+    if (r.added.length || r.updated.length || r.removed.length) {
       ops.push({ surface: 'collections', rpc: 'sync_push_collections',
         params: { p_profile_id: options.profileId, p_collections_json: result, p_origin_client_id: origin } });
     }

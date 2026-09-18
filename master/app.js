@@ -240,6 +240,9 @@
   const status = (n, m, c) => {
     if (!n) return;
     const t = m || '';
+    // When a result (ok/err) went up — the live refresh leaves a panel alone
+    // while one is fresh, so it never wipes the answer someone is reading.
+    n.__at = (c === 'ok' || c === 'err') ? Date.now() : 0;
     n.textContent = t;
     n.className = 'inline-status' + (c ? ' ' + c : '') + (!c && /…$/.test(t) ? ' shimmer' : '');
   };
@@ -478,8 +481,10 @@
         opts.details.forEach(d => { const li = el('li'); li.innerHTML = d; ul.appendChild(li); });
         msgBox.appendChild(ul);
       }
+      if (opts.node) msgBox.appendChild(opts.node);
       const card = root.querySelector('.modal-card');
       if (card) card.classList.toggle('danger-card', !!opts.danger);
+      if (card) card.classList.toggle('modal-wide', !!opts.wide);
       if (opts.input) { inp.style.display = ''; inp.value = opts.defaultVal || ''; setTimeout(() => { inp.focus(); inp.select(); }, 30); } else inp.style.display = 'none';
       ok.textContent = opts.okLabel || 'Confirm'; ok.className = 'btn ' + (opts.danger ? 'danger-btn' : 'btn-primary');
       cancel.style.display = opts.noCancel ? 'none' : '';
@@ -780,8 +785,138 @@
 
   // Invalidating drops in-flight reads too: a read that started before the
   // invalidation describes the old state, so it must not be handed out after.
-  const inval = id => { delete cache[id]; delete membershipCache[id]; delete inflight[id]; delete profileCache[id]; delete profileInflight[id]; delete profileStamp[id]; };
-  const invalAll = () => { [cache, membershipCache, inflight, profileCache, profileInflight, profileStamp].forEach(m => Object.keys(m).forEach(k => delete m[k])); };
+  const inval = id => { delete cache[id]; delete membershipCache[id]; delete inflight[id]; delete profileCache[id]; delete profileInflight[id]; delete profileStamp[id]; liveBump(id); };
+  const invalAll = () => { [cache, membershipCache, inflight, profileCache, profileInflight, profileStamp].forEach(m => Object.keys(m).forEach(k => delete m[k])); liveBump(null); };
+
+  // ======================================================================
+  // LIVE REFRESH (Furqan, 2026-09-17: "I have to switch to another tab and
+  // come back for it to update")
+  //
+  // Two inputs, one output:
+  //  - every write already calls inval()/invalAll(); that now also marks the
+  //    account as changed (a SELF change)
+  //  - while the page is visible, each linked account's change stamps are
+  //    checked every LIVE_POLL_MS and on returning to the tab, so a change made
+  //    in Nuvio's own app or another browser shows up too (an EXTERNAL change)
+  // and the tab on screen quietly redraws from a fresh read.
+  //
+  // It never takes anything away from someone mid-task. It waits while anything
+  // is in flight (a shimmering status — the app's own "busy" convention — or an
+  // open dialog), leaves the Profile editor alone while it has unsaved edits and
+  // Sync desk's choices alone while recipients are ticked, and does not redraw a
+  // panel that is showing a result from the last LIVE_FRESH_MS. The data is read
+  // BEFORE anything is cleared, so a redraw paints from cache in one frame
+  // instead of flashing "Loading…".
+  //
+  // The stamps: Nuvio has no change feed, but its tables are readable for the
+  // signed-in account. The newest updated_at of addons, plugins, profiles,
+  // collections and settings blobs catches edits; get_sync_overview's per-
+  // profile counts catch deletions (a deleted row leaves no updated_at behind)
+  // and watch history. Measured 2026-09-17: ~0.3 s and a few hundred bytes each.
+  // ======================================================================
+  const LIVE_POLL_MS = 45000, LIVE_FRESH_MS = 25000, LIVE_TABLES = ['addons', 'plugins', 'profiles', 'collections', 'profile_settings_blobs'];
+  const live = { self: new Set(), ext: new Set(), t: 0, stamps: {}, polling: false, lastPoll: 0, wasHidden: document.hidden };
+  function liveBump(id, external) {
+    const ids = id ? [id] : store.list().map(r => r.accountId);
+    ids.forEach(a => (external ? live.ext : live.self).add(a));
+    clearTimeout(live.t); live.t = setTimeout(liveRun, 700);
+  }
+  const livePanel = () => { const b = document.querySelector('.navbtn.on'); return b ? b.dataset.nav : ''; };
+  const liveShown = n => !!(n && n.offsetParent !== null);
+  function liveBusy(root) {
+    if ([...document.querySelectorAll('.modal-root')].some(m => m.style.display !== 'none')) return true;
+    if (document.querySelector('.mo-pop-layer:not([hidden])')) return true;
+    return [...(root || document).querySelectorAll('.shimmer')].some(liveShown);
+  }
+  function liveFreshFor(root) {
+    const now = Date.now(); let left = 0;
+    (root ? root.querySelectorAll('.inline-status.ok, .inline-status.err') : []).forEach(n => {
+      if (n.__at && liveShown(n)) left = Math.max(left, LIVE_FRESH_MS - (now - n.__at));
+    });
+    return left;
+  }
+  async function liveRun() {
+    live.t = 0;
+    if (!gAuth.token || (!live.self.size && !live.ext.size)) return;
+    if (document.hidden) return;                       // picked up again on visibilitychange
+    const panel = livePanel();
+    const root = document.querySelector('[data-panel="' + panel + '"]');
+    if (liveBusy(root)) { live.t = setTimeout(liveRun, 800); return; }
+    const linked = new Set(store.list().map(r => r.accountId));
+    const self = [...live.self].filter(a => linked.has(a)), ext = [...live.ext].filter(a => linked.has(a));
+    const fresh = liveFreshFor(root);
+    // A result on screen from a SELF write: that panel already shows what it did.
+    // An EXTERNAL change waits until the result has been read.
+    if (fresh > 0 && ext.length && !self.length) { live.t = setTimeout(liveRun, fresh + 200); return; }
+    live.self.clear(); live.ext.clear();
+    const aids = [...new Set(self.concat(ext))];
+    await Promise.all(aids.map(a => loadAccount(a).catch(() => null)));
+    if (livePanel() !== panel || liveBusy(root)) { aids.forEach(a => live.ext.add(a)); live.t = setTimeout(liveRun, 800); return; }
+    if (!(fresh > 0)) { try { await liveRepaint(panel, new Set(aids)); } catch (e) { /* a redraw is a courtesy; the next one will do */ } }
+    // Re-baseline, so Numax's own write is not seen again as somebody else's.
+    aids.forEach(a => liveStamp(a).then(s => { if (s) live.stamps[a] = s; }).catch(() => {}));
+  }
+  async function liveRepaint(panel, aids) {
+    if (panel === 'accounts') {
+      if (!document.querySelector('#ac-list .rename-input')) await refreshAccounts();
+    } else if (panel === 'profile') {
+      if (!pfA || !aids.has(pfA)) return;
+      const { profiles } = await loadAccount(pfA);
+      await renderPfPicker(pfA);
+      const unsaved = Object.keys(pfDirty).length > 0;
+      if (pfEdit && !unsaved) {
+        const idx = profiles.some(p => p.index === pfI) ? pfI : (profiles[0] && profiles[0].index);
+        if (idx == null) return;
+        const sc = [...document.querySelectorAll('[data-panel="profile"] .pf-pane, [data-panel="profile"] .pf-panes-wrap')].map(n => [n, n.scrollTop]);
+        await openProfile(pfA, idx, true, true);
+        sc.forEach(([n, t]) => { n.scrollTop = t; });
+      }
+    } else if (panel === 'sync') {
+      if (!syA || !aids.has(syA) && ![...syTargets].some(k => aids.has(String(k).split(':')[0]))) return;
+      if (syTargets.size && sySnap) await syncPreview();
+      else if (!document.querySelector('.sy-carry-chooser.open')) refreshSyncTab();
+    } else if (panel === 'drive') {
+      await refreshDrive();
+    } else if (panel === 'wizard') {
+      if (wz && wz.aid && aids.has(wz.aid)) wzRenderPanel();
+    }
+  }
+  // One account's change stamp, or null when it cannot be read this time.
+  async function liveStamp(aid) {
+    const c = A.client(store, aid);
+    const ov = await c.rpc('get_sync_overview', {});     // also refreshes the token if due
+    const rec = store.get(aid); const tok = rec && rec.session && rec.session.access_token;
+    if (!tok) return null;
+    const heads = { apikey: A.ANON, Authorization: 'Bearer ' + tok };
+    const tops = await Promise.all(LIVE_TABLES.map(t => fetch(A.REST_BASE.replace(/\/rpc\/?$/, '') + '/' + t + '?select=updated_at&order=updated_at.desc&limit=1', { headers: heads })
+      .then(r => (r.ok ? r.json() : null)).then(j => (Array.isArray(j) && j[0] ? j[0].updated_at : '')).catch(() => null)));
+    if (tops.some(x => x === null)) return null;
+    return JSON.stringify([ov, tops]);
+  }
+  async function livePoll(force) {
+    if (live.polling || document.hidden || !gAuth.token) return;
+    if (!force && Date.now() - live.lastPoll < LIVE_POLL_MS - 1000) return;
+    live.polling = true; live.lastPoll = Date.now();
+    try {
+      for (const r of store.list()) {
+        let s = null; try { s = await liveStamp(r.accountId); } catch (e) { s = null; }
+        if (!s) continue;
+        const was = live.stamps[r.accountId];
+        live.stamps[r.accountId] = s;
+        // No earlier stamp but the page has been in the background: what is on
+        // screen may predate changes made meanwhile, so redraw once to be sure.
+        if ((was && was !== s) || (!was && live.wasHidden)) { inval(r.accountId); live.self.delete(r.accountId); liveBump(r.accountId, true); }
+      }
+    } finally { live.polling = false; live.wasHidden = false; }
+  }
+  setInterval(() => livePoll(false), 5000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { live.wasHidden = true; return; }
+    if (live.self.size || live.ext.size) liveRun();
+    // Coming back to the tab is exactly when someone has been changing things
+    // in Nuvio; check now rather than on the next tick (at most every 5 s).
+    if (Date.now() - live.lastPoll > 5000) livePoll(true);
+  });
   // whether an account has an active Nuvio Supporter / Supporter Plus membership —
   // gates the supporter-only theme colors the same way Nuvio's own client does.
   async function getMembership(id) {
@@ -989,10 +1124,17 @@
     });
     openProfile(id, keep);
   }
-  async function openProfile(id, idx, silent) {
-    pfA = id; pfI = idx; Object.keys(pfDirty).forEach(k => delete pfDirty[k]);
-    document.querySelectorAll('#pf-profiles .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
-    const ed = $('pf-editor'); ed.classList.add('open'); $('pf-empty').style.display = 'none'; status($('pf-save-status'), '');
+  // `quiet` is the live refresh redrawing the profile already open. It must
+  // lose to anything the person does meanwhile: it clears no message, and it
+  // throws its read away if another profile was opened or anything was edited
+  // while it was reading — the reads take about a second.
+  let pfOpenGen = 0;
+  async function openProfile(id, idx, silent, quiet) {
+    const gen = ++pfOpenGen;
+    const stale = () => gen !== pfOpenGen || (quiet && Object.keys(pfDirty).length > 0);
+    if (!quiet) { pfA = id; pfI = idx; Object.keys(pfDirty).forEach(k => delete pfDirty[k]); }
+    if (!quiet) document.querySelectorAll('#pf-profiles .pchip').forEach((c, i) => loadAccount(id).then(({ profiles }) => c.classList.toggle('on', profiles[i] && profiles[i].index === idx)).catch(() => {}));
+    const ed = $('pf-editor'); ed.classList.add('open'); $('pf-empty').style.display = 'none'; if (!quiet) status($('pf-save-status'), '');
     let backup, profiles; try { const a = await loadAccount(id); backup = a.backup; profiles = a.profiles; } catch (e) { ed.classList.remove('open'); $('pf-empty').style.display = ''; $('pf-empty').textContent = "Couldn't read account: " + e.message; return; }
     const meta = profiles.find(p => p.index === idx) || { index: idx, name: 'Profile ' + idx };
     const slice = sliceProfile(backup, idx);
@@ -1001,7 +1143,10 @@
     try { const c = A.client(store, id); for (const pl of PLATS) { const row = await c.pullSettings(idx, pl); if (row && row.settings_json) { live[pl] = keysIncluded ? row.settings_json : stripKeys(row.settings_json); upd[pl] = row.updated_at || null; } } } catch (e) { logAct("Couldn't read settings: " + e.message, 'err'); }
     const watched = Array.isArray(backup.watched_items) ? backup.watched_items.filter(w => w.profile_id === idx) : [];
     const watchProgress = Array.isArray(backup.watch_progress) ? backup.watch_progress.filter(w => w.profile_id === idx) : [];
-    pfMembership = await getMembership(id);
+    const mem = await getMembership(id);
+    if (stale()) return;
+    if (quiet) { pfA = id; pfI = idx; }
+    pfMembership = mem;
     pfEdit = { meta: { ...meta }, addons: JSON.parse(JSON.stringify(slice.addons)), plugins: JSON.parse(JSON.stringify(slice.plugins)), collections: JSON.parse(JSON.stringify(slice.collections)), settings: JSON.parse(JSON.stringify(live)), upd, watched, watchProgress };
     pfPlat = PLATS.find(p => live[p]) || 'tv';
     renderPfEditor(); if (!silent) logAct('Opened ' + meta.name, 'info');
@@ -2304,6 +2449,111 @@
     }));
     return out;
   }
+  // ---- what Merge cannot keep -------------------------------------------------
+  // Merge keeps both sides wherever both can exist: two different add-ons, two
+  // different collections, a setting only one side has changed. It cannot where a
+  // thing holds ONE value — a setting both sides set, or the same add-on switched
+  // on here and off there. There the source's version wins, and the engine lists
+  // each of those in report.replaced / settings[pl].replaced. This turns them into
+  // one line under the preview and a dialog that shows every one, grouped the way
+  // the rest of the app is (Furqan, 2026-09-17).
+  const SET_LABELS = (() => {
+    const m = {};
+    Object.keys(SCHEMA || {}).forEach(pl => (SCHEMA[pl] || []).forEach(pg => (pg.groups || []).forEach(g => (g.fields || []).forEach(f => {
+      m[pl + '|' + f.feature + '|' + f.key] = { page: pg.title, title: f.title, def: f.defaultValue, options: f.options };
+    }))));
+    return m;
+  })();
+  const humanKey = k => String(k).replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\b(dp|id)\b/gi, s => s.toUpperCase()).replace(/^./, c => c.toUpperCase());
+  function pvVal(v, info) {
+    if (v === undefined || v === null) return 'Nuvio\u2019s default';
+    if (info && Array.isArray(info.options)) { const o = info.options.find(x => String(x.value) === String(v)); if (o) return o.label || String(o.value); }
+    if (typeof v === 'boolean') return v ? 'On' : 'Off';
+    if (Array.isArray(v)) return v.length ? v.length + ' item' + (v.length === 1 ? '' : 's') : 'none';
+    if (typeof v === 'object') return 'a custom set-up';
+    const s = String(v);
+    return s.length > 42 ? s.slice(0, 40) + '\u2026' : (s || 'not set');
+  }
+  // [{ kind, heading, rows:[{ name, what, from, to }] }] from one plan report.
+  function pvReplacedGroups(r) {
+    const out = [];
+    const lists = [['addons', 'Add-ons'], ['plugins', 'Plugins'], ['collections', 'Collections']];
+    lists.forEach(([k, h]) => {
+      const rep = r && r[k] && r[k].replaced;
+      if (!rep || !rep.length) return;
+      const rows = [];
+      rep.forEach(x => (x.diffs || []).forEach(d => rows.push({
+        name: pvShort(x.name), what: d.label,
+        from: d.field === 'enabled' ? (d.from ? 'On' : 'Off') : (d.from == null || d.from === '' ? 'no name' : String(d.from)),
+        to: d.field === 'enabled' ? (d.to ? 'On' : 'Off') : (d.to == null || d.to === '' ? 'no name' : String(d.to)),
+      })));
+      if (rows.length) out.push({ heading: h, rows });
+    });
+    if (r && r.settings) {
+      Object.keys(r.settings).forEach(pl => {
+        const rep = (r.settings[pl] && r.settings[pl].replaced) || [];
+        const byPage = new Map();
+        rep.forEach(x => {
+          const info = SET_LABELS[pl + '|' + x.group + '|' + x.leaf];
+          const from = x.from === undefined && info && info.def !== undefined ? info.def : x.from;
+          const a = pvVal(from, info), b = pvVal(x.to, info);
+          if (a === b) return;   // default -> the same value written out: nothing the user would see
+          const page = info ? info.page : ((E && E.groupLabel) ? E.groupLabel(x.group) : x.group);
+          if (!byPage.has(page)) byPage.set(page, []);
+          byPage.get(page).push({ name: info ? info.title : humanKey(x.leaf), from: a, to: b });
+        });
+        byPage.forEach((rows, page) => out.push({ heading: 'Settings \u00b7 ' + (PLAT_LABEL[pl] || pl) + ' \u00b7 ' + page, rows }));
+      });
+    }
+    return out;
+  }
+  function pvReplacedCount(groups) { return groups.reduce((n, g) => n + g.rows.length, 0); }
+  // `who` is a list of { name, report } — one per target profile.
+  function pvReplacedDialog(who, merge) {
+    const box = el('div', 'rp');
+    who.forEach(w => {
+      const groups = pvReplacedGroups(w.report);
+      if (!groups.length) return;
+      if (who.length > 1) box.appendChild(el('div', 'rp-who', w.name));
+      groups.forEach(g => {
+        const sec = el('div', 'rp-sec');
+        sec.appendChild(el('div', 'rp-h', g.heading));
+        g.rows.forEach(x => {
+          const row = el('div', 'rp-row');
+          row.appendChild(el('div', 'rp-n', x.what ? x.name + ' \u2014 ' + x.what : x.name));
+          const ch = el('div', 'rp-ch');
+          ch.appendChild(el('span', 'rp-from', x.from));
+          ch.appendChild(el('span', 'rp-arr', '\u2192'));
+          ch.appendChild(el('span', 'rp-to', x.to));
+          row.appendChild(ch);
+          sec.appendChild(row);
+        });
+        box.appendChild(sec);
+      });
+    });
+    uiModal({
+      title: merge ? 'What Merge replaces' : 'What gets replaced',
+      message: merge
+        ? 'Merge keeps both wherever both can exist. These can only hold one value, so the source\u2019s version takes the place of what is there now. Everything else on the profile stays as it is.'
+        : 'Overwrite makes the profile match the source. These are the values that change.',
+      node: box, okLabel: 'Close', noCancel: true, wide: true,
+    });
+  }
+  // The one-line notice under a preview; null when nothing is replaced.
+  function pvReplacedNotice(who, merge) {
+    const n = who.reduce((s, w) => s + pvReplacedCount(pvReplacedGroups(w.report)), 0);
+    if (!n) return null;
+    const row = el('div', 'rp-note');
+    row.appendChild(el('span', 'rp-note-tx', merge
+      ? n + ' thing' + (n === 1 ? '' : 's') + ' can\u2019t be merged, so the source\u2019s version replaces ' + (n === 1 ? 'it' : 'them') + '.'
+      : n + ' value' + (n === 1 ? '' : 's') + ' will change to match the source.'));
+    const b = el('button', 'rp-info', 'i'); b.type = 'button';
+    b.title = 'Show exactly what gets replaced'; b.setAttribute('aria-label', 'Show exactly what gets replaced');
+    b.onclick = e => { e.preventDefault(); e.stopPropagation(); pvReplacedDialog(who, merge); };
+    row.appendChild(b);
+    return row;
+  }
+
   // Everything a plan (plus its extras) will do, as sections. Shared by Sync
   // Desk, templates and restore so all three read the same way.
   function pvReport(r, extras, o) {
@@ -2312,7 +2562,8 @@
     const secs = [];
     const list = (label, b) => b && pvSection(label, [
       ['add', 'Adds', b.added],
-      ['upd', 'Updates', b.updated],
+      ['upd', 'Replaces', b.updated],
+      ['upd', 'Reorders', b.reordered ? 'to match the source' : ''],
       ['rem', 'Removes', b.removed],
       ['keep', 'Keeps', b.keptLocal, 'Only this profile has these — a merge leaves them alone'],
     ]);
@@ -2338,6 +2589,8 @@
     const wrap = el('div', 'pv');
     secs.filter(Boolean).forEach(s => wrap.appendChild(s));
     if (!wrap.firstChild) wrap.appendChild(el('div', 'pv-none', 'Already matches — nothing to do.'));
+    const note = pvReplacedNotice([{ name: '', report: r }], opt.merge !== false);
+    if (note) wrap.appendChild(note);
     return wrap;
   }
 
@@ -2349,7 +2602,7 @@
     status(st, '');
     clr(res); const r = plan.report; const d = el('div', 'report');
     const hasExtras = extras && ((extras.watched && extras.watched.length) || (extras.watchProgress && extras.watchProgress.length) || (extras.identity && extras.identity.name) || (extras.credentials && extras.credentials.length));
-    d.appendChild(pvReport(r, extras));
+    d.appendChild(pvReport(r, extras, { merge: !(extras && extras.mirror) }));
     res.appendChild(d);
     let confirmed = !plan.hasRemovals;
     if (plan.hasRemovals) { const w = el('label', 'confirm'); const cb = el('input'); cb.type = 'checkbox'; cb.onchange = () => { confirmed = cb.checked; ap.disabled = !confirmed; }; w.appendChild(cb); w.appendChild(el('span', '', 'This removes items the target has that this doesn\'t. I understand.')); res.appendChild(w); }
@@ -2392,7 +2645,13 @@
         status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + (checked ? ' — checked and saved.' : ' — saved.'), fails.length ? 'err' : 'ok');
         logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
         if (fails.length) { const ul = el('ul', 'modal-details'); fails.forEach(f => ul.appendChild(el('li', '', (f.surface ? f.surface + ': ' : '') + f.error))); res.appendChild(ul); }
-        if (!fails.length) celebrate(res.closest('.card') || res);
+        if (!fails.length) {
+          // The preview above is now a record, not a proposal — say so, so it
+          // does not read as something still waiting to be applied.
+          d.insertBefore(el('div', 'pv-done-h', 'Applied — this is what changed'), d.firstChild);
+          ap.style.display = 'none';
+          celebrate(res.closest('.card') || res);
+        }
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
     };
     res.appendChild(ap);
@@ -3116,7 +3375,7 @@
         ? ((nuvio && nuvio.ok) ? "Copied with Nuvio's own profile copy — whole platforms, same account."
           : 'Numax copies the chosen settings sections' + (nuvio && nuvio.why ? ' (' + nuvio.why + ')' : '') + '.')
         : '';
-      d.appendChild(pvReport(plan.report, extras, { settingsWhy: why }));
+      d.appendChild(pvReport(plan.report, extras, { settingsWhy: why, merge: $('sy-mode').value !== 'overwrite' }));
       box.appendChild(d);
     });
   }
@@ -3367,7 +3626,7 @@
         const wrap = el('div', 'mk-seg-wrap' + (dr.mode === 'overwrite' ? ' danger' : ''));
         const seg = el('div', 'mk-seg');
         const MODES = [
-          ['merge', 'Merge', 'Adds and updates what you picked, and keeps everything else already on the profile.'],
+          ['merge', 'Merge', 'Adds what you picked and keeps everything already on the profile. Anything that can only be one way — a setting, or the same add-on set differently — takes the backup\u2019s version; the preview lists exactly which.'],
           ['overwrite', 'Overwrite', 'Makes the profile match exactly — anything on it that is not in what you picked is removed.'],
         ];
         MODES.forEach(([v, t]) => {
@@ -3429,7 +3688,7 @@
         watched: saved.watched, watchProgress: saved.watchProgress,
         identity: saved.profile || (src.kind === 'backup' && saved.name ? { name: saved.name } : null),
         credentials: saved.credentials,
-        credentialsReplace: dr.mode === 'overwrite',
+        credentialsReplace: dr.mode === 'overwrite', mirror: dr.mode === 'overwrite',
       });
     } catch (e) { if (gen === dr.gen) status(st, e.message, 'err'); }
   }
@@ -4267,7 +4526,7 @@
     const seg = el('div', 'mk-seg');
     let value = 'merge';
     const opts = [
-      { v: 'merge', t: 'Merge', d: 'Add it and keep everything already on the profile.' },
+      { v: 'merge', t: 'Merge', d: 'Add it and keep everything already on the profile. If it is already there but set differently, this version replaces it.' },
       { v: 'mirror', t: 'Overwrite', d: 'Replace every ' + kindLabel + ' on the profile with just this one.' },
     ];
     const desc = el('div', 'mk-seg-d', opts[0].d);
@@ -4504,7 +4763,7 @@
           return { ...m, sort_order: had ? (had.sort_order ?? 0) : base + 1 + i };
         });
         const plan = E.planTarget({ [kind]: rows }, state, {
-          categories: { [kind]: true }, modes: { [kind]: mode },
+          categories: { [kind]: true }, modes: { [kind]: mode }, listOrder: keepOrder ? 'source' : undefined,
           profileId: t.idx, originClientId: 'numax-web',
         });
         plans.push({ t, plan });
@@ -4522,11 +4781,14 @@
       const r = (plan.report && plan.report[kind]) || {};
       const sec = pvSection(t.name, [
         ['add', 'Adds', r.added],
-        ['upd', 'Updates', r.updated],
+        ['upd', 'Replaces', r.updated],
         ['rem', 'Removes', r.removed],
+        ['upd', 'Reorders', r.reordered ? 'to put it where you asked' : ''],
       ]) || pvSection(t.name, [['keep', 'No change', 'Already there']]);
       pv.appendChild(sec);
     });
+    const rpNote = pvReplacedNotice(plans.map(p => ({ name: p.t.name, report: p.plan.report })), mode !== 'mirror');
+    if (rpNote) pv.appendChild(rpNote);
     rep.appendChild(pv);
     res.appendChild(rep);
     status(st, '');
@@ -5239,7 +5501,7 @@
         const plan = E.planTarget(master, state, { categories: cats, modes: { collections: mode, addons: 'merge' }, profileId: idx, originClientId: 'numax-web' });
         status(st, '');
         renderApplyPlan(res, st, plan, aid, 'Collection installed', {
-          verify: () => verifyCollections(aid, idx, collections),
+          verify: () => verifyCollections(aid, idx, collections), mirror: mode === 'mirror',
         });
         btn.style.display = 'none';
       } catch (e) { status(st, 'Failed: ' + e.message, 'err'); }
@@ -8569,7 +8831,36 @@
     try { ok = await wzCommitStep(wz.step); }
     catch (e) { ok = false; logAct('Wizard: could not save this step \u2014 ' + e.message, 'err'); }
     btn.textContent = label; btn.disabled = false;
+    if (ok && wz.step === 'streams' && !(await wzStreamsOk())) { wzPaintNext(); return; }
     if (ok) wzGo(1); else wzPaintNext();
+  }
+  // Streams stay skippable (Furqan, 2026-09-17) — but leaving the step with no
+  // stream source at all is worth one question: Nuvio can show titles without
+  // one, but it has nothing to play. A source is any add-on whose manifest
+  // offers streams, or any plugin repository. If the profile cannot be read,
+  // this asks anyway rather than guessing it is fine.
+  async function wzStreamsOk() {
+    const t = wzTarget(); if (!t) return true;
+    let has = false;
+    try {
+      const st = sliceProfile((await loadAccount(t.aid, true)).backup, t.idx);
+      if ((st.plugins || []).length) has = true;
+      else {
+        const kinds = await Promise.all((st.addons || []).filter(a => a && a.url && a.enabled !== false)
+          .map(a => wzAddonInfo(a.url, a.name).then(i => i.kind).catch(() => '')));
+        has = kinds.includes('stream');
+      }
+    } catch (e) { has = false; }
+    if (has) return true;
+    return uiModal({
+      title: 'Nothing is set up to play yet',
+      message: 'This profile has no stream source — no streaming add-on and no plugin. Nuvio will show movies and shows, but pressing play will find nothing to watch.',
+      details: [
+        'Go back to this step and pick a route to set one up, or',
+        'carry on and add a stream source later from the Marketplace.',
+      ],
+      okLabel: 'Carry on anyway', cancelLabel: 'Set up streams',
+    });
   }
 
   // Finishing is not undoing, and the two must never be confused: everything
@@ -8726,7 +9017,7 @@
       const desc = $('sy-mode-desc');
       if (desc) desc.textContent = $('sy-mode').value === 'overwrite'
         ? 'Overwrite mode makes the target match the source exactly. Anything the target has that the source doesn\'t will be removed.'
-        : 'Merge mode adds new items and updates existing ones, but keeps everything else as-is.';
+        : 'Merge keeps both wherever both can exist. Where only one can — a setting, or the same add-on set differently — the source wins; the ⓘ under the preview shows exactly what.';
       scheduleLivePreview();
     });
     $('sy-preview').onclick = syncPreview; $('sy-apply').onclick = syncApply; $('sy-confirm').onchange = () => { $('sy-apply').disabled = !$('sy-confirm').checked; };

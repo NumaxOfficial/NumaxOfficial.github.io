@@ -834,6 +834,27 @@
   .pv-t[title]{ cursor:help; }
   .pv-none{ font-size:12.5px; color:var(--t45); font-style:italic; }
   .report .pv{ padding:8px 10px; }
+  /* What Merge replaces: one line under the preview, and the dialog behind its i */
+  .pv-done-h{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; font-weight:700; color:var(--ok-soft); padding:8px 10px 0; }
+  .rp-note{ display:flex; align-items:center; gap:10px; padding:8px 10px; margin-top:2px; border-radius:10px;
+    background:rgba(var(--warn-rgb,245,166,35),.08); border:1px solid rgba(var(--warn-rgb,245,166,35),.28); font-size:12px; line-height:1.4; color:var(--t70); }
+  .rp-note-tx{ flex:1 1 auto; min-width:0; }
+  .rp-info{ flex:none; width:22px; height:22px; border-radius:50%; border:1px solid rgba(var(--ink),.3); background:transparent;
+    color:var(--t); font:italic 700 12px/1 Georgia, serif; cursor:pointer; display:grid; place-items:center; transition:background .15s, border-color .15s; }
+  .rp-info:hover, .rp-info:focus-visible{ background:rgba(var(--ink),.1); border-color:rgba(var(--ink),.55); }
+  .modal-card.modal-wide{ width:min(620px, calc(100vw - 32px)); max-width:none; }
+  .rp{ display:flex; flex-direction:column; gap:14px; margin-top:14px; max-height:min(52vh, 460px); overflow-y:auto; padding-right:4px; }
+  .rp-who{ font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:700; color:var(--accent); }
+  .rp-sec{ flex:none; display:flex; flex-direction:column; border:1px solid var(--line); border-radius:11px; overflow:hidden; }
+  .rp-h{ font-size:12px; font-weight:700; padding:8px 12px; background:rgba(var(--ink),.04); border-bottom:1px solid var(--line); }
+  .rp-row{ display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); gap:12px; align-items:center; padding:7px 12px; font-size:12.5px; }
+  .rp-row + .rp-row{ border-top:1px solid var(--line-2); }
+  .rp-n{ min-width:0; overflow-wrap:anywhere; }
+  .rp-ch{ display:flex; align-items:center; gap:7px; min-width:0; flex-wrap:wrap; }
+  .rp-from{ color:var(--t45); text-decoration:line-through; text-decoration-color:rgba(var(--ink),.3); overflow-wrap:anywhere; }
+  .rp-arr{ color:var(--t35); flex:none; }
+  .rp-to{ color:var(--t); font-weight:600; overflow-wrap:anywhere; }
+  @media (max-width:520px){ .rp-row{ grid-template-columns:1fr; gap:3px; } }
   .sy-card-report .rhead-acct{ font-size:11.5px; color:var(--t45); white-space:nowrap; }
   .tag.warn{ background:rgba(255,152,0,.18); color:var(--warn); cursor:help; }
   /* .confirm is defined in the review/change-summary block above. */
@@ -3465,7 +3486,7 @@
                       <option value="overwrite" data-label="Overwrite" data-hint="make target match source exactly">Overwrite — make target match source exactly</option>
                     </select>
                   </div>
-                  <p class="sy-mode-desc" id="sy-mode-desc">Merge mode adds new items and updates existing ones, but keeps everything else as-is.</p>
+                  <p class="sy-mode-desc" id="sy-mode-desc">Merge keeps both wherever both can exist. Where only one can — a setting, or the same add-on set differently — the source wins; the ⓘ under the preview shows exactly what.</p>
                 </div>
                 <div id="sy-confirm-wrap" style="display:none;margin-bottom:12px"><label class="confirm"><input type="checkbox" id="sy-confirm"><span>Some profiles will lose items they currently have. I've read the list and want to continue.</span></label></div>
                 <div class="sy-btns">
@@ -3610,7 +3631,7 @@
 <script src="https://accounts.google.com/gsi/client" async></script>
 <script src="./api.js?v=ad202910"></script>
 <script src="./store.js?v=5e895a2c"></script>
-<script src="./engine.js?v=37047507"></script>
+<script src="./engine.js?v=6e8485a0"></script>
 <script src="./meta.js?v=2fac004b"></script>
 <script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
 <script src="./ui-motion.js?v=1b5b5a01"></script>
@@ -3618,6 +3639,6 @@
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
 <script src="./mascot.js?v=5f1cfff1"></script>
-<script src="./app.js?v=6b23ce22"></script>
+<script src="./app.js?v=3b330cfb"></script>
 </body>
 </html>
