@@ -686,7 +686,7 @@
   /* Cards spread into columns instead of stacking in one narrow strip down the
      left of a wide window. auto-fit collapses back to a single column below the
      minimum, so nothing needs a breakpoint. */
-  .panel-cols{ display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:18px; align-items:start; }
+  .panel-cols{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(430px,100%),1fr)); gap:18px; align-items:start; }
   .panel-cols > .card{ margin-bottom:0; }
   /* row lists that are one line each read fine in columns once they fit */
   .panel[data-panel="market"]{ max-width:1800px; }
@@ -1300,6 +1300,10 @@
   /* kept off the card's right edge: a hand touching the border reads as cut */
   #wz-entry .wz-door-new .wz-door-art{ padding-right:clamp(12px,2vw,28px); }
   #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(94%, 260px); }
+  /* Rests a little below the card's floor, so the flat cut at the bottom of
+     the picture stays under the edge even at the top of the rise's overshoot
+     or a lean; the hide depth is trimmed to match (Furqan, 2026-09-17). */
+  #wz-entry .wz-door-new .wz-door-art .nx-mascot{ translate:0 4%; --nxm-hide:77%; }
   @media (max-height:760px){
     #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:min(78%, 180px); }
     #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(92%, 220px); }
@@ -1414,7 +1418,7 @@
   /* align-items:stretch: two cards side by side have to be the same height, or
      the row reads as broken. That means a card whose "?" is open makes its
      neighbour equally tall - which is the trade, and the right way round. */
-  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:14px; align-items:stretch; }
+  .wz-routes{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(330px,100%),1fr)); gap:14px; align-items:stretch; }
   .wz-pick{ text-align:left; font-family:inherit; color:inherit; cursor:pointer; position:relative; min-width:0;
     display:flex; flex-direction:column;
     background:var(--surface); border:2px solid var(--line); border-radius:16px; padding:16px 17px;
@@ -1479,7 +1483,7 @@
 
   /* align-items:start so opening one card's detail does not stretch every other
      card in its row to match. */
-  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; align-items:stretch; }
+  .wz-debrid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr)); gap:12px; align-items:stretch; }
   /* Two options, so two columns - auto-fit would put them side by side at any
      width and then strand the second one on its own row just below 660px. */
   .wz-p2p{ grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); }
@@ -1951,7 +1955,7 @@
   .mk-row .mk-ru{ font-size:11px; color:var(--t35); font-family:var(--f-mono); font-variant-numeric:tabular-nums; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* provider (plugin) list — a grid, not a single column with half the card empty */
-  .mk-prov-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:8px; }
+  .mk-prov-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(min(320px,100%),1fr)); gap:8px; }
   .mk-prov{ display:flex; align-items:center; gap:12px; padding:11px 14px; border-radius:11px; border:1px solid var(--line); background:var(--surface); }
   .mk-prov:hover{ border-color:rgba(var(--ink),.17); }
   .mk-prov.dead{ opacity:.6; }
@@ -2007,7 +2011,7 @@
        ~1200px window. 360px puts them side by side from ~1060px, which is the
        same width the stacked escape below takes over at, so the two never
        disagree. */
-    grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); }
+    grid-template-columns:repeat(auto-fit,minmax(min(360px,100%),1fr)); }
   .panel[data-panel="drive"] .panel-cols > .card{ display:flex; flex-direction:column; min-height:0; overflow:hidden; }
   .panel[data-panel="drive"] .panel-cols > .card > .chead{ flex:none; }
   /* everything under each card's heading is the scroller */
@@ -2202,6 +2206,11 @@
   .dr-row .es{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .dr-grp-h .dr-del{ color:var(--danger-soft); }
   .dr-grp-h .dr-del:hover{ border-color:rgba(var(--danger-rgb),.5); }
+  /* Deleting: dimmed the moment it is confirmed, folded away once Drive agrees. */
+  .dr-grp, .dr-row{ transition:opacity .2s var(--mo-ease,ease), height .28s var(--mo-ease,ease), margin .28s var(--mo-ease,ease), padding .28s var(--mo-ease,ease); }
+  .dr-busy{ opacity:.4; pointer-events:none; }
+  .dr-gone{ opacity:0; overflow:hidden; padding-top:0 !important; padding-bottom:0 !important; margin-top:-14px; border-width:0 !important; }
+  .dr-grp-rows .dr-gone{ margin-top:0; }
   .dr-pickname{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .dr-pickchange{ margin-left:auto; flex:none; font-size:11px; color:var(--t45); }
   .mk-inst{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:9px; }
@@ -2305,7 +2314,7 @@
   .mk-coll-img{ width:100%; aspect-ratio:16/9; object-fit:cover; display:block; background:var(--surface-2); }
   .mk-coll-body{ padding:12px 13px 13px; display:flex; flex-direction:column; gap:6px; flex:1; }
   .mk-coll-title{ font-size:13.5px; font-weight:600; }
-  .mk-coll-desc{ font-size:11.5px; color:var(--t45); line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .mk-coll-desc{ font-size:11.5px; color:var(--t45); line-height:1.45; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; }
   .mk-coll-tags{ display:flex; flex-wrap:wrap; gap:5px; }
   .mk-coll-more{ font-size:10.5px; color:var(--t35); align-self:center; }
   .mk-coll-stats{ display:flex; gap:18px; padding:2px 0 1px; }
@@ -2725,15 +2734,36 @@
   /* Mascot placements outside the wizard (Furqan's Studio notes, 2026-09-17).
      Every one is decoration: pointer-events off, hidden where the card is too
      small to hold it beside its own content, and absent if mascot.js is. */
-  /* Accounts: leaning out from behind the Add-an-account card's right edge,
-     beside the form. The card is the container so the rule follows the card's
-     own width, not the window's. */
+  /* Accounts: hanging by both hands from a bar mounted on the top edge of the
+     Add-an-account card, beside the form (Furqan, 2026-09-17 — leaning out
+     from the side did not make sense there). The card is the container so the
+     rule follows the card's own width, not the window's. The fists sit IN
+     FRONT of the bar, which is what a grip looks like from the front. */
   .accounts-layout > .card:first-child{ position:relative; container-type:inline-size; }
-  .accounts-layout .ac-peek{ position:absolute; right:0; top:62px; width:136px; pointer-events:none; z-index:0; }
-  @container (max-width:560px){ .accounts-layout .ac-peek{ display:none; } }
-  /* Profile: peeking up over the bottom edge of the head card, under the title. */
+  .accounts-layout .ac-hang{ position:absolute; right:24px; top:0; width:128px; pointer-events:none; z-index:0; }
+  .accounts-layout .ac-bar{ position:absolute; left:-16px; right:-16px; top:24px; height:6px; border-radius:3px;
+    background:linear-gradient(180deg, #e4e7ee, #9aa0ad 55%, #5d626e);
+    box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 3px 6px rgba(0,0,0,.55); }
+  /* the two mounts running up to the card's top edge */
+  .accounts-layout .ac-bar::before, .accounts-layout .ac-bar::after{ content:""; position:absolute; top:-24px; width:4px; height:26px;
+    border-radius:2px 2px 0 0; background:linear-gradient(90deg, #5d626e, #c3c8d2, #5d626e); }
+  .accounts-layout .ac-bar::before{ left:5px; } .accounts-layout .ac-bar::after{ right:5px; }
+  .accounts-layout .ac-hang .nx-mascot{ position:relative; z-index:1; margin-top:17px; }
+  /* A gentler swing than the default, turning about the fists so they stay on the bar. */
+  @keyframes ac-swing{ 0%,100%{ rotate:-1.4deg; } 50%{ rotate:1.4deg; } }
+  .accounts-layout .ac-hang .nx-mascot.a-swing .nxm-body{ animation-name:ac-swing; animation-duration:3.2s; transform-origin:50% 6%; }
+  .accounts-layout .ac-hang .nx-mascot .nxm-lean{ transform-origin:50% 6%; }
+  :root[data-theme="light"] .accounts-layout .ac-bar{ box-shadow:0 1px 0 rgba(255,255,255,.4) inset, 0 3px 6px rgba(18,26,43,.25); }
+  /* Clear of the 440px form column. Container widths are the card's CONTENT
+     box (card minus 22px padding each side) — 578 is where 128px still leaves
+     8px beside the fields, 548 the same for 104px. Measured at 1600x900. */
+  @container (max-width:577px){ .accounts-layout .ac-hang{ width:104px; right:18px; } }
+  @container (max-width:547px){ .accounts-layout .ac-hang{ display:none; } }
+  /* Profile: peeking up over the bottom edge of the head card, under the title.
+     Sits a few px BELOW the card's floor so the flat cut at the bottom of the
+     picture never shows, even at the top of its bob (Furqan, 2026-09-17). */
   .pf-head-l{ position:relative; }
-  .pf-head-card .pf-sit{ position:absolute; left:auto; right:22px; bottom:-16px; width:66px; pointer-events:none; }
+  .pf-head-card .pf-sit{ position:absolute; left:auto; right:22px; bottom:-23px; width:66px; pointer-events:none; }
   @media (max-width:900px){ .pf-head-card .pf-sit{ display:none; } }
   /* Restore: arms up in the card's empty lower half; pushed down (and off
      screen, inside the card's own scroller) as the restore steps grow. */
@@ -2741,6 +2771,38 @@
   .dr-cheer{ margin:auto auto 0; padding-top:18px; width:150px; pointer-events:none; }
   .dr-cheer .nx-mascot{ width:100%; }
   @media (max-height:720px){ .dr-cheer{ display:none; } }
+  /* ===== Phones (release sweep, 2026-09-17) =====
+     Measured at 375px: add-on names ran underneath their Configure button,
+     the Profile stat tiles ran off the right edge, the two profile fields sat
+     side by side at 100px each, and the wizard bar's two lines of text drew
+     over each other. Everything here is below 520px only. */
+  @media (max-width:520px){
+    /* Profile: avatar above three even stat tiles */
+    .pf-head-stats{ flex-direction:column; align-items:stretch; gap:14px; }
+    .pf-head-stats .pf-avatar-halo{ align-self:center; }
+    .pf-stat-row{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+    .pf-stat{ min-width:0; }
+    /* Profile: the two fields stacked, the save buttons under them */
+    .pf-name-card{ flex-wrap:wrap; padding:16px; }
+    .pf-name-card .fld{ flex:1 1 100%; max-width:none; }
+    .pf-name-card .spacer{ display:none; }
+    /* Profile: rows keep the name on its own line; Configure drops under it.
+       No drag handle — dragging to reorder does not work on a touch screen. */
+    .pf-panes-wrap .erow{ flex-wrap:wrap; row-gap:8px; gap:10px; padding:10px 11px; }
+    .pf-panes-wrap .erow .draghandle{ display:none; }
+    .pf-panes-wrap .erow .eb{ flex:1 1 0; min-width:calc(100% - 140px); }
+    .pf-panes-wrap .erow .en{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .pf-panes-wrap .erow > .btn{ order:10; margin-left:auto; }
+    /* the pop-out is a desktop convenience; on a phone the section is already full width */
+    .pf-tabs-bar .pf-tabs-pop{ display:none; }
+    .pf-tabs-bar{ padding:0 12px; }
+    .pf-tabs-header{ flex-wrap:wrap; gap:8px; }
+    /* Wizard bar: one line of text, not two drawn over each other */
+    .wz-target #wz-foot-note{ display:none; }
+    /* Sync desk: the three-step strip repeats the section list right under it,
+       and on a phone it cost a whole screen before anything could be chosen */
+    .sy-steps{ display:none; }
+  }
 </style>
 <script>
   // Theme is a device preference and never leaves this browser, so it is read
@@ -3155,7 +3217,7 @@
       <div class="accounts-layout">
       <div class="card">
         <div class="chead"><h3>Add an account</h3></div>
-        <span class="ac-peek" data-mascot="peek" data-mascot-side="right" data-mascot-size="100%" data-mascot-follow></span>
+        <span class="ac-hang" aria-hidden="true"><span class="ac-bar"></span><span data-mascot="hang" data-mascot-size="100%" data-mascot-follow></span></span>
         <div class="field-col">
           <label class="fld"><span>Nuvio email</span><input id="ac-email" type="email" autocomplete="off" placeholder="name@example.com"></label>
           <label class="fld"><span>Password</span><input id="ac-pass" type="password" autocomplete="off" placeholder="Nuvio password"></label>
@@ -3458,7 +3520,7 @@
       <div id="mk-pane-addons" class="mk-pane">
         <div class="card">
           <div class="chead"><h3>Staples</h3><span class="spacer"></span>
-            <span class="muted sm">The four most people start with.</span></div>
+            <span class="muted sm">The ones most people start with.</span></div>
           <div class="mk-staples" id="mk-staples"></div>
         </div>
         <div class="card">
@@ -3551,11 +3613,11 @@
 <script src="./engine.js?v=37047507"></script>
 <script src="./meta.js?v=2fac004b"></script>
 <script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
-<script src="./ui-motion.js?v=68a58b1e"></script>
+<script src="./ui-motion.js?v=1b5b5a01"></script>
 <script src="./market.js?v=d723c06a"></script>
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
 <script src="./mascot.js?v=5f1cfff1"></script>
-<script src="./app.js?v=12a8e586"></script>
+<script src="./app.js?v=6b23ce22"></script>
 </body>
 </html>

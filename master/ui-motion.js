@@ -186,6 +186,10 @@
       var was = modalSeen.get(r);
       if (open === was) continue;
       modalSeen.set(r, open);
+      // First sight of a dialog that is already shut: nothing closed. Without
+      // this every page load played the exit animation on the confirm and
+      // template dialogs, flashing both on screen for 130ms.
+      if (was === undefined && !open) continue;
       var card = r.querySelector('.modal-card');
       if (!card) continue;
       if (open) {

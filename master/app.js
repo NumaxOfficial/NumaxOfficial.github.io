@@ -800,12 +800,22 @@
   // ======================================================================
   // ACCOUNTS
   // ======================================================================
+  // api.js reports a failed sign-in with the server's raw reply attached,
+  // which put JSON in front of the person who just mistyped a password.
+  function signInWhy(e) {
+    const m = String((e && e.message) || '');
+    if (/invalid_credentials|Invalid login/i.test(m)) return 'That email and password don’t match a Nuvio account. Check both and try again.';
+    if (/email_not_confirmed/i.test(m)) return 'This Nuvio account hasn’t confirmed its email yet.';
+    if (/over_request_rate_limit|429/.test(m)) return 'Nuvio is refusing sign-ins for a moment (too many tries). Wait a minute and try again.';
+    if (/Failed to fetch|NetworkError/i.test(m)) return 'Couldn’t reach Nuvio. Check your connection and try again.';
+    return 'Sign-in failed: ' + m;
+  }
   async function linkAccount() {
     const email = $('ac-email').value.trim(), pass = $('ac-pass').value, label = $('ac-label').value.trim(), log = $('ac-log');
     if (!gAuth.token) { status(log, 'Sign in with Google first (reload if needed).', 'err'); return; }
     if (!email || !pass) { status(log, 'Enter a Nuvio email and password.', 'err'); return; }
     status(log, 'Signing in to Nuvio…');
-    let session; try { session = await A.signIn(email, pass); } catch (e) { status(log, 'Sign-in failed: ' + e.message, 'err'); return; }
+    let session; try { session = await A.signIn(email, pass); } catch (e) { status(log, signInWhy(e), 'err'); return; }
     const already = store.get(S.decodeSub(session.access_token));
     try { store.add(session, { email, label, keysIncluded: readKeys }); } catch (e) { status(log, "Couldn't save: " + e.message, 'err'); return; }
     inval(S.decodeSub(session.access_token));
@@ -2121,7 +2131,10 @@
     const suggest = () => {
       if (!nameBox || nameTouched) return;
       const on = TPL_PARTS.map(p => p.key).filter(k => checks[k] && checks[k].checked && !checks[k].disabled);
-      const part = !on.length ? '' : (on.length === TPL_PARTS.length ? 'profile' : on.map(k => PF_TAB_LABEL[k] || k).join(', '));
+      // "everything" means everything this profile HAS — a part that is empty
+      // here cannot be ticked, and counting it made the name a list of five.
+      const avail = TPL_PARTS.filter(p => checks[p.key] && !checks[p.key].disabled).length;
+      const part = !on.length ? '' : (on.length === avail ? 'profile' : on.map(k => PF_TAB_LABEL[k] || k).join(', '));
       nameBox.value = (pfEdit.meta.name + (part ? ' ' + part : '')).trim();
     };
     TPL_PARTS.forEach(part => {
@@ -2154,17 +2167,26 @@
     raiseLayer(root);
     root.style.display = '';
     return new Promise(resolve => {
+      // Checked BEFORE the dialog closes. It used to close first and then warn,
+      // so a missed tick or a blank name threw the whole dialog away — and left
+      // its buttons unwired underneath (release sweep, 2026-09-17).
+      let busy = false;
       const done = async (proceed) => {
+        if (busy) return;
+        const kinds = TPL_PARTS.map(p => p.key).filter(k => checks[k].checked && !checks[k].disabled);
+        const tplName = (nameBox && nameBox.value.trim()) || '';
+        const selectedPlats = PLATS.filter(pl => platChecks[pl] && platChecks[pl].checked && !platChecks[pl].disabled);
+        if (proceed) {
+          busy = true;
+          const why = !kinds.length ? 'Pick at least one thing to save.'
+            : !tplName ? 'Give the template a name.'
+            : kinds.includes('settings') && !selectedPlats.length ? 'Pick at least one platform for Settings, or uncheck Settings.' : '';
+          if (why) { await uiAlert(why); busy = false; return; }
+        }
         root.style.display = 'none'; ok.onclick = cancel.onclick = bg.onclick = null;
         if (!proceed) { resolve(); return; }
-        const kinds = TPL_PARTS.map(p => p.key).filter(k => checks[k].checked && !checks[k].disabled);
-        if (!kinds.length) { await uiAlert('Pick at least one thing to save.'); resolve(); return; }
-        const tplName = (nameBox && nameBox.value.trim()) || '';
-        if (!tplName) { await uiAlert('Give the template a name.'); resolve(); return; }
         let includeKeys = false;
-        const selectedPlats = PLATS.filter(pl => platChecks[pl] && platChecks[pl].checked && !platChecks[pl].disabled);
         if (kinds.includes('settings')) {
-          if (!selectedPlats.length) { await uiAlert('Pick at least one platform for Settings, or uncheck Settings.'); resolve(); return; }
           if (accountKeysIncluded(pfA)) includeKeys = await uiConfirm('Include this profile\'s API keys (debrid, TMDB, etc.) in this template?', { okLabel: 'Include keys' });
           else await uiAlert('This account wasn\'t linked with "Read API keys" on, so there are no key values to include — settings will save without keys.');
         }
@@ -2229,8 +2251,19 @@
   // "Playback"), never by leaf. Watched and progress stay a count: they are
   // bulk history rows and a list of episode titles would say less, not more.
   const PREVIEW_MAX_NAMES = 8;
+  // An add-on Nuvio stored without a name reaches the report as its manifest
+  // URL, and a configured one carries the user's whole encoded setup in it —
+  // a screen of text, sometimes with keys inside. Show the site instead, the
+  // way the Profile editor does, and count repeats rather than listing them.
+  function pvShort(x) {
+    const s = String(x).trim();
+    if (!/^(https?|stremio):\/\//i.test(s)) return s;
+    try { return new URL(s.replace(/^stremio:/i, 'https:')).hostname; } catch (e) { return s.slice(0, 60); }
+  }
   function pvNames(names) {
-    const list = (names || []).filter(x => x != null && String(x).trim()).map(String);
+    const raw = (names || []).filter(x => x != null && String(x).trim()).map(pvShort);
+    const seen = new Map(); raw.forEach(x => seen.set(x, (seen.get(x) || 0) + 1));
+    const list = [...seen].map(([x, k]) => k > 1 ? x + ' ×' + k : x);
     const shown = list.slice(0, PREVIEW_MAX_NAMES);
     const more = list.length - shown.length;
     return { n: list.length, text: shown.join(', ') + (more ? ', and ' + more + ' more' : ''), all: list.join('\n') };
@@ -2349,11 +2382,14 @@
         // Prove it landed. The push RPCs answer 204 with an empty body, so a
         // clean response is not evidence the data is actually on the profile —
         // which is how a write could report success having changed nothing.
-        if (!fails.length && extras && typeof extras.verify === 'function') {
+        const checked = !fails.length && extras && typeof extras.verify === 'function';
+        if (checked) {
           status(st, 'Checking it saved…');
           (await extras.verify()).forEach(m => fails.push({ ok: false, surface: 'verify', error: m }));
         }
-        status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + ' — checked and saved.', fails.length ? 'err' : 'ok');
+        // "checked" only when a read-back actually ran — restore and templates
+        // pass no verify, and the message used to claim one anyway.
+        status(st, fails.length ? okMsg + ' with ' + fails.length + ' error(s).' : okMsg + (checked ? ' — checked and saved.' : ' — saved.'), fails.length ? 'err' : 'ok');
         logAct(okMsg + (fails.length ? ' (' + fails.length + ' errors)' : ''), fails.length ? 'err' : 'ok');
         if (fails.length) { const ul = el('ul', 'modal-details'); fails.forEach(f => ul.appendChild(el('li', '', (f.surface ? f.surface + ': ' : '') + f.error))); res.appendChild(ul); }
         if (!fails.length) celebrate(res.closest('.card') || res);
@@ -3171,10 +3207,15 @@
       } catch (e) { fail++; logAct('Apply failed: ' + e.message, 'err'); }
     }
     invalAll();
-    status($('sy-status'), 'Done — ' + ok + ' change' + (ok === 1 ? '' : 's') + (fail ? ', ' + fail + ' failed.' : '.'), fail ? 'err' : 'ok');
+    const doneMsg = 'Done — ' + ok + ' change' + (ok === 1 ? '' : 's') + (fail ? ', ' + fail + ' failed.' : '.');
+    status($('sy-status'), doneMsg, fail ? 'err' : 'ok');
     logAct('Applied sync: ' + ok + ' ok' + (fail ? ', ' + fail + ' failed' : ''), fail ? 'err' : 'ok');
     if (ok && !fail) celebrate(document.querySelector('.sy-review-card'));
-    syPlans = null; selectSource(syA, syI);
+    // Re-reading the source clears #sy-status on its way through, which wiped
+    // this result the instant it appeared — a copy that worked looked like
+    // one that did nothing (release sweep, 2026-09-17). Put it back after.
+    syPlans = null; await selectSource(syA, syI);
+    status($('sy-status'), doneMsg, fail ? 'err' : 'ok');
   }
 
   // ======================================================================
@@ -3243,11 +3284,39 @@
     if (!drDocs[k]) drDocs[k] = driveDownload(f.id).catch(e => { delete drDocs[k]; throw e; });
     return drDocs[k];
   }
+  // Deleting from the browser used to re-read the whole list from Drive, so
+  // every delete put "Reading your backups…" back up (Furqan, 2026-09-17).
+  // Now the row dims the moment the delete is confirmed and folds away once
+  // Drive says yes; on a failure it comes back with the reason under it.
+  function drBusy(node, on) { node.classList.toggle('dr-busy', on); }
+  function drGone(node, then) {
+    drBusy(node, false);
+    node.style.height = node.offsetHeight + 'px';
+    void node.offsetHeight;
+    node.classList.add('dr-gone');
+    node.style.height = '0px';
+    let done = false;
+    const fin = () => { if (done) return; done = true; node.remove(); if (then) then(); };
+    node.addEventListener('transitionend', e => { if (e.target === node && e.propertyName === 'height') fin(); });
+    setTimeout(fin, 400);   // a hidden tab never fires transitionend
+  }
+  function drFail(node, msg) {
+    drBusy(node, false);
+    const old = node.querySelector(':scope > .dr-err'); if (old) old.remove();
+    node.appendChild(el('p', 'es err-text dr-err', msg));
+  }
+  function drEmptyCheck(list, kind) {
+    if (list.querySelector('.dr-grp, .dr-row')) return;
+    clr(list);
+    list.appendChild(el('p', 'empty sm', kind === 'backup'
+      ? 'No backups left. Back a profile up on the left and it shows up here.'
+      : 'No templates left.'));
+  }
   function drCounts(s) {
     const n = (a, one) => Array.isArray(a) && a.length ? a.length + ' ' + one + (a.length === 1 ? '' : 's') : '';
     return [n(s.addons, 'add-on'), n(s.plugins, 'plugin'), n(s.collections, 'collection'),
       s.settings && Object.keys(s.settings).length ? 'settings' : '',
-      n(s.watched, 'watched item'), Array.isArray(s.credentials) && s.credentials.length ? 'API keys' : '']
+      n(s.watched, 'watched item'), n(s.watchProgress, 'in-progress item'), Array.isArray(s.credentials) && s.credentials.length ? 'API keys' : '']
       .filter(Boolean).join(' · ') || 'nothing in it';
   }
   function refreshRestore() { paintRestore(); }
@@ -3403,17 +3472,19 @@
       const h = el('div', 'dr-grp-h');
       const ht = el('div', 'dr-grp-tx');
       ht.appendChild(el('b', '', f.name.replace(/\.json$/, '')));
-      ht.appendChild(el('span', '', f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : ''));
+      const when = el('span', '', f.modifiedTime ? new Date(f.modifiedTime).toLocaleString() : '');
+      ht.appendChild(when);
       h.appendChild(ht);
       const delAll = el('button', 'btn btn-ghost btn-xs dr-del', 'Delete backup'); delAll.type = 'button';
       delAll.onclick = async () => {
         if (!(await drConfirmDelete('Delete the backup “' + f.name.replace(/\.json$/, '') + '”?', 'The whole backup file, with every profile in it, is removed from your Google Drive.'))) return;
+        drBusy(grp, true);
         try {
           await driveDelete(f.id);
           logAct('Deleted backup "' + f.name + '"', 'info');
           if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
-        } catch (e) { logAct("Couldn't delete backup: " + e.message, 'err'); }
-        if (!stale()) drListBackups(list, stale, onTab, choose);
+          drGone(grp, () => drEmptyCheck(list, 'backup'));
+        } catch (e) { logAct("Couldn't delete backup: " + e.message, 'err'); drFail(grp, "Couldn't delete it: " + e.message); }
       };
       h.appendChild(delAll);
       grp.appendChild(h);
@@ -3421,8 +3492,7 @@
       rows.appendChild(el('p', 'muted sm shimmer', 'Opening…'));
       grp.appendChild(rows);
       list.appendChild(grp);
-      drRead(f).then(doc => {
-        if (!live()) return;
+      const paint = doc => {
         clr(rows);
         const profs = Array.isArray(doc.profiles) ? doc.profiles : [];
         if (!profs.length) { rows.appendChild(el('p', 'empty sm', 'No profiles in this backup.')); return; }
@@ -3442,21 +3512,30 @@
             if (!(await drConfirmDelete('Delete “' + (p.name || 'this profile') + '” from this backup?',
               last ? 'It is the only profile in “' + f.name.replace(/\.json$/, '') + '”, so the whole backup file is removed from your Google Drive.'
                 : 'The backup “' + f.name.replace(/\.json$/, '') + '” is saved again without it. ' + (profs.length === 2 ? 'The other profile in it stays.' : 'The other ' + (profs.length - 1) + ' profiles in it stay.')))) return;
+            drBusy(last ? grp : r, true);
             try {
+              let next = null;
               if (last) await driveDelete(f.id);
               else {
-                const next = Object.assign({}, doc, { profiles: profs.filter((_, j) => j !== i), savedAt: doc.savedAt });
-                await driveUpload(f.name, next, { numax: 'backup' }, f.id);
+                next = Object.assign({}, doc, { profiles: profs.filter((_, j) => j !== i), savedAt: doc.savedAt });
+                const up = await driveUpload(f.name, next, { numax: 'backup' }, f.id);
+                // The file on Drive is now exactly `next`; keep it as the cached
+                // copy so neither this list nor a later open downloads it again.
+                delete drDocs[drKey(f)];
+                if (up.modifiedTime) { f.modifiedTime = up.modifiedTime; when.textContent = new Date(f.modifiedTime).toLocaleString(); }
+                drDocs[drKey(f)] = Promise.resolve(next);
               }
               logAct('Deleted ' + (p.name || 'a profile') + ' from backup "' + f.name + '"', 'info');
               if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
-            } catch (e) { logAct("Couldn't delete it: " + e.message, 'err'); }
-            if (!stale()) drListBackups(list, stale, onTab, choose);
+              if (last) drGone(grp, () => drEmptyCheck(list, 'backup'));
+              else drGone(r, () => { if (!stale()) paint(next); });
+            } catch (e) { logAct("Couldn't delete it: " + e.message, 'err'); drFail(last ? grp : r, "Couldn't delete it: " + e.message); }
           };
           r.appendChild(del);
           rows.appendChild(r);
         });
-      }).catch(e => { if (live()) { clr(rows); rows.appendChild(el('p', 'empty sm err-text', "Couldn't open it: " + e.message)); } });
+      };
+      drRead(f).then(doc => { if (live()) paint(doc); }).catch(e => { if (live()) { clr(rows); rows.appendChild(el('p', 'empty sm err-text', "Couldn't open it: " + e.message)); } });
     });
   }
   async function drListTemplates(list, stale, onTab, choose) {
@@ -3494,12 +3573,13 @@
       const del = el('button', 'iconbtn', '✕'); del.type = 'button'; del.title = 'Delete template';
       del.onclick = async () => {
         if (!(await drConfirmDelete('Delete the template “' + tname + '”?', 'The template file is removed from your Google Drive. Profiles you already applied it to are not changed.'))) return;
+        drBusy(r, true);
         try {
           await driveDelete(f.id);
           logAct('Deleted template "' + tname + '"', 'info');
           if (dr.src && dr.src.fileId === f.id) { dr.src = null; dr.target = null; paintRestore(); }
-        } catch (e) { logAct("Couldn't delete template: " + e.message, 'err'); }
-        if (!stale()) drListTemplates(list, stale, onTab, choose);
+          drGone(r, () => drEmptyCheck(list, 'template'));
+        } catch (e) { logAct("Couldn't delete template: " + e.message, 'err'); drBusy(r, false); drFail(b, "Couldn't delete it: " + e.message); }
       };
       r.appendChild(del);
       list.appendChild(r);
@@ -5594,7 +5674,9 @@
           // only comes up while the card is hovered or focused (Furqan,
           // 2026-09-17). The welcome-back one waves its arm the whole time.
           const hide = e.mascot === 'ledge';
-          const m = window.NumaxMascot.create({ pose: e.mascot, size: '100%', follow: true, hide });
+          // No idle bob on the hiding one: it lifted the flat cut at the bottom
+          // of the picture off the card's floor (Furqan, 2026-09-17).
+          const m = window.NumaxMascot.create({ pose: e.mascot, size: '100%', follow: true, hide, anim: hide ? 'blink look' : null });
           art.appendChild(m);
           if (hide) {
             const up = on => window.NumaxMascot.peek(m, on);
