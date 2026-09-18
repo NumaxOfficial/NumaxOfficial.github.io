@@ -692,63 +692,77 @@
   ];
 
   // Group order is the display order. `note` is context, never a warning.
+  //
+  // `kind` is what the add-on actually is, in plain words, and it is only set
+  // where the add-on SAYS so — its own manifest description or its own
+  // configure page, read 2026-09-18 (Furqan: "is something under HTTP REALLY
+  // HTTP or is it torrent too?"). No kind means we could not confirm one.
+  // That audit moved Sootio out of HTTP (it searches your debrid / usenet
+  // services — nothing plays without one), Dramayo from Anime to Asian (its
+  // sixteen catalogs are all Asian dramas and films, no anime), and Stravo II
+  // out of Asian (Nollywood, sitcoms, dubbed anime — Asian is two catalogs of
+  // twenty-five). Comet's link was its OBSOLETE configure page — the manifest
+  // that page produces names itself "OBSOLETE CONFIGURATION, re-configure on
+  // comet.elfhosted.com". Flix-Streams linked one user's personal config.
+  // Filmora was removed: its host answers 402 (the deployment is switched off).
+  // HDHub does NOT resolve on some ISPs' DNS but is up (checked through
+  // Cloudflare DNS) — do not remove it for that.
   const ADDON_GROUPS = [
     {
       title: 'P2P · consistently good', tone: 'good',
-      note: 'torrent / magnet only',
+      note: 'torrent sources — debrid optional',
       items: [
-        { name: 'Torrentio', url: 'https://torrentio.strem.fun/configure' },
-        { name: 'StremThru Torz', url: 'https://stremthru.13377001.xyz/stremio/torz/configure' },
-        { name: 'Peerflix', url: 'https://config.peerflix.mov/' },
-        { name: 'TorrentsDB', url: 'https://torrentsdb.com/' },
+        { name: 'Torrentio', url: 'https://torrentio.strem.fun/configure', kind: 'Torrents · debrid optional' },
+        { name: 'StremThru Torz', url: 'https://stremthru.13377001.xyz/stremio/torz/configure', kind: 'Torrents · debrid or P2P' },
+        { name: 'Peerflix', url: 'https://config.peerflix.mov/', kind: 'Torrents · debrid optional' },
+        { name: 'TorrentsDB', url: 'https://torrentsdb.com/', kind: 'Torrents · debrid optional' },
       ],
     },
     {
       title: 'Multi-source · consistently good', tone: 'good',
-      note: 'torrent plus usenet / debrid — not P2P-only',
+      note: 'built around a debrid or usenet account',
       items: [
-        { name: 'Comet', url: 'https://comet.elfhosted.com/stremio/configure' },
-        { name: 'MediaFusion', url: 'https://mediafusion.elfhosted.com/app' },
-        { name: 'Meteor', url: 'https://meteorfortheweebs.midnightignite.me/configure' },
-        { name: 'Jackettio', url: 'https://jackettio.elfhosted.com/configure' },
+        { name: 'Comet', url: 'https://comet.elfhosted.com/configure', kind: 'Torrents · debrid' },
+        { name: 'MediaFusion', url: 'https://mediafusion.elfhosted.com/app', kind: 'Torrents · debrid · live TV' },
+        { name: 'Meteor', url: 'https://meteorfortheweebs.midnightignite.me/configure', kind: 'Torrents · debrid / usenet' },
+        { name: 'Jackettio', url: 'https://jackettio.elfhosted.com/configure', kind: 'Torrents · needs debrid' },
+        { name: 'Sootio', url: 'https://sooti.click/configure', kind: 'Debrid / usenet · needs an account' },
       ],
     },
     {
       title: 'HTTP · consistently good', tone: 'good',
-      note: 'no debrid needed',
+      note: 'direct links — no debrid needed',
       items: [
-        { name: 'PenguPlay', url: 'https://pengu.uk/configure' },
-        { name: 'Sootio', url: 'https://sooti.click/configure' },
-        { name: 'WebStreamr MBG', url: 'https://87d6a6ef6b58-webstreamrmbg.baby-beamup.club/configure' },
-        { name: 'HDHub', url: 'https://hdhub.thevolecitor.qzz.io/' },
-        { name: 'Flix-Streams', url: 'https://flixnest.app/flix-streams/u/o8jsvzaougx/configure' },
+        { name: 'PenguPlay', url: 'https://pengu.uk/configure', kind: 'Direct links' },
+        { name: 'WebStreamr MBG', url: 'https://87d6a6ef6b58-webstreamrmbg.baby-beamup.club/configure', kind: 'Direct links' },
+        { name: 'HDHub', url: 'https://hdhub.thevolecitor.qzz.io/', kind: 'Direct links' },
+        { name: 'Flix-Streams', url: 'https://flixnest.app/flix-streams/configure', kind: 'Direct links · live TV' },
       ],
     },
     {
       title: 'Okay & promising', tone: 'mid',
       note: 'newer, less consistent',
       items: [
-        { name: 'Filmora', url: 'https://stremio-addons.net/addons/filmora' },
-        { name: 'TorrentClaw', url: 'https://torrentclaw.com/api/stremio/configure' },
-        { name: 'Watcho', url: 'https://stremio-addons.net/addons/watcho' },
-        { name: 'AutoStream', url: 'https://autostreamtest.onrender.com/configure' },
+        { name: 'TorrentClaw', url: 'https://torrentclaw.com/api/stremio/configure', kind: 'Torrents · debrid optional' },
+        { name: 'Watcho', url: 'https://stremio-addons.net/addons/watcho', kind: 'Torrents' },
+        { name: 'AutoStream', url: 'https://autostreamtest.onrender.com/configure', kind: 'Torrents · needs debrid' },
+        { name: 'Stravo II', url: 'https://v2.stravo.site/local/configure', kind: 'Direct links · dubbed audio' },
       ],
     },
     {
       title: 'Anime', tone: 'plain',
       note: 'worth having more than one',
       items: [
-        { name: 'Nexio Torii', url: 'https://torii.nexioapp.org/configure' },
-        { name: 'Dramayo', url: 'https://dramayo.stream/configure' },
-        { name: 'YukiStreams', url: 'https://stremio.yukistreams.xyz/configure' },
+        { name: 'Nexio Torii', url: 'https://torii.nexioapp.org/configure', kind: 'Torrents · debrid or P2P' },
+        { name: 'YukiStreams', url: 'https://stremio.yukistreams.xyz/configure', kind: 'Direct links · debrid optional' },
       ],
     },
     {
       title: 'Asian content', tone: 'plain',
       note: 'usually HD or lower',
       items: [
-        { name: 'YaStream', url: 'https://yastream.tamthai.de/configure' },
-        { name: 'Stravo II', url: 'https://v2.stravo.site/local/configure' },
+        { name: 'Dramayo', url: 'https://dramayo.stream/configure' },
+        { name: 'YaStream', url: 'https://yastream.tamthai.de/configure', kind: 'Direct links' },
       ],
     },
     {

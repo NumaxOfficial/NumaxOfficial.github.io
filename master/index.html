@@ -361,8 +361,8 @@
   .sy-ct-group-lbl{ font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--t45); font-weight:700; }
   .sy-ct-group-selall{ font-size:11px; font-weight:600; color:var(--accent); background:none; border:none; cursor:pointer; padding:1px 2px; margin-left:auto; }
   .sy-ct-group-selall:hover{ text-decoration:underline; color:var(--primary-soft); }
-  .sy-ct-chips{ display:flex; flex-wrap:wrap; gap:6px; }
-  .sy-chip{ display:inline-flex; align-items:center; gap:6px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 10px 4px 4px; cursor:pointer;
+  .sy-ct-chips{ display:flex; flex-wrap:wrap; gap:7px; }
+  .sy-chip{ display:inline-flex; align-items:center; gap:7px; background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:5px 13px 5px 5px; cursor:pointer;
     /* named properties, not the `transition:.14s` shorthand this was: that is
        `all`, so every layout property animated too and each chip re-laid itself
        out on hover. */
@@ -370,8 +370,8 @@
   .sy-chip:active{ transform:scale(.97); }
   .sy-chip:hover{ border-color:rgba(var(--ink),.28); }
   .sy-chip.on{ border-color:var(--accent); background:rgba(var(--accent-rgb),.1); }
-  .sy-chip .av{ width:22px; height:22px; font-size:10px; }
-  .sy-chip .pcn{ font-size:12px; font-weight:500; }
+  .sy-chip .av{ width:26px; height:26px; font-size:11px; }
+  .sy-chip .pcn{ font-size:13px; font-weight:500; }
   .sy-chip .chk{ display:none; width:16px; height:16px; border-radius:50%; background:var(--accent); color:#fff; font-size:10px; place-items:center; }
   .sy-chip.on .chk{ display:grid; }
 
@@ -1054,7 +1054,21 @@
     grid-template-columns:minmax(0,1fr) 322px; gap:32px; }
   /* No profile picked yet means no live panel, and a hidden panel still holds
      its 322px track open. app.js sets this whenever wzRenderPanel hides it. */
-  .wz-body.solo{ grid-template-columns:minmax(0,1fr); }
+  /* A 0px second track rather than one track, so the change between the two
+     can be interpolated: picking a profile glides the step block over to make
+     room and the panel then fades in beside it; clearing it glides back
+     (Furqan, 2026-09-18). The panel's content keeps its finished width while
+     the track opens, so it is revealed rather than re-wrapped. */
+  .wz-body.solo{ grid-template-columns:minmax(0,1fr) 0px; column-gap:0; }
+  .wz-body{ transition:grid-template-columns .55s var(--mo-ease,cubic-bezier(.32,.72,0,1)),
+    column-gap .55s var(--mo-ease,cubic-bezier(.32,.72,0,1)); }
+  @keyframes wz-pnl-in{ from{ opacity:0; translate:26px 0; } to{ opacity:1; translate:0 0; } }
+  .wz-panel.wz-pnl-in{ animation:wz-pnl-in .5s .16s var(--mo-ease,cubic-bezier(.32,.72,0,1)) both; }
+  @media (min-width:1181px){
+    .wz-body > .wz-panel{ overflow-x:hidden; }
+    .wz-body > .wz-panel > *{ min-width:276px; } }
+  @media (prefers-reduced-motion:reduce){
+    .wz-body{ transition:none; } .wz-panel.wz-pnl-in{ animation:none; } }
   /* Each column scrolls on its own, and nothing scrolls the page. The profile
      panel therefore stays where it is while a long step moves under it, which
      is what "fix the panel and scroll only what needs it" means in layout.
@@ -1126,11 +1140,18 @@
      viewBox ends where the panel does, which is what makes it read as leaning
      in rather than floating. Gone below 1150px or on a short window, where the
      form column wants the whole width. */
-  .wz-peek{ position:absolute; right:clamp(4px,3%,54px); bottom:0; z-index:0;
-    width:clamp(116px,15vw,186px); pointer-events:none; opacity:.85; }
-  .wz-peek svg{ display:block; width:100%; height:auto; }
+  /* Both mascots stand on the bottom bar's rule (bottom:100% of the bar).
+     The peeker's right edge is pulled out by the block's own padding (--wzp)
+     so it meets the block's inside edge exactly — the scroller clips him
+     there, which is what makes him lean out from behind it. */
+  .wz-peek{ position:absolute; right:calc(-1 * var(--wzp, 24px)); bottom:calc(100% + 1px); z-index:0;
+    width:clamp(112px,10vw,148px); pointer-events:none; line-height:0; }
+  .wz-peek .nx-mascot{ width:100%; }
+  .wz-bar-sit{ position:absolute; right:clamp(12px,7%,90px); bottom:calc(100% + 1px); width:94px;
+    pointer-events:none; line-height:0; }
+  .wz-bar-sit .nx-mascot{ width:100%; }
   .wz-branch > .wz-sec, .wz-branch-bar{ position:relative; z-index:1; }
-  @media (max-width:1150px), (max-height:720px){ .wz-peek{ display:none; } }
+  @media (max-width:1150px), (max-height:720px){ .wz-peek, .wz-bar-sit{ display:none; } }
   .wz-branch-bar{ order:2; margin-top:auto; padding-top:20px; margin-bottom:0;
     border-top:1px solid rgba(var(--ink),.07); }
   /* At size. The account select and the profile chips ARE the question on
@@ -1144,9 +1165,9 @@
   .wz-branch .wz-chips-big .pchip.wz-add .plus{ width:52px; height:52px; font-size:23px; }
   .wz-branch .field-col{ max-width:520px; }
   .wz-branch .field-col input{ font-size:15px; padding:14px 16px; }
-  .wz-main{ min-width:0; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  .wz-main{ min-width:0; min-height:0; overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
     display:flex; flex-direction:column; gap:20px;
-    padding:clamp(16px,1.6vw,24px);
+    --wzp:clamp(16px,1.6vw,24px); padding:var(--wzp);
     container-type:inline-size; container-name:wzmain; }
   .wz-main::-webkit-scrollbar, .wz-panel::-webkit-scrollbar{ width:5px; }
   .wz-main::-webkit-scrollbar-thumb, .wz-panel::-webkit-scrollbar-thumb{ background:rgba(var(--ink),.14); border-radius:4px; }
@@ -1162,6 +1183,7 @@
     .panel[data-panel="wizard"] .phead > p{ display:none; }
     .wz-pane{ gap:18px; }
     .wz-main, .wz-panel{ padding:14px 16px; }
+    .wz-main{ --wzp:16px; }
     .wz-head h2{ font-size:20px; }
   }
   @media (min-width:1181px) and (max-height:660px){
@@ -1317,29 +1339,29 @@
      short window shrinks him instead of letting him push the card taller. */
   #wz-entry .wz-door-art{ position:relative; display:flex; align-items:flex-end; justify-content:center; min-width:0; pointer-events:none; }
   #wz-entry .wz-door-have .wz-door-art{ padding-bottom:clamp(18px,3.4vh,34px); }
-  #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:min(86%, 230px); }
+  #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:min(74%, 196px); }
   /* kept off the card's right edge: a hand touching the border reads as cut */
   #wz-entry .wz-door-new .wz-door-art{ padding-right:clamp(12px,2vw,28px); }
-  #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(94%, 260px); }
+  #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(82%, 222px); }
   /* Rests a little below the card's floor, so the flat cut at the bottom of
      the picture stays under the edge even at the top of the rise's overshoot
      or a lean; the hide depth is trimmed to match (Furqan, 2026-09-17). */
   #wz-entry .wz-door-new .wz-door-art .nx-mascot{ translate:0 4%; --nxm-hide:77%; }
   @media (max-height:760px){
-    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:min(78%, 180px); }
-    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(92%, 220px); }
+    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:min(68%, 154px); }
+    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:min(80%, 188px); }
     #wz-entry .wz-door-pts{ display:none; } }
   @media (max-width:980px){ #wz-entry{ grid-template-columns:1fr; }
     #wz-entry .wz-door{ min-height:0; grid-template-columns:minmax(0,1fr) 150px; }
-    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:120px; }
-    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:140px; } }
+    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:104px; }
+    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:120px; } }
   /* A phone has no room for two columns: the mascot moves under the words. */
   @media (max-width:520px){ #wz-entry .wz-door{ grid-template-columns:1fr; }
     #wz-entry .wz-door-tx{ padding:22px 22px 4px; }
     #wz-entry .wz-door-art{ justify-content:flex-end; padding-right:22px; }
     #wz-entry .wz-door-have .wz-door-art{ padding-bottom:18px; }
-    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:96px; }
-    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:120px; } }
+    #wz-entry .wz-door-have .wz-door-art .nx-mascot{ width:84px; }
+    #wz-entry .wz-door-new .wz-door-art .nx-mascot{ width:104px; } }
   #wz-mode-simple, #wz-mode-advanced, #wz-route-aiostreams, #wz-route-native,
   #wz-account-body{ display:flex; flex-direction:column; gap:22px; min-width:0; }
   .wz-rail{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
@@ -1447,6 +1469,19 @@
   /* The one-liner takes the slack, so every card in a row lines its rule and
      its disclosure up at the same height however long the text above is. */
   .wz-pick > .wz-pick-one{ flex:1 1 auto; }
+  /* "Do it all for me" is asleep; "Advanced setup" is lifting (Furqan,
+     2026-09-18). The picture stands on the card's own floor on the left; the
+     sleeper clips himself at that floor, so the card itself does not clip and
+     his Z's can drift up past its top edge — only a short way, so they fade
+     out in the gap above rather than over the text there. */
+  #wz-modes .wz-pick.has-art{ padding-left:128px; min-height:122px; }
+  #wz-modes .wz-mode-art .nxm-zzz{ top:-16%; left:76%; width:38%; height:32%; }
+  #wz-modes .wz-mode-art{ position:absolute; left:16px; bottom:0; width:98px; pointer-events:none; line-height:0; }
+  #wz-modes .wz-mode-art .nx-mascot{ width:100%; }
+  #wz-modes .wz-mode-art.lift{ left:30px; width:70px; bottom:12px; }
+  @container wzmain (max-width:600px){
+    #wz-modes .wz-pick.has-art{ padding-left:17px; min-height:0; }
+    #wz-modes .wz-mode-art{ display:none; } }
   .wz-pick:hover{ border-color:rgba(var(--ink),.26); }
   .wz-pick:focus-visible{ outline:2px solid var(--accent); outline-offset:3px; }
   .wz-pick.on{ border-color:var(--accent); background:rgba(var(--accent-rgb),.07); }
@@ -2189,6 +2224,14 @@
      profiles; auto-fit shares the card out between the pills it has. */
   .mk-pick-chips{ display:grid; grid-template-columns:repeat(auto-fit,minmax(118px,1fr)); gap:7px; }
   .mk-pick-chip{ flex-direction:row; gap:8px; min-width:0; padding:7px 13px 7px 8px; border-radius:11px; border-width:1.5px; justify-content:flex-start; }
+  /* The card stays the size its row gives it; what is inside an open one now
+     grows into it (Furqan, 2026-09-18): the profile rows share the height the
+     card has left over, so a two-profile card next to a six-profile one has
+     taller pills instead of an empty lower half. A closed card is untouched —
+     its height is the disclosure's, and growing it would show what it hides. */
+  .mk-pick-acct.open > .mk-pick-w{ flex:1 0 auto; display:flex; flex-direction:column; }
+  .mk-pick-acct.open .mk-pick-b{ flex:1 0 auto; display:flex; flex-direction:column; }
+  .mk-pick-acct.open .mk-pick-chips{ flex:1 0 auto; grid-auto-rows:minmax(44px,1fr); }
   .mk-pick-chip .av{ flex:none; }
   .mk-pick-chip .pcn{ font-size:12.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .mk-pick-chip.multi .chk{ top:-5px; right:-5px; width:16px; height:16px; font-size:9px; }
@@ -2789,8 +2832,14 @@
   /* Restore: arms up in the card's empty lower half; pushed down (and off
      screen, inside the card's own scroller) as the restore steps grow. */
   .panel[data-panel="drive"] .dr-scroll{ display:flex; flex-direction:column; }
-  .dr-cheer{ margin:auto auto 0; padding-top:18px; width:150px; pointer-events:none; }
+  /* Sitting on the card's bottom edge (Furqan, 2026-09-18): the card drops
+     its bottom padding so the scroller — and the mascot at its end — reaches
+     the border, and the flat cut of the picture sits exactly on it. Still in
+     the flow, so a long restore pushes him down rather than covering it. */
+  .dr-cheer{ margin:auto 14px 0 auto; padding-top:18px; width:112px; pointer-events:none; flex:none; line-height:0;
+    overflow-y:clip; } /* his idle bob dips below the floor; that must not make the card scroll */
   .dr-cheer .nx-mascot{ width:100%; }
+  @media (min-height:721px){ .panel[data-panel="drive"] .panel-cols > .card:has(.dr-cheer){ padding-bottom:0; } }
   @media (max-height:720px){ .dr-cheer{ display:none; } }
   /* ===== Phones (release sweep, 2026-09-17) =====
      Measured at 375px: add-on names ran underneath their Configure button,
@@ -2959,7 +3008,7 @@
       <!-- The step's own question on the left, and a live read of the profile
            it is all going to on the right. The panel is read-only and writes
            nothing; see app.js wzRenderPanel for why it holds no state. -->
-      <div class="wz-body">
+      <div class="wz-body solo">
        <div class="wz-main">
         <div class="wz-head" id="wz-head" style="display:none"></div>
 
@@ -3033,6 +3082,7 @@
           <div class="wz-branch" id="wz-have" style="display:none">
             <div class="wz-branch-bar">
               <button class="btn btn-ghost btn-xs wz-entry-swap"></button>
+              <span class="wz-bar-sit" aria-hidden="true"><span data-mascot="ledge" data-mascot-size="100%" data-mascot-follow></span></span>
             </div>
             <div class="wz-acc" id="wz-profile-card">
               <div class="nsel-slot wz-acc-sel"><select class="sel" id="wz-account"></select></div>
@@ -3053,6 +3103,12 @@
             <div class="wz-branch-bar">
               <button class="btn btn-ghost btn-xs wz-entry-swap"></button>
               <span class="muted sm">You'll be signed straight in &mdash; there's no confirmation email to wait for.</span>
+              <!-- The sign-up form is one narrow column, so the right of this
+                   screen is empty. The real mascot leans out from behind the
+                   block's right edge, standing on this bar's rule (Furqan,
+                   2026-09-18: "replace whatever this mascot is with my actual
+                   one"). Decoration only, and gone when the form needs the room. -->
+              <span class="wz-peek" aria-hidden="true"><span data-mascot="peek" data-mascot-side="right" data-mascot-size="100%" data-mascot-follow></span></span>
             </div>
             <div class="wz-sec wz-narrow">
               <div class="field-col">
@@ -3063,24 +3119,6 @@
                 <button class="btn btn-primary" id="wz-new-btn">Create account</button>
                 <div class="inline-status" id="wz-new-status"></div>
               </div>
-            </div>
-            <!-- The sign-up form is one narrow column, so the right of this
-                 screen is empty (Furqan, 2026-09-15: "add baymax here peeking
-                 in"). This is an ORIGINAL drawing in that spirit — a soft
-                 rounded helper leaning over the bottom edge — not a copy of
-                 anyone's character. It is decoration only: aria-hidden, no
-                 pointer events, and it hides itself the moment the column
-                 needs the room rather than pushing the form around. -->
-            <div class="wz-peek" aria-hidden="true">
-              <svg viewBox="0 0 200 150" fill="none">
-                <ellipse cx="100" cy="128" rx="40" ry="34" fill="rgba(var(--ink),.90)"/>
-                <ellipse cx="50" cy="132" rx="19" ry="14" fill="rgba(var(--ink),.90)"/>
-                <ellipse cx="150" cy="132" rx="19" ry="14" fill="rgba(var(--ink),.90)"/>
-                <ellipse cx="100" cy="66" rx="47" ry="43" fill="rgba(var(--ink),.94)"/>
-                <circle cx="80" cy="66" r="5.5" fill="var(--bg)"/>
-                <circle cx="120" cy="66" r="5.5" fill="var(--bg)"/>
-                <path d="M85.5 66h29" stroke="var(--bg)" stroke-width="3" stroke-linecap="round"/>
-              </svg>
             </div>
           </div>
         </div>
@@ -3522,7 +3560,7 @@
       <div class="card"><div class="chead"><h3>Restore</h3></div>
         <div class="dr-scroll">
           <div id="dr-restore"><p class="empty sm">Open this tab to restore.</p></div>
-          <div class="dr-cheer"><span data-mascot="hang" data-mascot-anim="idle blink look" data-mascot-size="100%" data-mascot-follow></span></div>
+          <div class="dr-cheer"><span data-mascot="ledge" data-mascot-size="100%" data-mascot-follow></span></div>
         </div></div>
       </div>
     </section>
@@ -3635,10 +3673,10 @@
 <script src="./meta.js?v=2fac004b"></script>
 <script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
 <script src="./ui-motion.js?v=1b5b5a01"></script>
-<script src="./market.js?v=d723c06a"></script>
+<script src="./market.js?v=08b14401"></script>
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
-<script src="./mascot.js?v=5f1cfff1"></script>
-<script src="./app.js?v=3b330cfb"></script>
+<script src="./mascot.js?v=31ee7c10"></script>
+<script src="./app.js?v=7f4c7154"></script>
 </body>
 </html>

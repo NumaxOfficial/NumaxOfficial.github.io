@@ -3175,7 +3175,7 @@
       tgt.forEach(p => {
         const tid = rec.accountId + ':' + p.index; allSyTids.push(tid); acctTids.push(tid);
         const c = el('button', 'sy-chip'); c.type = 'button'; c.dataset.tid = tid;
-        c.appendChild(avatar(p, 22)); c.appendChild(el('span', 'pcn', p.name));
+        c.appendChild(avatar(p, 26)); c.appendChild(el('span', 'pcn', p.name));
         const chk = el('span', 'chk'); chk.textContent = '✓'; c.appendChild(chk);
         c.onclick = () => {
           const on = syTargets.has(tid), first = syTargets.size === 0;
@@ -4143,7 +4143,7 @@
         const ic = mkAddonLogo(it.name, it.url, 'mk-ic-s');
         const b = el('div', 'mk-rb');
         b.appendChild(el('div', 'mk-rn', it.name));
-        b.appendChild(el('div', 'mk-ru', host(it.url)));
+        b.appendChild(el('div', 'mk-ru', it.kind ? host(it.url) + ' \u00b7 ' + it.kind : host(it.url)));
         const site = el('button', 'btn btn-ghost btn-xs', 'Open');
         site.onclick = () => { openTab(it.url); logAct('Opened ' + it.name, 'info'); };
         const add = el('button', 'btn btn-ghost btn-xs', 'Add');
@@ -6558,9 +6558,18 @@
     // step block was 920px inside 1274px of space with the rest simply empty.
     // `.solo` drops the grid to one column for exactly that state.
     const bodyEl = document.querySelector('.wz-body');
+    const wasSolo = !!bodyEl && bodyEl.classList.contains('solo');
     if (bodyEl) bodyEl.classList.toggle('solo', !t);
-    if (!t) { host.style.display = 'none'; return; }
+    if (!t) { host.style.display = 'none'; host.classList.remove('wz-pnl-in'); return; }
     host.style.display = '';
+    // Arriving, not repainting: the step block glides over (a CSS transition
+    // on the grid) and the panel fades in beside it once — not on every
+    // re-render, and not every time the wizard tab is shown again.
+    if (wasSolo) {
+      host.classList.remove('wz-pnl-in'); void host.offsetWidth; host.classList.add('wz-pnl-in');
+      clearTimeout(host.__pnlT);
+      host.__pnlT = setTimeout(() => host.classList.remove('wz-pnl-in'), 900);
+    }
     const gen = ++wzPanelGen;
 
     clr(host);
@@ -7202,6 +7211,26 @@
         const wrap = el('div', 'wz-pc-wrap');
         wrap.appendChild(m.id === 'simple' ? wzPresetBlock() : wzProsCons(m.pros, m.cons));
         c.appendChild(wrap);
+        // The picture on each card (Furqan, 2026-09-18): asleep on "Do it all
+        // for me" — he opens his eyes while you look at it — and lifting on
+        // "Advanced setup". Decoration only; the card is complete without it.
+        if (window.NumaxMascot) {
+          const simple = m.id === 'simple';
+          const art = el('div', 'wz-mode-art' + (simple ? '' : ' lift'));
+          const mm = window.NumaxMascot.create(simple
+            ? { pose: 'ledge', size: '100%', anim: 'sleep' }
+            : { pose: 'hang', size: '100%', anim: 'lift blink' });
+          art.appendChild(mm);
+          c.insertBefore(art, c.firstChild);
+          c.classList.add('has-art');
+          if (simple) {
+            const wake = on => window.NumaxMascot.wake(mm, on);
+            c.addEventListener('mouseenter', () => wake(true));
+            c.addEventListener('mouseleave', () => wake(c.matches(':focus-visible')));
+            c.addEventListener('focus', () => wake(true));
+            c.addEventListener('blur', () => wake(c.matches(':hover')));
+          }
+        }
         modes.appendChild(c);
       });
       modes.dataset.built = '1';

@@ -42,6 +42,10 @@
 //         hang (hanging from an edge: put the element's top on the edge)
 // Loops:  idle (breathing / bob / sway, per pose) | blink | wave (the arm waves)
 //         | swing (hang) | look (glances about when not following)
+//         | sleep (eyes held shut, slow breathing, Z's drifting up; wake(m, on)
+//           opens his eyes while the caller says so)
+//         | lift (hang pose only: arms up is a barbell overhead — the bar is
+//           drawn behind the fists so they grip it, and he stands to press it)
 // follow: true makes the eyes and a slight lean track the pointer.
 // size:   the rendered WIDTH, as before.
 // Everything that moves stops under prefers-reduced-motion, and nothing runs
@@ -52,7 +56,7 @@
   var D = document, W = window;
 
   var POSES = ['stand', 'wave', 'ledge', 'peek', 'hang'];
-  var LOOPS = ['idle', 'blink', 'wave', 'swing', 'look'];
+  var LOOPS = ['idle', 'blink', 'wave', 'swing', 'look', 'sleep', 'lift'];
   var ONESHOTS = ['hop', 'nod', 'pop', 'wiggle'];
   var ALIAS = { stand: 'wave' };
 
@@ -90,12 +94,35 @@
   }
   function pct(v) { return (+v.toFixed(3)) + '%'; }
 
-  function build(m, art, name) {
+  // The barbell for `lift`, drawn in units of 1% of the figure's width. The
+  // hang render's fists sit at about 10% and 90% across and 4% down, so the
+  // bar runs through both at that height; the SVG is inserted BEHIND the
+  // render, which is what puts the fists in front of the bar — a grip.
+  var BARBELL = '<svg class="nxm-bar" viewBox="0 0 148 26" aria-hidden="true">' +
+    '<defs><linearGradient id="nxmSteel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eef0f4"/>' +
+    '<stop offset=".55" stop-color="#a3a8b3"/><stop offset="1" stop-color="#5d626e"/></linearGradient>' +
+    '<linearGradient id="nxmPlate" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a3d45"/>' +
+    '<stop offset=".5" stop-color="#1b1d22"/><stop offset="1" stop-color="#101114"/></linearGradient></defs>' +
+    '<rect x="5" y="11.6" width="138" height="2.8" rx="1.4" fill="url(#nxmSteel)"/>' +
+    '<rect x="9" y="1" width="7" height="24" rx="2.2" fill="url(#nxmPlate)"/>' +
+    '<rect x="132" y="1" width="7" height="24" rx="2.2" fill="url(#nxmPlate)"/>' +
+    '<rect x="16" y="4.5" width="4.5" height="17" rx="1.6" fill="#c8202b"/>' +
+    '<rect x="127.5" y="4.5" width="4.5" height="17" rx="1.6" fill="#c8202b"/>' +
+    '<rect x="20.5" y="9.5" width="2.2" height="7" rx=".8" fill="url(#nxmSteel)"/>' +
+    '<rect x="125.3" y="9.5" width="2.2" height="7" rx=".8" fill="url(#nxmSteel)"/></svg>';
+
+  function build(m, art, name, loops) {
     var hider = h('span', 'nxm-hider', m);      // hiding: resting down / peeking up
     var stage = h('span', 'nxm-stage', hider);  // one-shots
     h('span', 'nxm-shadow', stage);             // contact shadow (standing only)
     var body = h('span', 'nxm-body', stage);    // loops
     var lean = h('span', 'nxm-lean', body);     // pointer lean
+    if (loops.indexOf('lift') >= 0 && name === 'hang') lean.insertAdjacentHTML('beforeend', BARBELL);
+    if (loops.indexOf('sleep') >= 0) {
+      // Outside the lean, so the Z's drift straight up whatever he is doing.
+      var zz = h('span', 'nxm-zzz', stage);
+      ['z', 'z', 'Z'].forEach(function (t, i) { var s = h('span', 'nxm-z nxm-z' + i, zz); s.textContent = t; });
+    }
     var img = h('img', 'nxm-img', lean);
     img.alt = ''; img.draggable = false; img.decoding = 'async';
     // Not loading="lazy": a lazy image never starts while the document is
@@ -140,7 +167,6 @@
       '.nx-mascot.hiding.up .nxm-hider{translate:0 0;transition-duration:.6s;transition-timing-function:cubic-bezier(.3,1.3,.5,1)}',
       '.nx-mascot .nxm-img{display:block;width:100%;height:auto;pointer-events:none;',
       '  filter:drop-shadow(0 1px 0 rgba(255,255,255,.10)) drop-shadow(0 10px 18px rgba(0,0,0,.35))}',
-      ':root[data-theme="light"] .nx-mascot .nxm-img{filter:drop-shadow(0 8px 14px rgba(18,26,43,.18))}',
       '.nx-mascot .nxm-eye{position:absolute;display:block;background-repeat:no-repeat;',
       '  translate:var(--nxm-ex) var(--nxm-ey);transition:translate .22s cubic-bezier(.3,.7,.4,1);transform-origin:50% 55%}',
       '.nx-mascot .nxm-shadow{display:none}',
@@ -152,8 +178,17 @@
       '.nx-mascot[data-pose="hang"] .nxm-lean{transform-origin:50% 0}',
       '.nx-mascot[data-pose="ledge"] .nxm-lean{transform-origin:50% 100%}',
       /* ledge and peek sit behind their edge: clip at it */
-      '.nx-mascot[data-pose="ledge"]{overflow:hidden;padding-top:6%;margin-top:-6%}',
-      '.nx-mascot[data-pose="peek"]{overflow:hidden}',
+      /* ONLY at the edge. These used overflow:hidden, which also cut the soft
+         drop shadow off in a hard rectangle on the other three sides — on a
+         light card that rectangle was the "grey background" behind him
+         (Furqan, 2026-09-18). clip-path with negative insets clips the one
+         side the edge is on and leaves the rest free. Mirroring (scale) comes
+         after the clip, so a right-side peek is clipped on the right. */
+      '.nx-mascot[data-pose="ledge"]{clip-path:inset(-60% -40% 0 -40%);padding-top:6%;margin-top:-6%}',
+      '.nx-mascot[data-pose="peek"]{clip-path:inset(-40% -40% 0 0)}',
+      /* A white face on a white card needs an edge, not a haze: light mode
+         gets a tight contact shadow rather than a spread one. */
+      ':root[data-theme="light"] .nx-mascot .nxm-img{filter:drop-shadow(0 1px 1.5px rgba(18,26,43,.28)) drop-shadow(0 4px 8px rgba(18,26,43,.10))}',
       /* mirrored as a whole, so every inner origin and animation still holds */
       '.nx-mascot[data-pose="peek"][data-side="right"]{scale:-1 1}',
       '.nx-mascot[data-pose="peek"] .nxm-lean{transform-origin:0 100%}',
@@ -196,6 +231,36 @@
       '.nx-mascot[data-pose="peek"].enter .nxm-stage{animation:nxm-slide .75s cubic-bezier(.3,1.25,.5,1) both}',
       '.nx-mascot[data-pose="hang"].enter .nxm-stage{animation:nxm-drop .7s cubic-bezier(.3,1.3,.5,1) both}',
       '.nx-mascot[data-pose="wave"].enter .nxm-stage{animation:nxm-pop .55s cubic-bezier(.34,1.56,.64,1) both}',
+      /* sleep: the eyes held as the closed line a blink passes through, a slow
+         breath with the head settling, and Z's drifting up off the cap.
+         .awake opens the eyes and lets the Z's fade. */
+      '.nx-mascot.a-sleep .nxm-eye{scale:1.06 .08;transition:translate .22s cubic-bezier(.3,.7,.4,1),scale .3s ease}',
+      '.nx-mascot.a-sleep.awake .nxm-eye{scale:1 1}',
+      '@keyframes nxm-snooze{0%,100%{translate:0 0;rotate:0deg;scale:1 1}50%{translate:0 1.6%;rotate:-1.4deg;scale:1.012 .99}}',
+      '.nx-mascot.a-sleep .nxm-body{animation:nxm-snooze 4.6s ease-in-out infinite;transform-origin:50% 100%}',
+      '.nx-mascot.a-sleep.awake .nxm-body{animation-play-state:paused}',
+      /* the box sits off the cap's top right corner; the Z's rise out of it */
+      '.nx-mascot .nxm-zzz{position:absolute;left:74%;top:-34%;width:44%;height:44%;pointer-events:none;',
+      '  container-type:size;font:800 1em/1 "Space Grotesk",system-ui,sans-serif;color:rgba(var(--ink,255,255,255),.82);',
+      '  transition:opacity .3s ease}',
+      '.nx-mascot.a-sleep.awake .nxm-zzz{opacity:0}',
+      '.nx-mascot .nxm-z{position:absolute;left:0;bottom:0;font-size:30cqw;opacity:0;animation:nxm-z 3.6s ease-in-out infinite}',
+      '.nx-mascot .nxm-z1{animation-delay:1.2s;font-size:38cqw}',
+      '.nx-mascot .nxm-z2{animation-delay:2.4s;font-size:48cqw}',
+      '@keyframes nxm-z{0%{translate:0 0;rotate:-8deg;opacity:0}15%{opacity:.95}70%{opacity:.7}',
+      '  100%{translate:55cqw -95cqh;rotate:12deg;opacity:0}}',
+      /* lift: stands (so it turns about the feet, not the fists) and presses
+         the bar up, the bar tipping a touch as it goes */
+      '.nx-mascot .nxm-bar{position:absolute;left:-24%;top:-5.3%;width:148%;height:auto;display:block;pointer-events:none;',
+      '  filter:drop-shadow(0 3px 4px rgba(0,0,0,.35))}',
+      '.nx-mascot.a-lift .nxm-lean,.nx-mascot.a-lift .nxm-stage,.nx-mascot.a-lift .nxm-body{transform-origin:50% 100%}',
+      '.nx-mascot.a-lift .nxm-shadow{display:block;position:absolute;left:14%;right:14%;bottom:-3%;height:7%;',
+      '  border-radius:50%;background:radial-gradient(closest-side,rgba(0,0,0,.42),rgba(0,0,0,0))}',
+      '@keyframes nxm-press{0%,18%,100%{translate:0 0;scale:1 1}34%{translate:0 1.5%;scale:1.03 .96}',
+      '  52%,70%{translate:0 -4%;scale:.99 1.02}84%{translate:0 0;scale:1.01 .99}}',
+      '@keyframes nxm-tip{0%,18%,100%{rotate:0deg}52%{rotate:-2.4deg}70%{rotate:1.6deg}}',
+      '.nx-mascot.a-lift .nxm-body{animation:nxm-press 2.6s cubic-bezier(.4,0,.3,1) infinite}',
+      '.nx-mascot.a-lift .nxm-lean{animation:nxm-tip 2.6s ease-in-out infinite;transform-origin:50% 100%}',
       /* nothing moves when motion is unwanted, or while the tab is hidden */
       '.nx-mascot.paused,.nx-mascot.paused *{animation-play-state:paused!important}',
       '@media (prefers-reduced-motion:reduce){.nx-mascot,.nx-mascot *{animation:none!important;transition:none!important}',
@@ -220,6 +285,9 @@
       fn();
     }, ms);
   }
+  // A blink runs the eye from open to shut and back, so on a sleeping mascot
+  // it would flash his eyes open. Neither blinks nor glances while asleep.
+  function asleep(m) { return m.classList.contains('a-sleep') && !m.classList.contains('awake'); }
   function blinkOnce(m) {
     m.classList.remove('blinking'); void m.offsetWidth; m.classList.add('blinking');
     setTimeout(function () { m.classList.remove('blinking'); }, 170);
@@ -227,6 +295,7 @@
   function scheduleBlink(m) {
     if (!m.classList.contains('a-blink')) return;
     later(m, '__nxmBlink', 2200 + Math.random() * 3800, function () {
+      if (asleep(m)) { scheduleBlink(m); return; }
       blinkOnce(m);
       if (Math.random() < 0.22) setTimeout(function () { blinkOnce(m); }, 260);
       scheduleBlink(m);
@@ -235,6 +304,7 @@
   function scheduleLook(m) {
     if (!m.classList.contains('a-look')) return;
     later(m, '__nxmLook', 3500 + Math.random() * 4000, function () {
+      if (asleep(m)) { scheduleLook(m); return; }
       if (!m.classList.contains('following') || !lastPt) {
         var dir = Math.random() < 0.5 ? -1 : 1;
         setEyes(m, dir * 0.8, (Math.random() - 0.5) * 0.4);
@@ -262,6 +332,7 @@
     if (!lastPt || D.hidden || reduce.matches) return;
     followers.forEach(function (m) {
       if (!m.isConnected) { followers.delete(m); return; }
+      if (asleep(m)) return;
       var r = m.getBoundingClientRect();
       if (!r.width) return;
       var cx = r.left + r.width / 2, cy = r.top + r.height * 0.4;
@@ -290,10 +361,11 @@
     if (o.side === 'right') m.setAttribute('data-side', 'right'); else m.removeAttribute('data-side');
     if (o.size) m.style.setProperty('--nxm-size', typeof o.size === 'number' ? o.size + 'px' : o.size);
     while (m.firstChild) m.removeChild(m.firstChild);
-    build(m, art, pose);
-    LOOPS.forEach(function (l) { m.classList.remove('a-' + l); });
     var loops = toList(o.anim);
     if (!o.anim) loops = pose === 'hang' ? ['swing', 'blink'] : pose === 'wave' ? ['wave', 'idle', 'blink'] : ['idle', 'blink', 'look'];
+    build(m, art, pose, loops);
+    LOOPS.forEach(function (l) { m.classList.remove('a-' + l); });
+    m.classList.remove('awake');
     loops.forEach(function (l) { m.classList.add('a-' + l); });
     if (o.follow) { m.classList.add('following'); followers.add(m); } else { m.classList.remove('following'); followers.delete(m); }
     m.style.setProperty('--nxm-ex', '0px'); m.style.setProperty('--nxm-ey', '0px'); m.style.setProperty('--nxm-lean', '0deg');
@@ -354,6 +426,15 @@
     m.classList.toggle('up', !!up);
   }
 
+  // A sleeping mascot (anim 'sleep') opens his eyes while wake(m, true) holds,
+  // and nods back off on wake(m, false). Again the caller decides what wakes
+  // him — usually hovering the card he is asleep on.
+  function wake(m, on) {
+    if (!m || !m.classList.contains('a-sleep')) return;
+    m.classList.toggle('awake', !!on);
+    if (!on) { m.style.setProperty('--nxm-ex', '0px'); m.style.setProperty('--nxm-ey', '0px'); m.style.setProperty('--nxm-lean', '0deg'); }
+  }
+
   // [data-mascot] placeholders, now and later.
   function upgradeOne(n) {
     if (!n || n.__nxmDone) return;
@@ -400,6 +481,6 @@
   }
   if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', start); else start();
 
-  W.NumaxMascot = { create: create, mount: mount, pose: pose, play: play, peek: peek, upgrade: upgrade,
+  W.NumaxMascot = { create: create, mount: mount, pose: pose, play: play, peek: peek, wake: wake, upgrade: upgrade,
     poses: POSES.slice(), loops: LOOPS.slice(), oneshots: ONESHOTS.slice() };
 })();
