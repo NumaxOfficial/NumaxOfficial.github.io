@@ -2722,6 +2722,25 @@
   /* The pill indicator draws the selected chip's background, so whatever sits
      on top of it has to read against --invert-bg, not against the page. */
   .set-tabs .set-tab.on, .set-platbar button.on{ color:var(--invert-fg); }
+  /* Mascot placements outside the wizard (Furqan's Studio notes, 2026-09-17).
+     Every one is decoration: pointer-events off, hidden where the card is too
+     small to hold it beside its own content, and absent if mascot.js is. */
+  /* Accounts: leaning out from behind the Add-an-account card's right edge,
+     beside the form. The card is the container so the rule follows the card's
+     own width, not the window's. */
+  .accounts-layout > .card:first-child{ position:relative; container-type:inline-size; }
+  .accounts-layout .ac-peek{ position:absolute; right:0; top:62px; width:136px; pointer-events:none; z-index:0; }
+  @container (max-width:560px){ .accounts-layout .ac-peek{ display:none; } }
+  /* Profile: peeking up over the bottom edge of the head card, under the title. */
+  .pf-head-l{ position:relative; }
+  .pf-head-card .pf-sit{ position:absolute; left:auto; right:22px; bottom:-16px; width:66px; pointer-events:none; }
+  @media (max-width:900px){ .pf-head-card .pf-sit{ display:none; } }
+  /* Restore: arms up in the card's empty lower half; pushed down (and off
+     screen, inside the card's own scroller) as the restore steps grow. */
+  .panel[data-panel="drive"] .dr-scroll{ display:flex; flex-direction:column; }
+  .dr-cheer{ margin:auto auto 0; padding-top:18px; width:150px; pointer-events:none; }
+  .dr-cheer .nx-mascot{ width:100%; }
+  @media (max-height:720px){ .dr-cheer{ display:none; } }
 </style>
 <script>
   // Theme is a device preference and never leaves this browser, so it is read
@@ -3136,6 +3155,7 @@
       <div class="accounts-layout">
       <div class="card">
         <div class="chead"><h3>Add an account</h3></div>
+        <span class="ac-peek" data-mascot="peek" data-mascot-side="right" data-mascot-size="100%" data-mascot-follow></span>
         <div class="field-col">
           <label class="fld"><span>Nuvio email</span><input id="ac-email" type="email" autocomplete="off" placeholder="name@example.com"></label>
           <label class="fld"><span>Password</span><input id="ac-pass" type="password" autocomplete="off" placeholder="Nuvio password"></label>
@@ -3160,6 +3180,7 @@
           <span class="eyebrow">Profile</span>
           <h1>Open one profile and edit it.</h1>
           <p>Add-ons, plugins, collections, and settings — editable in place.</p>
+          <span class="pf-sit" data-mascot="ledge" data-mascot-size="100%" data-mascot-follow></span>
         </div>
         <div class="pf-head-r">
           <span class="eyebrow">Choose a profile</span>
@@ -3418,6 +3439,7 @@
       <div class="card"><div class="chead"><h3>Restore</h3></div>
         <div class="dr-scroll">
           <div id="dr-restore"><p class="empty sm">Open this tab to restore.</p></div>
+          <div class="dr-cheer"><span data-mascot="hang" data-mascot-anim="idle blink look" data-mascot-size="100%" data-mascot-follow></span></div>
         </div></div>
       </div>
     </section>
@@ -3529,11 +3551,11 @@
 <script src="./engine.js?v=37047507"></script>
 <script src="./meta.js?v=2fac004b"></script>
 <script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
-<script src="./ui-motion.js?v=2d4d14a8"></script>
+<script src="./ui-motion.js?v=68a58b1e"></script>
 <script src="./market.js?v=d723c06a"></script>
 <script src="./collections.js?v=4e74c1ec"></script>
 <script src="./wizard.js?v=cbaaef0b"></script>
-<script src="./mascot.js?v=ca081ba6"></script>
-<script src="./app.js?v=b9fde37f"></script>
+<script src="./mascot.js?v=5f1cfff1"></script>
+<script src="./app.js?v=12a8e586"></script>
 </body>
 </html>

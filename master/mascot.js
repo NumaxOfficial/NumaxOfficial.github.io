@@ -6,10 +6,11 @@
 // was an SVG re-drawing and it never looked like him (Furqan, 2026-09-17), so
 // the renders themselves are used, rigged the way a 2D animator would:
 //
-//   mascot/<pose>.webp        the render, cut out of its studio backdrop, with
-//                             the eyes painted out (the face filled in under
-//                             them from the surrounding shading)
+//   mascot/<pose>.webp        the render (from Furqan's clean-background PNGs,
+//                             not keyed off a backdrop), with the eyes painted
+//                             out (filled in from the surrounding shading)
 //   mascot/<pose>-eyes.webp   the render's own eyes, alone, on transparency
+//   mascot/wave-arm.webp      wave only: the raised arm, so it can wave alone
 //
 // Stacked, the two reproduce the render exactly. Apart, the eyes can blink
 // (squash to a line) and follow the pointer without touching the face.
@@ -30,6 +31,8 @@
 //   host.appendChild(m);
 //   NumaxMascot.play(m, 'hop');      // one-shot: hop | nod | pop | wiggle
 //   NumaxMascot.pose(m, 'wave');     // switch pose in place
+//   NumaxMascot.create({ pose: 'ledge', hide: true })  // rests below its edge
+//   NumaxMascot.peek(m, true|false)  // ...comes up / goes back down
 //
 // Poses:  wave (standing, one hand up; `stand` is the same render)
 //         ledge (peeking up over an edge: put the element's bottom ON the edge;
@@ -37,7 +40,7 @@
 //         peek (leaning out from behind an edge; side:'left'|'right' names the
 //               side the edge is on)
 //         hang (hanging from an edge: put the element's top on the edge)
-// Loops:  idle (breathing / bob / sway, per pose) | blink | wave (a hello rock)
+// Loops:  idle (breathing / bob / sway, per pose) | blink | wave (the arm waves)
 //         | swing (hang) | look (glances about when not following)
 // follow: true makes the eyes and a slight lean track the pointer.
 // size:   the rendered WIDTH, as before.
@@ -61,12 +64,21 @@
   // Per render: its size (for the aspect ratio) and each eye's box as
   // [left, top, width, height] in percent of the figure, padded so a moved or
   // squashed eye never shows the edge of its own box.
+  // `arm` (wave only): the raised arm is its own layer, mascot/wave-arm.webp,
+  // figure-sized, turning about the shoulder at [left, top] percent. The body
+  // under it keeps a shoulder stub so the joint never opens. It only swings
+  // OUTWARD far — past about +6deg the sleeve's underside parts from the torso.
+  // Rebuilt 2026-09-17 from Furqan's own clean-background renders (the earlier
+  // cut-outs had been keyed off a studio backdrop and some of it showed).
   var ART = {
-    wave:  { w: 329, h: 440, eyes: [[23.72, 33.93, 9.9, 11.61], [63.31, 40.69, 10.07, 11.73]] },
-    ledge: { w: 406, h: 440, eyes: [[24.42, 48.59, 9.87, 15.26], [65.71, 54.89, 10.05, 15.42]] },
-    hang:  { w: 325, h: 440, eyes: [[23.5, 32.57, 10.02, 11.98], [63.93, 37.69, 10.38, 12.11]] },
-    peek:  { w: 280, h: 440, eyes: [[16.95, 30.22, 12.57, 10.68], [56.38, 41.99, 12.76, 10.68]] },
+    wave:  { w: 326, h: 440, eyes: [[17.82, 29.89, 22.14, 19.38], [56.65, 36.7, 22.82, 19.21]], arm: [24.45, 69.13] },
+    ledge: { w: 396, h: 440, eyes: [[18.68, 40.51, 23.03, 25.53], [59.26, 46.29, 24.02, 25.74]] },
+    hang:  { w: 324, h: 440, eyes: [[16.68, 28.29, 23.27, 20.51], [56.95, 33.07, 23.64, 20.87]] },
+    peek:  { w: 280, h: 440, eyes: [[7.17, 27.58, 30.55, 17.73], [46.67, 39.24, 30.55, 17.56]] },
   };
+  // Bumped whenever the webp files change: the images are replaced under the
+  // same names, and a cached old picture under new eye boxes looks broken.
+  var ART_V = '?v=3';
 
   var reduce = W.matchMedia ? W.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
 
@@ -79,7 +91,8 @@
   function pct(v) { return (+v.toFixed(3)) + '%'; }
 
   function build(m, art, name) {
-    var stage = h('span', 'nxm-stage', m);     // one-shots
+    var hider = h('span', 'nxm-hider', m);      // hiding: resting down / peeking up
+    var stage = h('span', 'nxm-stage', hider);  // one-shots
     h('span', 'nxm-shadow', stage);             // contact shadow (standing only)
     var body = h('span', 'nxm-body', stage);    // loops
     var lean = h('span', 'nxm-lean', body);     // pointer lean
@@ -87,9 +100,15 @@
     img.alt = ''; img.draggable = false; img.decoding = 'async';
     // Not loading="lazy": a lazy image never starts while the document is
     // hidden, the same measured trap wzLogo and mkLogo document.
-    img.src = BASE + name + '.webp';
+    img.src = BASE + name + '.webp' + ART_V;
     img.width = art.w; img.height = art.h;
-    var url = 'url("' + BASE + name + '-eyes.webp")';
+    if (art.arm) {
+      var arm = h('img', 'nxm-arm', lean);
+      arm.alt = ''; arm.draggable = false; arm.decoding = 'async';
+      arm.src = BASE + name + '-arm.webp' + ART_V;
+      arm.style.transformOrigin = pct(art.arm[0]) + ' ' + pct(art.arm[1]);
+    }
+    var url = 'url("' + BASE + name + '-eyes.webp' + ART_V + '")';
     art.eyes.forEach(function (e) {
       var eye = h('span', 'nxm-eye', lean);
       var L = e[0], T = e[1], w = e[2], hh = e[3];
@@ -110,7 +129,15 @@
     st.textContent = [
       '.nx-mascot{display:inline-block;position:relative;line-height:0;vertical-align:bottom;width:var(--nxm-size,120px);flex:none;',
       '  -webkit-user-select:none;user-select:none;--nxm-ex:0px;--nxm-ey:0px;--nxm-lean:0deg}',
-      '.nx-mascot .nxm-stage,.nx-mascot .nxm-body,.nx-mascot .nxm-lean{display:block;position:relative}',
+      '.nx-mascot .nxm-hider,.nx-mascot .nxm-stage,.nx-mascot .nxm-body,.nx-mascot .nxm-lean{display:block;position:relative}',
+      /* the waving arm: its own layer over the body, turning at the shoulder */
+      '.nx-mascot .nxm-arm{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;',
+      '  filter:drop-shadow(0 6px 10px rgba(0,0,0,.28))}',
+      /* hiding: resting below its edge with only the cap showing; .up brings it
+         up (springy), and it sinks back without the overshoot */
+      '.nx-mascot .nxm-hider{transition:translate .6s cubic-bezier(.3,1.3,.5,1)}',
+      '.nx-mascot.hiding .nxm-hider{translate:0 var(--nxm-hide,80%);transition-duration:.38s;transition-timing-function:cubic-bezier(.5,0,.7,.4)}',
+      '.nx-mascot.hiding.up .nxm-hider{translate:0 0;transition-duration:.6s;transition-timing-function:cubic-bezier(.3,1.3,.5,1)}',
       '.nx-mascot .nxm-img{display:block;width:100%;height:auto;pointer-events:none;',
       '  filter:drop-shadow(0 1px 0 rgba(255,255,255,.10)) drop-shadow(0 10px 18px rgba(0,0,0,.35))}',
       ':root[data-theme="light"] .nx-mascot .nxm-img{filter:drop-shadow(0 8px 14px rgba(18,26,43,.18))}',
@@ -137,13 +164,13 @@
       '@keyframes nxm-breathe{0%,100%{scale:1 1}50%{scale:.992 1.014}}',
       '@keyframes nxm-bob{0%,100%{translate:0 0}50%{translate:0 2.5%}}',
       '@keyframes nxm-sway{0%,100%{rotate:0deg;translate:0 0}50%{rotate:1.6deg;translate:-2% 0}}',
-      '@keyframes nxm-rock{0%,100%{rotate:0deg}25%{rotate:-2.6deg}75%{rotate:2.6deg}}',
+      /* a wave is the arm, not the body: two quick swings out, then a rest */
+      '@keyframes nxm-arm{0%,70%,100%{rotate:0deg}12%{rotate:-17deg}24%{rotate:4deg}37%{rotate:-15deg}50%{rotate:3deg}60%{rotate:-4deg}}',
       '@keyframes nxm-swing{0%,100%{rotate:-3deg}50%{rotate:3deg}}',
       '.nx-mascot.a-idle .nxm-body{animation:nxm-breathe 3.6s ease-in-out infinite;transform-origin:50% 100%}',
       '.nx-mascot[data-pose="ledge"].a-idle .nxm-body{animation:nxm-bob 3.8s ease-in-out infinite}',
       '.nx-mascot[data-pose="peek"].a-idle .nxm-body{animation:nxm-sway 4.4s ease-in-out infinite;transform-origin:0 100%}',
-      '.nx-mascot[data-pose="wave"].a-wave .nxm-body{animation:nxm-rock 2.4s ease-in-out infinite;transform-origin:50% 100%}',
-      '.nx-mascot[data-pose="wave"].a-wave.a-idle .nxm-lean{animation:nxm-breathe 3.6s ease-in-out infinite}',
+      '.nx-mascot[data-pose="wave"].a-wave .nxm-arm{animation:nxm-arm 2.8s ease-in-out infinite}',
       '.nx-mascot.a-swing .nxm-body{animation:nxm-swing 2.8s ease-in-out infinite;transform-origin:50% 0}',
       /* one-shots: anticipation, action, overshoot, settle */
       '@keyframes nxm-hop{0%{scale:1 1;translate:0 0}14%{scale:1.07 .9;translate:0 0}38%{scale:.94 1.08;translate:0 -14%}',
@@ -258,6 +285,8 @@
     var pose = ART[want] ? want : 'wave';
     var art = ART[pose];
     m.setAttribute('data-pose', pose);
+    m.classList.toggle('hiding', !!o.hide);
+    if (!o.hide) m.classList.remove('up');
     if (o.side === 'right') m.setAttribute('data-side', 'right'); else m.removeAttribute('data-side');
     if (o.size) m.style.setProperty('--nxm-size', typeof o.size === 'number' ? o.size + 'px' : o.size);
     while (m.firstChild) m.removeChild(m.firstChild);
@@ -268,7 +297,7 @@
     loops.forEach(function (l) { m.classList.add('a-' + l); });
     if (o.follow) { m.classList.add('following'); followers.add(m); } else { m.classList.remove('following'); followers.delete(m); }
     m.style.setProperty('--nxm-ex', '0px'); m.style.setProperty('--nxm-ey', '0px'); m.style.setProperty('--nxm-lean', '0deg');
-    m.__nxm = { pose: o.pose, side: o.side, size: o.size, anim: o.anim, follow: !!o.follow, label: o.label };
+    m.__nxm = { pose: o.pose, side: o.side, size: o.size, anim: o.anim, follow: !!o.follow, label: o.label, hide: !!o.hide };
     scheduleBlink(m);
     scheduleLook(m);
   }
@@ -281,7 +310,8 @@
     if (o.label) { m.setAttribute('role', 'img'); m.setAttribute('aria-label', o.label); }
     else m.setAttribute('aria-hidden', 'true');
     apply(m, o);
-    if (o.enter !== false) {
+    // A hiding mascot is already where it belongs; rising in would give it away.
+    if (o.enter !== false && !o.hide) {
       m.classList.add('enter');
       setTimeout(function () { m.classList.remove('enter'); }, 900);
     }
@@ -316,6 +346,14 @@
     m.__nxmT = setTimeout(function () { m.classList.remove(c); m.__nxmBusy = false; }, 850);
   }
 
+  // A hiding mascot (hide:true) rests below its edge; peek(m, true) brings it
+  // up and it stays up until peek(m, false). The caller decides what "hover"
+  // means — usually the card around it.
+  function peek(m, up) {
+    if (!m || !m.classList.contains('hiding')) return;
+    m.classList.toggle('up', !!up);
+  }
+
   // [data-mascot] placeholders, now and later.
   function upgradeOne(n) {
     if (!n || n.__nxmDone) return;
@@ -328,11 +366,13 @@
       side: n.getAttribute('data-mascot-side'),
       follow: n.hasAttribute('data-mascot-follow'),
       label: n.getAttribute('data-mascot-label'),
+      hide: n.hasAttribute('data-mascot-hide'),
     };
     n.classList.add('nx-mascot');
     if (o.label) { n.setAttribute('role', 'img'); n.setAttribute('aria-label', o.label); }
     else n.setAttribute('aria-hidden', 'true');
     apply(n, o);
+    if (o.hide) return;
     n.classList.add('enter');
     setTimeout(function () { n.classList.remove('enter'); }, 900);
   }
@@ -360,6 +400,6 @@
   }
   if (D.readyState === 'loading') D.addEventListener('DOMContentLoaded', start); else start();
 
-  W.NumaxMascot = { create: create, mount: mount, pose: pose, play: play, upgrade: upgrade,
+  W.NumaxMascot = { create: create, mount: mount, pose: pose, play: play, peek: peek, upgrade: upgrade,
     poses: POSES.slice(), loops: LOOPS.slice(), oneshots: ONESHOTS.slice() };
 })();

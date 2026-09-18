@@ -161,7 +161,10 @@
   // the accessibility scaffolding around that, without touching how the
   // dialog resolves. Escape/Enter handling stays in app.js.
   // ===============================================================
-  var modalSeen = new WeakMap(), modalReturn = null, trapRoot = null;
+  // Dialogs can stack (a confirm asked from inside a browse dialog), so the
+  // trap is a stack too: closing the top one hands the trap back to the one
+  // beneath it, and each dialog remembers where ITS focus came from.
+  var modalSeen = new WeakMap(), trapRoot = null, trapStack = [];
   function focusables(root) {
     return [].slice.call(root.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -192,7 +195,9 @@
         card.setAttribute('aria-modal', 'true');
         var msg = card.querySelector('.modal-msg');
         if (msg) { if (!msg.id) msg.id = 'mo-dlg-msg-' + i; card.setAttribute('aria-labelledby', msg.id); }
-        modalReturn = D.activeElement;
+        r.__moReturn = D.activeElement;
+        trapStack = trapStack.filter(function (c) { return c !== card; });
+        trapStack.push(card);
         trapRoot = card; D.addEventListener('keydown', onTrapKey, true);
         // app.js focuses the text input itself when the dialog has one;
         // only take focus when it does not, so the two never fight.
@@ -217,9 +222,11 @@
           r.style.display = ''; r.classList.add('mo-closing');
           r.__moCloseT = setTimeout(makeCloser(r), 130);
         }
-        if (trapRoot && r.contains(trapRoot)) { D.removeEventListener('keydown', onTrapKey, true); trapRoot = null; }
-        if (modalReturn && modalReturn.focus) { try { modalReturn.focus(); } catch (e) {} }
-        modalReturn = null;
+        trapStack = trapStack.filter(function (c) { return c !== card && c.isConnected; });
+        trapRoot = trapStack.length ? trapStack[trapStack.length - 1] : null;
+        if (!trapRoot) D.removeEventListener('keydown', onTrapKey, true);
+        var back = r.__moReturn; r.__moReturn = null;
+        if (back && back.isConnected && back.focus) { try { back.focus({ preventScroll: true }); } catch (e) {} }
       }
     }
   }

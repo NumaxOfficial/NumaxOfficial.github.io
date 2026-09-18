@@ -351,6 +351,7 @@
         list.appendChild(row);
       });
       document.body.appendChild(list);
+      raiseLayer(list);
       // Measured, then clamped into the viewport in both axes — a list opened
       // from a control near the bottom flips above rather than running off.
       const r = btn.getBoundingClientRect();
@@ -454,6 +455,14 @@
     w.appendChild(el('h4', '', title)); w.appendChild(el('p', '', body)); return w;
   }
 
+  // Stacking: whatever opened LAST is on top. The confirm/prompt dialog used a
+  // fixed z-index (100) and the marketplace-style dialogs another (120), so a
+  // confirm or "Name the new profile" asked from inside a browse dialog opened
+  // underneath it (Furqan, 2026-09-17). Every floating surface — both dialog
+  // kinds and the custom select's list — takes the next number up as it opens.
+  let layerZ = 200;
+  const raiseLayer = n => { if (n) n.style.zIndex = String(++layerZ); return n; };
+
   // in-app modal — replaces browser confirm/prompt (no native "top" dialogs)
   function uiModal(opts) {
     return new Promise(resolve => {
@@ -475,6 +484,7 @@
       ok.textContent = opts.okLabel || 'Confirm'; ok.className = 'btn ' + (opts.danger ? 'danger-btn' : 'btn-primary');
       cancel.style.display = opts.noCancel ? 'none' : '';
       cancel.textContent = opts.cancelLabel || 'Cancel';
+      raiseLayer(root);
       root.style.display = '';
       const done = v => { root.style.display = 'none'; ok.onclick = cancel.onclick = $('modal-bg').onclick = null; document.removeEventListener('keydown', onKey); resolve(v); };
       ok.onclick = () => done(opts.input ? inp.value : true);
@@ -2141,6 +2151,7 @@
       nameBox.oninput = () => { nameTouched = !!nameBox.value.trim(); };
       suggest();
     }
+    raiseLayer(root);
     root.style.display = '';
     return new Promise(resolve => {
       const done = async (proceed) => {
@@ -3564,7 +3575,15 @@
   // so every existing caller works unchanged; place() is simply a no-op now,
   // because a centred dialog has nowhere to be placed.
   let mkPop = null;
-  function mkPopKey(e) { if (e.key === 'Escape') { e.stopPropagation(); closeMkPop(); } }
+  // Escape closes the TOP thing only: a confirm or an open dropdown sitting on
+  // this dialog handles its own Escape, and this capture-phase listener would
+  // otherwise get there first and close the dialog underneath instead.
+  function mkPopKey(e) {
+    if (e.key !== 'Escape' || openSelect) return;
+    const conf = $('modal-root');
+    if (conf && conf.style.display !== 'none' && !conf.classList.contains('mo-closing')) return;
+    e.stopPropagation(); closeMkPop();
+  }
   function closeMkPop() {
     if (!mkPop) return;
     const root = mkPop.root, after = mkPop.onClose; mkPop = null;
@@ -3581,7 +3600,7 @@
   }
   function openMkPop(anchor, title, sub) {
     closeMkPop();
-    const root = el('div', 'modal-root mk-dlg-root');
+    const root = raiseLayer(el('div', 'modal-root mk-dlg-root'));
     const bg = el('div', 'modal-bg');
     const box = el('div', 'modal-card mk-dlg');
     const h = el('div', 'mk-dlg-h modal-msg');
@@ -5571,9 +5590,21 @@
         card.appendChild(tx);
         const art = el('div', 'wz-door-art');
         if (window.NumaxMascot) {
-          const m = window.NumaxMascot.create({ pose: e.mascot, size: '100%', follow: true });
+          // The new-account door's mascot is hiding below the card's floor and
+          // only comes up while the card is hovered or focused (Furqan,
+          // 2026-09-17). The welcome-back one waves its arm the whole time.
+          const hide = e.mascot === 'ledge';
+          const m = window.NumaxMascot.create({ pose: e.mascot, size: '100%', follow: true, hide });
           art.appendChild(m);
-          card.addEventListener('mouseenter', () => window.NumaxMascot.play(m, 'hop'));
+          if (hide) {
+            const up = on => window.NumaxMascot.peek(m, on);
+            card.addEventListener('mouseenter', () => up(true));
+            card.addEventListener('mouseleave', () => up(card.matches(':focus-visible')));
+            card.addEventListener('focus', () => up(true));
+            card.addEventListener('blur', () => up(card.matches(':hover')));
+          } else {
+            card.addEventListener('mouseenter', () => window.NumaxMascot.play(m, 'hop'));
+          }
         }
         card.appendChild(art);
         box.appendChild(card);
