@@ -56,7 +56,17 @@
   const KEYS = [
     {
       id: 'tmdb', name: 'TMDB', provider: 'tmdb', field: 'api_key',
-      tag: 'Required', required: true,
+      // Nuvio ships its own TMDB key now (verified against release source
+      // 2026-09-19): mobile from 0.4.19, desktop from 0.1.24, and the TV app has
+      // always used a built-in one. A personal key still overrides it on mobile
+      // 0.4.22+ / desktop 0.1.24+. So TMDB is optional UNLESS the account still
+      // runs an older mobile or desktop build — app.js decides that from the
+      // account's own device list (list_my_sessions), see wzKeyRequired.
+      tag: 'Optional', required: false, requiredWhenOld: true,
+      // What the app reports as its version (desktop reports the mobile
+      // marketing version: 0.1.24-alpha says "0.4.22", 0.1.23 says "0.4.14"),
+      // so one floor covers both.
+      builtInFrom: { 'Nuvio Mobile': '0.4.19', 'Nuvio Desktop': '0.4.19' },
       logo: 'https://www.themoviedb.org/assets/apple-touch-icon-57ed4b3b0450fd5e9a0c20f34e814b82adaa1085c79bdde2f00ca8787b63d2c4.png', mono: 'T',
       blurb: 'Better artwork, cast, episode titles and descriptions on every title.',
       shape: /^[A-Za-z0-9]{32}$/, verify: 'tmdb',

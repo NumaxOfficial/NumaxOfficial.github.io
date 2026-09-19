@@ -919,11 +919,37 @@
   });
   // whether an account has an active Nuvio Supporter / Supporter Plus membership —
   // gates the supporter-only theme colors the same way Nuvio's own client does.
+  //
+  // Nuvio's apps (TV, mobile and desktop, checked 2026-09-19) no longer unlock
+  // supporter cosmetics on "is a supporter" alone: they ask get_my_member_access,
+  // which answers {tier, entitlements[]}, and unlock each theme only when its own
+  // entitlement (GOLD_THEME, JADE_THEME, ...) is in that list. That is also where
+  // grants and lifetime memberships land. The overview stays as the fallback —
+  // it is what Nuvio's own website still uses — so an account whose access read
+  // fails is judged exactly as the website judges it.
   async function getMembership(id) {
     if (id in membershipCache) return membershipCache[id];
-    try { membershipCache[id] = await A.client(store, id).getMembership(); }
-    catch (e) { membershipCache[id] = null; }
-    return membershipCache[id];
+    const c = A.client(store, id);
+    let m = null;
+    try { m = await c.getMembership(); } catch (e) { m = null; }
+    try {
+      const rows = await c.rpc('get_my_member_access', {});
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      const tier = row && /^SUPPORTER(_PLUS)?$/.test(String(row.tier || '')) ? row.tier : null;
+      const ents = tier && Array.isArray(row.entitlements) ? row.entitlements.map(String) : [];
+      m = Object.assign({ status: tier ? 'active' : 'inactive' }, m || {}, { isSupporter: !!tier || !!(m && m.isSupporter), tier: tier || (m && m.tier) || null, entitlements: tier ? ents : null });
+    } catch (e) { /* keep the overview's answer */ }
+    membershipCache[id] = m;
+    return m;
+  }
+  // Whether this membership unlocks one supporter-only option. An option naming
+  // its entitlement is judged by the entitlement list when we have one; without
+  // that list (the access read failed) the overview's yes/no decides, as before.
+  function memberUnlocks(mem, o) {
+    if (!o || !o.supporterOnly) return true;
+    if (!mem) return false;
+    if (Array.isArray(mem.entitlements) && o.entitlement) return mem.entitlements.includes(o.entitlement);
+    return !!mem.isSupporter;
   }
   function sliceProfile(backup, idx) {
     const pick = a => Array.isArray(a) ? a.filter(r => r.profile_id === idx) : [];
@@ -1078,7 +1104,11 @@
     if (isPayload(feat)) { let o = {}; try { o = blob.features[feat] ? (typeof blob.features[feat] === 'string' ? JSON.parse(blob.features[feat] || '{}') : blob.features[feat]) : {}; } catch {} o[key] = val; blob.features[feat] = JSON.stringify(o); return; }
     if (!blob.features[feat] || typeof blob.features[feat] !== 'object') blob.features[feat] = {};
     const prev = blob.features[feat][key];
-    const t = (prev && prev.type) || ({ boolean: 'boolean', int: 'int', number: 'int', string: 'string' }[type] || 'string');
+    // Nuvio reads a leaf only when its type label is exactly the one it expects
+    // (decodeSyncFloat checks type === "float", and so on), so a new leaf has to
+    // carry the schema's own type. Mapping float and string_set to "string" here
+    // made every first-time slider or checklist edit land and then be ignored.
+    const t = (prev && prev.type) || ({ boolean: 'boolean', int: 'int', number: 'int', long: 'long', float: 'float', double: 'double', string: 'string', string_set: 'string_set' }[type] || 'string');
     blob.features[feat][key] = { type: t, value: val };
   }
 
@@ -1981,7 +2011,23 @@
     document.querySelectorAll('#set-body .set-group').forEach(g => { const any = [...g.querySelectorAll('.set-field')].some(r => r.style.display !== 'none'); g.style.display = any ? '' : 'none'; });
   }
   function curVal(f) { const b = pfEdit.settings[pfPlat]; return blobGet(b, f.feature, f.key, f.defaultValue); }
-  function setVal(f, v) { blobSet(pfEdit.settings[pfPlat], f.feature, f.key, v, f.type); dirty('settings-' + pfPlat); applyVisibility(); }
+  function setVal(f, v) { blobSet(pfEdit.settings[pfPlat], f.feature, f.key, v, f.type); alsoSet(f, v); dirty('settings-' + pfPlat); applyVisibility(); }
+  // Some settings are written in pairs by Nuvio's own clients, and the schema says
+  // which (onChangeAlso): Home Layout also marks has_chosen_layout, poster width
+  // also sets height (x1.5), and background_mode also sets the legacy
+  // cinematicBackground that older app builds still read. Setting only the first
+  // half leaves the profile in a state Nuvio itself never produces.
+  function alsoSet(f, v) {
+    (Array.isArray(f.onChangeAlso) ? f.onChangeAlso : []).forEach(x => {
+      if (!x || !x.key) return;
+      let nv;
+      if ('value' in x) nv = x.value;
+      else if (x.map) { if (!(String(v) in x.map)) return; nv = x.map[String(v)]; }
+      else if (x.scale) nv = Math.round(Number(v || 0) * x.scale);
+      else return;
+      blobSet(pfEdit.settings[pfPlat], x.feature || f.feature, x.key, nv, x.type);
+    });
+  }
   function applyVisibility() {
     document.querySelectorAll('#set-body .set-field').forEach(row => {
       let show = true; const vw = row._vw;
@@ -2005,7 +2051,7 @@
       return w;
     }
     if (ctl === 'toggle') { const w = el('div', 'sf-toggle-wrap'); const st = el('span', 'st', v ? 'On' : 'Off'); const tg = el('button', 'tog' + (v ? ' on' : '')); tg.onclick = () => { const nv = !tg.classList.contains('on'); tg.classList.toggle('on', nv); st.textContent = nv ? 'On' : 'Off'; setVal(f, nv); }; w.appendChild(st); w.appendChild(tg); return w; }
-    if (ctl === 'swatches') { const w = el('div', 'swatches'); const isSupporter = !!(pfMembership && pfMembership.isSupporter); (f.options || []).forEach(o => { const locked = !!o.supporterOnly && !isSupporter; const b = el('button', 'swatch' + (String(v) === String(o.value) ? ' on' : '') + (locked ? ' locked' : '')); b.type = 'button'; if (locked) { b.disabled = true; b.title = 'Requires an active Nuvio Supporter membership on this account.'; } if (o.color) { const d = el('span', 'dot'); d.style.background = o.color; b.appendChild(d); } b.appendChild(el('span', '', o.label || o.value)); if (o.supporterOnly) b.appendChild(el('span', 'sup', 'Supporter')); b.onclick = () => { if (locked) return; setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
+    if (ctl === 'swatches') { const w = el('div', 'swatches'); (f.options || []).forEach(o => { const locked = !memberUnlocks(pfMembership, o); const b = el('button', 'swatch' + (String(v) === String(o.value) ? ' on' : '') + (locked ? ' locked' : '')); b.type = 'button'; if (locked) { b.disabled = true; b.title = 'Requires an active Nuvio Supporter membership on this account.'; } if (o.color) { const d = el('span', 'dot'); d.style.background = o.color; b.appendChild(d); } b.appendChild(el('span', '', o.label || o.value)); if (o.supporterOnly) b.appendChild(el('span', 'sup', 'Supporter')); b.onclick = () => { if (locked) return; setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
     if (ctl === 'segmented') { const w = el('div', 'seg' + ((f.options || []).some(o => o.desc) ? ' cards' : '')); (f.options || []).forEach(o => { const b = el('button', String(v) === String(o.value) ? 'on' : ''); b.appendChild(el('span', '', o.label || o.value)); if (o.desc) b.appendChild(el('span', 'osub', o.desc)); b.onclick = () => { setVal(f, o.value); [...w.children].forEach(x => x.classList.remove('on')); b.classList.add('on'); }; w.appendChild(b); }); return w; }
     if (ctl === 'select' || ctl === 'language') { const s = el('select', 'sel'); (f.options || []).forEach(o => { const op = document.createElement('option'); op.value = o.value; op.textContent = o.label || o.value; if (String(v) === String(o.value)) op.selected = true; s.appendChild(op); }); s.onchange = () => setVal(f, s.value); return s; }
     if (ctl === 'slider') { const w = el('div', 'sf-range-wrap'); const r = el('input'); r.type = 'range'; if (f.min != null) r.min = f.min; if (f.max != null) r.max = f.max; if (f.step != null) r.step = f.step; r.value = v == null ? (f.min || 0) : v; const o = el('output', '', String(r.value) + (f.unit ? ' ' + f.unit : '')); r.oninput = () => { o.textContent = r.value + (f.unit ? ' ' + f.unit : ''); }; r.onchange = () => setVal(f, Number(r.value)); w.appendChild(r); w.appendChild(o); return w; }
@@ -2017,7 +2063,15 @@
     const i = el('input'); i.type = 'text'; i.value = (v == null ? '' : v); i.onchange = () => setVal(f, i.value); return i;
   }
   function normHex(v) { if (typeof v !== 'string') return '#000000'; let s = v.replace('#', ''); if (s.length === 8) s = s.slice(0, 6); if (/^[0-9a-fA-F]{6}$/.test(s)) return '#' + s; if (/^[0-9a-fA-F]{3}$/.test(s)) return '#' + s.split('').map(x => x + x).join(''); return '#000000'; }
-  function multiOptions(f) { const src = /plugin/i.test(f.title) ? pfEdit.plugins : pfEdit.addons; return (src || []).map(x => ({ value: x.url, label: x.name || host(x.url) })); }
+  // A checklist either names its own choices (Automatic Skipping: intro, recap…) or
+  // is filled from the profile's add-ons/plugins (runtimeOptions). The fixed kind
+  // used to fall through to the add-on list too, so Automatic Skipping offered
+  // the profile's add-ons as things to skip.
+  function multiOptions(f) {
+    if (!f.runtimeOptions && Array.isArray(f.options) && f.options.length) return f.options.map(o => ({ value: o.value, label: o.label || o.value }));
+    const src = (f.runtimeOptions === 'plugins' || (!f.runtimeOptions && /plugin/i.test(f.title))) ? pfEdit.plugins : pfEdit.addons;
+    return (src || []).map(x => ({ value: x.url, label: x.name || host(x.url) }));
+  }
 
   // ---- profile saves ----
   // Two sticky buttons replace the old per-tab save buttons: the red one commits every
@@ -6346,7 +6400,7 @@
   function wzStepDirty(step) {
     if (!WZ) return false;
     if (step === 'keys') {
-      return WZ.KEYS.some(k => {
+      return wzTmdbBuiltinPending() || WZ.KEYS.some(k => {
         const i = $('wz-key-' + k.id); const v = i ? i.value.trim() : '';
         return !!v && wzSavedKeys.get(k.id) !== v;
       });
@@ -6366,6 +6420,7 @@
   function wzCanAdvance(step) {
     if (!wzTarget()) return false;
     if (step === 'keys') {
+      if (!wzKeyRequired(wzKeyDef('tmdb'))) return true;
       const i = $('wz-key-tmdb');
       return wzSavedKeys.has('tmdb') || !!(i && i.value.trim()) || wzHasCred('tmdb');
     }
@@ -6375,7 +6430,7 @@
   // What is missing, in the words of the thing that is missing. Only shown when
   // Next is not lit, so it never sits next to a button that already works.
   const WZ_BLOCKED = {
-    keys: 'TMDB is required — paste its key to carry on.',
+    keys: 'TMDB is required on this account — paste its key to carry on.',
     streams: 'Pick how you want your streams set up.',
   };
   // ---- what this profile ALREADY has -------------------------------------
@@ -6388,6 +6443,91 @@
   let wzCreds = { key: '', set: new Set() };
   const wzCredKey = () => { const t = wzTarget(); return t ? t.aid + ':' + t.idx : ''; };
   const wzHasCred = p => wzCreds.key === wzCredKey() && wzCreds.set.has(p);
+
+  // ---- which Nuvio apps this account actually runs --------------------------
+  // Every Nuvio app registers itself with the account every 15 minutes
+  // (register_current_device: client name + version), and list_my_sessions reads
+  // that back — it is what Nuvio's own website shows under signed-in devices.
+  // The wizard uses it to answer one question: does any mobile/desktop app on
+  // this account predate Nuvio's built-in TMDB key? A device idle for more than
+  // WZ_DEVICE_STALE_DAYS is ignored, so a phone in a drawer cannot make TMDB
+  // compulsory. Per account, cached for the run.
+  const WZ_DEVICE_STALE_DAYS = 60;
+  let wzDev = { aid: '', list: null, err: null, busy: null };
+  function wzLoadDevices() {
+    const t = wzTarget(); if (!t) return Promise.resolve(null);
+    if (wzDev.aid === t.aid && (wzDev.list || wzDev.err)) return Promise.resolve(wzDev.list);
+    if (wzDev.aid === t.aid && wzDev.busy) return wzDev.busy;
+    const aid = t.aid;
+    wzDev = { aid, list: null, err: null, busy: null };
+    wzDev.busy = A.client(store, aid).rpc('list_my_sessions', {}).then(rows => {
+      if (wzDev.aid !== aid) return null;
+      wzDev.list = (Array.isArray(rows) ? rows : []).map(r => ({
+        client: String((r && r.client_name) || ''), version: String((r && r.client_version) || '').trim(),
+        device: String((r && r.device_name) || '').trim(), platform: String((r && r.platform) || ''),
+        seen: Date.parse((r && (r.last_active_at || r.created_at)) || '') || 0,
+      }));
+      wzDev.busy = null; wzPaintKeyNeed(); wzPaintNext();
+      return wzDev.list;
+    }).catch(e => {
+      if (wzDev.aid !== aid) return null;
+      wzDev.err = e; wzDev.busy = null; wzPaintKeyNeed(); wzPaintNext();
+      return null;
+    });
+    wzPaintKeyNeed();
+    return wzDev.busy;
+  }
+  // "0.4.12", "0.4.24-beta", "v1.2" -> [0,4,12]; anything unparseable -> null.
+  function wzVer(s) { const m = String(s || '').match(/(\d+)\.(\d+)(?:\.(\d+))?/); return m ? [+m[1], +m[2], +(m[3] || 0)] : null; }
+  function wzVerLess(a, b) { for (let i = 0; i < 3; i++) { if (a[i] !== b[i]) return a[i] < b[i]; } return false; }
+  // The apps on this account too old for a key's built-in replacement.
+  function wzOldApps(k) {
+    const t = wzTarget();
+    if (!k || !k.builtInFrom || !t || wzDev.aid !== t.aid || !Array.isArray(wzDev.list)) return [];
+    const cutoff = Date.now() - WZ_DEVICE_STALE_DAYS * 864e5;
+    return wzDev.list.filter(d => {
+      const floor = k.builtInFrom[d.client]; if (!floor) return false;
+      if (d.seen && d.seen < cutoff) return false;
+      const v = wzVer(d.version);
+      return !!v && wzVerLess(v, wzVer(floor));
+    });
+  }
+  // Required outright, or required because this account still runs an app
+  // that predates the built-in key. Unknown devices (the read failed, or has
+  // not answered yet) do NOT make it required — the note under the box says
+  // which versions need one instead.
+  function wzKeyRequired(k) { return !!k && (!!k.required || (!!k.requiredWhenOld && wzOldApps(k).length > 0)); }
+  const wzKeyDef = id => ((WZ && WZ.KEYS) || []).find(k => k.id === id);
+  // TMDB left empty on a profile whose apps have the built-in key: the switch
+  // that turns TMDB enrichment on still has to be written, once, if the tick
+  // under the box asks for it.
+  function wzTmdbBuiltinPending() {
+    const k = wzKeyDef('tmdb'), cb = $('wz-tmdb-builtin'), i = $('wz-key-tmdb');
+    if (!k || !cb || !cb.checked || cb.closest('[hidden]')) return false;
+    if (wzKeyRequired(k) || (i && i.value.trim()) || wzSavedKeys.has('tmdb') || wzHasCred('tmdb')) return false;
+    return wz.tmdbBuiltin !== wzCredKey();
+  }
+  function wzPaintKeyNeed() {
+    const k = wzKeyDef('tmdb'); if (!k) return;
+    const w = document.querySelector('[data-wzkey="tmdb"]'); if (!w) return;
+    const note = w.querySelector('.wz-key-need'), opt = w.querySelector('.wz-key-builtin');
+    const tag = w.querySelector('.wz-key-h .wz-tag:not(.wz-key-have)');
+    const have = wzHasCred('tmdb'), req = wzKeyRequired(k), old = wzOldApps(k);
+    if (tag) { tag.textContent = req ? 'Required' : 'Optional'; tag.classList.toggle('req', req); tag.classList.toggle('plain', !req); tag.style.display = (have && req) ? 'none' : ''; }
+    const inp = $('wz-key-tmdb'); if (inp) { if (req) inp.setAttribute('aria-required', 'true'); else inp.removeAttribute('aria-required'); }
+    if (note) {
+      let msg;
+      if (have) msg = 'This profile already has its own TMDB key.';
+      else if (req) msg = 'Needed here: ' + old.map(d => (d.device || d.client) + ' runs ' + d.client + ' ' + d.version).join(', ') +
+        '. Nuvio only has TMDB built in from 0.4.19 on phones and tablets, and 0.1.24 on desktop — update ' + (old.length === 1 ? 'that app' : 'those apps') + ', or paste a key.';
+      else if (wzDev.busy) msg = 'Checking which Nuvio apps this account uses…';
+      else if (wzDev.err || !Array.isArray(wzDev.list)) msg = 'Could not see which Nuvio apps this account uses. Nuvio has TMDB built in from mobile 0.4.19, desktop 0.1.24 and on every TV version — older phone or desktop apps need a key.';
+      else msg = 'Nuvio has TMDB built in on every app this account uses. Your own key is only needed if you want it used instead (mobile 0.4.22+, desktop 0.1.24+; the TV app always uses the built-in one).';
+      note.textContent = msg;
+      note.classList.toggle('warn', req);
+    }
+    if (opt) opt.hidden = have || req || !!(inp && inp.value.trim()) || wzSavedKeys.has('tmdb');
+  }
   function wzPaintNext() {
     const back = $('wz-back');
     if (back) back.style.display = wzCanGoBack() ? '' : 'none';
@@ -6838,7 +6978,7 @@
       // at a glance which site this row is asking you to go to.
       h.appendChild(wzLogo(k, 'sm'));
       h.appendChild(el('span', 'wz-key-n', k.name));
-      if (k.tag) h.appendChild(wzTag(k.tag, k.required ? 'req' : (/optional/i.test(k.tag) ? 'plain' : '')));
+      if (k.tag) h.appendChild(wzTag(k.tag, wzKeyRequired(k) ? 'req' : (/optional/i.test(k.tag) ? 'plain' : '')));
       h.appendChild(el('span', 'wz-pick-sp'));
       const get = el('button', 'btn btn-ghost btn-xs', 'Get one · ' + k.getLabel);
       get.onclick = () => wzOpen(k.getUrl);
@@ -6863,11 +7003,24 @@
       row.appendChild(inp); row.appendChild(chk);
       w.appendChild(row);
       const v = el('div', 'wz-key-v'); v.id = 'wz-keyv-' + k.id; w.appendChild(v);
+      if (k.requiredWhenOld) {
+        // Whether this account needs the key at all, in words, and — when it
+        // does not — the one switch the key used to flip, offered on its own.
+        w.appendChild(el('div', 'wz-key-need'));
+        const lab = el('label', 'wz-key-builtin'); lab.hidden = true;
+        const cb = el('input'); cb.type = 'checkbox'; cb.id = 'wz-' + k.id + '-builtin'; cb.checked = true;
+        cb.onchange = () => wzPaintNext();
+        lab.appendChild(cb);
+        lab.appendChild(el('span', '', 'Turn on ' + k.name + ' enrichment with Nuvio’s built-in key if I leave this empty'));
+        w.appendChild(lab);
+        inp.addEventListener('input', () => wzPaintKeyNeed());
+      }
       wzWireCheck({ inp, chk, val: v, card: w }, () => k);
       box.appendChild(w);
     });
     box.dataset.built = '1';
     wzMarkKeysPresent();
+    wzLoadDevices();
   }
 
   // A key the profile already carries is said so on its own row, and the
@@ -6895,6 +7048,7 @@
       if (inp && on) inp.placeholder = 'Paste a new ' + k.name + ' key to replace it';
       else if (inp) inp.placeholder = k.placeholder;
     });
+    wzPaintKeyNeed();
   }
 
   // ---- is this key real? --------------------------------------------------
@@ -7049,13 +7203,44 @@
     const st = $('wz-keys-status'), res = $('wz-keys-res'), btn = $('wz-next');
     clr(res);
     const entered = WZ.KEYS.map(k => ({ k, v: ($('wz-key-' + k.id).value || '').trim() })).filter(x => x.v);
-    const missingRequired = WZ.KEYS.filter(k => k.required && !entered.some(x => x.k.id === k.id) && !wzSavedKeys.has(k.id));
+    const missingRequired = WZ.KEYS.filter(k => wzKeyRequired(k) && !entered.some(x => x.k.id === k.id) && !wzSavedKeys.has(k.id) && !wzHasCred(k.provider));
     if (missingRequired.length) {
-      status(st, missingRequired.map(k => k.name).join(' and ') + ' is required — paste its key first.', 'err');
+      status(st, missingRequired.map(k => k.name).join(' and ') + ' is required on this account — paste its key first.', 'err');
       missingRequired.forEach(k => { const i = $('wz-key-' + k.id); if (i) i.classList.add('wz-need'); });
       return false;
     }
-    if (!entered.length) { status(st, 'Nothing typed in.', 'ok'); return true; }
+    // TMDB left empty where the apps have it built in, with the tick on: no key
+    // to store, but the enrichment switch the key used to flip is still written.
+    const builtin = wzTmdbBuiltinPending() ? wzKeyDef('tmdb') : null;
+    if (!entered.length && !builtin) { status(st, 'Nothing typed in.', 'ok'); return true; }
+    if (!entered.length && builtin) {
+      if (btn) btn.disabled = true;
+      status(st, 'Turning on TMDB enrichment…');
+      try {
+        const flipped = await wzApplyToggles(t, Object.keys(builtin.toggles).map(pl => ({ platform: pl, sets: builtin.toggles[pl] })));
+        const rep = el('div', 'report');
+        const r = el('div', 'rline'); r.innerHTML = '<span class="rk">TMDB (Nuvio’s built-in key)</span>' + (flipped.problems.length ? '<span class="tag rem">not switched on</span>' : '<span class="tag add">switched on</span>');
+        rep.appendChild(r);
+        flipped.notes.forEach(n => rep.appendChild(el('div', 'rline muted', n)));
+        res.appendChild(rep);
+        if (flipped.problems.length) {
+          status(st, flipped.problems.length + ' problem' + (flipped.problems.length === 1 ? '' : 's') + ' — see below.', 'err');
+          const ul = el('ul', 'modal-details'); flipped.problems.forEach(p => ul.appendChild(el('li', '', p))); res.appendChild(ul);
+          logAct('Wizard: TMDB enrichment — ' + flipped.problems.length + ' problem(s)', 'err');
+          return false;
+        }
+        wz.tmdbBuiltin = wzCredKey();
+        status(st, 'TMDB enrichment is on, using Nuvio’s built-in key — checked and confirmed.', 'ok');
+        wzLock();
+        wzLog('Turned on TMDB enrichment with Nuvio’s built-in key.');
+        logAct('Wizard: TMDB enrichment on (built-in key) for ' + t.name, 'ok');
+        inval(t.aid);
+        return true;
+      } catch (e) {
+        status(st, "Couldn't turn TMDB enrichment on: " + e.message, 'err');
+        return false;
+      } finally { if (btn) btn.disabled = false; }
+    }
     if (btn) btn.disabled = true;
     status(st, 'Saving keys…');
     const lines = [], problems = [];
@@ -7083,8 +7268,9 @@
         else wzSavedKeys.set(x.k.id, x.v);
       });
       // 2. the switches that make them do something
-      const flipped = await wzApplyToggles(t, entered.reduce((acc, x) => acc.concat(
+      const flipped = await wzApplyToggles(t, entered.concat(builtin ? [{ k: builtin }] : []).reduce((acc, x) => acc.concat(
         Object.keys(x.k.toggles).map(pl => ({ platform: pl, sets: x.k.toggles[pl] }))), []));
+      if (builtin && !flipped.problems.length) { wz.tmdbBuiltin = wzCredKey(); lines.push({ name: 'TMDB enrichment switched on (Nuvio’s built-in key)', ok: true, note: true }); }
       flipped.notes.forEach(n => lines.push({ name: n, ok: true, note: true }));
       flipped.problems.forEach(p => problems.push(p));
       const rep = el('div', 'report');
@@ -8833,13 +9019,13 @@
     if (step === 'keys') {
       const inp = $('wz-key-tmdb');
       const tmdb = (inp && inp.value || '').trim();
-      if (!tmdb && !wzSavedKeys.has('tmdb') && !wzHasCred('tmdb')) {
-        status($('wz-keys-status'), 'TMDB is required \u2014 paste its key before moving on.', 'err');
+      if (!tmdb && !wzSavedKeys.has('tmdb') && !wzHasCred('tmdb') && wzKeyRequired(wzKeyDef('tmdb'))) {
+        status($('wz-keys-status'), 'TMDB is required on this account \u2014 paste its key before moving on.', 'err');
         if (inp) { inp.classList.add('wz-need'); inp.focus(); }
         return false;
       }
       const anyNew = WZ.KEYS.some(k => { const v = ($('wz-key-' + k.id).value || '').trim(); return v && wzSavedKeys.get(k.id) !== v; });
-      return anyNew ? wzSaveKeys() : true;
+      return (anyNew || wzTmdbBuiltinPending()) ? wzSaveKeys() : true;
     }
     if (step === 'streams' && wz.route === 'native') {
       const key = ($('wz-native-key').value || '').trim();

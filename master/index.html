@@ -1681,6 +1681,14 @@
   .wz-key-v{ font-size:12px; margin-top:8px; line-height:1.5; }
   .wz-key-v.good{ color:var(--ok-soft); } .wz-key-v.bad{ color:var(--danger-soft); } .wz-key-v.unknown{ color:var(--warn-soft); }
   .wz-key-v:empty{ display:none; }
+  /* whether this account needs a TMDB key at all, from its own device list */
+  .wz-key-need{ font-size:12px; margin-top:8px; line-height:1.5; color:var(--t55); max-width:76ch; }
+  .wz-key-need.warn{ color:var(--warn-soft); }
+  .wz-key-need:empty{ display:none; }
+  .wz-key-builtin{ display:flex; align-items:flex-start; gap:8px; margin-top:8px; font-size:12.5px; color:var(--t70, var(--t55)); cursor:pointer; }
+  .wz-key-builtin[hidden]{ display:none; }
+  .wz-key-builtin input{ flex:none; margin-top:2px; }
+  .wz-key-builtin span{ min-width:0; }
 
   /* ---- other people's logos ----------------------------------------------
      One element for every third party the wizard names - TMDB, MDBList, Anime
@@ -3671,12 +3679,12 @@
 <script src="./store.js?v=5e895a2c"></script>
 <script src="./engine.js?v=6e8485a0"></script>
 <script src="./meta.js?v=2fac004b"></script>
-<script src="./nuvio-settings-schema.js?v=e11b5ae1"></script>
+<script src="./nuvio-settings-schema.js?v=1f16802b"></script>
 <script src="./ui-motion.js?v=1b5b5a01"></script>
 <script src="./market.js?v=08b14401"></script>
 <script src="./collections.js?v=4e74c1ec"></script>
-<script src="./wizard.js?v=cbaaef0b"></script>
+<script src="./wizard.js?v=9832dedb"></script>
 <script src="./mascot.js?v=31ee7c10"></script>
-<script src="./app.js?v=7f4c7154"></script>
+<script src="./app.js?v=bd374760"></script>
 </body>
 </html>
